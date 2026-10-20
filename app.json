@@ -55,7 +55,18 @@
       ]
     ],
     "extra": {
-      "router": {}
+      "router": {
+        "headers": {
+          "Cross-Origin-Embedder-Policy": "credentialless",
+          "Cross-Origin-Opener-Policy": "same-origin"
+        },
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "16417576-ddbb-4a19-b5cd-a4453a715d85"
+      }
     }
   }
 }
