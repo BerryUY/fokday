@@ -9,22 +9,19 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
-      },
-      "node": "24.6.0"
+      }
     },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
-      },
-      "node": "24.6.0"
+      }
     },
     "production": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
-      },
-      "node": "24.6.0"
+      }
     }
   }
 }
