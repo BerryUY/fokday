@@ -1,0 +1,15 @@
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+android/
+ios/
+*.apk
+*.aab
+.env
+.env.local
+server/.env
+server/.vercel
+server/node_modules
+coverage/

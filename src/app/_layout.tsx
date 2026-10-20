@@ -1,0 +1,99 @@
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  Inter_800ExtraBold,
+  useFonts,
+} from '@expo-google-fonts/inter';
+import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
+import * as SystemUI from 'expo-system-ui';
+import { useEffect, useState } from 'react';
+import { ScrollView, Text, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { startBackupService } from '@/backup/service';
+import { getProfile, type ThemePreference } from '@/data/settings';
+import { openAppDatabase } from '@/db/client';
+import type { Db } from '@/db/types';
+import { DbProvider, useDataVersion, useDb } from '@/state/db';
+import { ToastProvider } from '@/state/toast';
+import { ThemeProvider, useColors } from '@/theme/ThemeProvider';
+
+void SplashScreen.preventAutoHideAsync().catch(() => {});
+
+export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold });
+  const [db, setDb] = useState<Db | null>(null);
+  const [dbError, setDbError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    openAppDatabase().then(setDb).catch((e: Error) => setDbError(e));
+  }, []);
+
+  useEffect(() => {
+    if (db) return startBackupService(db);
+  }, [db]);
+
+  const ready = (fontsLoaded || !!fontError) && (!!db || !!dbError);
+  useEffect(() => {
+    if (ready) void SplashScreen.hideAsync().catch(() => {});
+  }, [ready]);
+
+  if (!ready) return null;
+
+  if (dbError || !db) {
+    return (
+      <ScrollView style={{ flex: 1, backgroundColor: '#09090A' }} contentContainerStyle={{ padding: 24, paddingTop: 80 }}>
+        <Text style={{ color: '#F5F5F4', fontSize: 22, fontWeight: '700', marginBottom: 12 }}>No se pudo abrir la base de datos</Text>
+        <Text style={{ color: '#A1A1A6', fontSize: 15, lineHeight: 22 }}>
+          Tus datos no se modificaron. Cerrá y volvé a abrir la app. Si el problema sigue, instalá la última versión del APK.
+        </Text>
+        <Text style={{ color: '#6B6B72', fontSize: 13, marginTop: 20 }}>{dbError?.message}</Text>
+      </ScrollView>
+    );
+  }
+
+  return (
+    <SafeAreaProvider>
+      <DbProvider db={db}>
+        <ThemedApp />
+      </DbProvider>
+    </SafeAreaProvider>
+  );
+}
+
+function ThemedApp() {
+  const db = useDb();
+  const version = useDataVersion();
+  const [preference, setPreference] = useState<ThemePreference>('dark');
+
+  useEffect(() => {
+    getProfile(db).then((p) => setPreference(p.theme)).catch(() => {});
+  }, [db, version]);
+
+  return (
+    <ThemeProvider preference={preference}>
+      <ToastProvider>
+        <Navigator />
+      </ToastProvider>
+    </ThemeProvider>
+  );
+}
+
+function Navigator() {
+  const c = useColors();
+  useEffect(() => {
+    void SystemUI.setBackgroundColorAsync(c.bg).catch(() => {});
+  }, [c.bg]);
+  return (
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <StatusBar style={c.scheme === 'dark' ? 'light' : 'dark'} />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg }, animation: 'slide_from_right' }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="sesion/activa" options={{ gestureEnabled: false }} />
+      </Stack>
+    </View>
+  );
+}
