@@ -13,3 +13,6 @@ server/.env
 server/.vercel
 server/node_modules
 coverage/
+
+# Momentum invite code (share it only with people you invite)
+codigo-invitacion.txt

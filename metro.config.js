@@ -3,9 +3,9 @@ const { getDefaultConfig } = require('expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
 
-// The backup API in ./server is a separate Vercel project; keep it out of the app bundle.
+// The backup API in ./supabase runs on Supabase Edge Functions (Deno); keep it out of the app bundle.
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const serverDir = escape(path.join(__dirname, 'server')).replace(/\\\\|\//g, '[\\\\/]');
+const serverDir = escape(path.join(__dirname, 'supabase')).replace(/\\\\|\//g, '[\\\\/]');
 config.resolver.blockList = [new RegExp(`^${serverDir}[\\\\/].*`)];
 
 // expo-sqlite on web (used only for local UI previews) loads a .wasm build.

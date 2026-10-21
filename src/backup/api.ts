@@ -57,7 +57,7 @@ async function request<T>(config: { url: string; token?: string }, path: string,
   if (!res.ok) {
     const serverMsg = (body as { error?: string } | null)?.error;
     const msg =
-      res.status === 401 ? 'El token no es válido. Revisalo en Ajustes → Respaldo.'
+      res.status === 401 ? 'El código de recuperación (token) no es válido. Revisalo en Ajustes → Datos y respaldo.'
       : res.status === 413 ? 'El respaldo es más grande de lo que acepta el servidor.'
       : serverMsg ?? `El servidor respondió con un error (${res.status}).`;
     throw new ApiError(msg, res.status);
@@ -84,7 +84,17 @@ export const cloudApi = {
     return request<{ backups: CloudBackupMeta[] }>(config, 'backups', {}, fetchImpl);
   },
 
-  upload(config: CloudConfig, id: string, envelope: BackupEnvelope, fetchImpl?: FetchLike) {
+  /** Removes this person's profile and every backup from the server. */
+  deleteProfile(config: CloudConfig, fetchImpl?: FetchLike) {
+    return request<{ deleted: true }>(config, 'profiles/me', { method: 'DELETE' }, fetchImpl);
+  },
+
+  /** Issues a new recovery code; the old one stops working right away. */
+  rotateToken(config: CloudConfig, fetchImpl?: FetchLike) {
+    return request<{ token: string }>(config, 'profiles/me/token', { method: 'POST' }, fetchImpl);
+  },
+
+  upload(config: CloudConfig, id: string, envelope: BackupEnvelope, fetchImpl?: FetchLike, manual = false) {
     const s = envelope.snapshot;
     return request<{ id: string; duplicate: boolean; receivedAt: string }>(
       config,
@@ -100,6 +110,7 @@ export const cloudApi = {
           counts: s.counts,
           checksum: envelope.checksum,
           snapshot: s,
+          manual,
         }),
       },
       fetchImpl,

@@ -114,7 +114,7 @@ export async function runBackup(deps: SyncDeps, opts: { manual?: boolean } = {})
       await setMeta(db, 'pending_backup_revision', String(snapshot.localRevision));
     }
 
-    const res = await cloudApi.upload(config, id, envelope, deps.fetchImpl);
+    const res = await cloudApi.upload(config, id, envelope, deps.fetchImpl, !!opts.manual);
     const at = res.receivedAt ?? new Date().toISOString();
     // Only what was in the snapshot is safe: writes made during the upload stay pending.
     await setMeta(db, 'backed_up_revision', String(snapshot.localRevision));

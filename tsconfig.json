@@ -19,6 +19,7 @@
   ],
   "exclude": [
     "node_modules",
-    "server"
+    "supabase/functions/momentum/index.ts",
+    "supabase/functions/momentum/store.ts"
   ]
 }
