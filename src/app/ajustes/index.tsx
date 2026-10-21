@@ -1,18 +1,25 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Switch, View } from 'react-native';
 import { useSyncState } from '@/backup/service';
 import { Field, Stepper } from '@/components/ui/form';
 import { ListRow, Loading, Screen } from '@/components/ui/layout';
 import { Button, Card, Chip, Divider, Row, SectionHeader, Segmented, T } from '@/components/ui/primitives';
-import { getGoalForDate, getProfile, setGoalsFrom, updateProfile, type Profile, type ThemePreference } from '@/data/settings';
+import { getGoalForDate, getProfile, HABIT_FEATURES, setGoalsFrom, updateProfile, type FeatureKey, type Profile, type ThemePreference } from '@/data/settings';
+import { EXTRA_NUTRIENTS } from '@/domain/nutrition';
+import { useColors } from '@/theme/ThemeProvider';
 import { listWeights, saveWeight } from '@/data/weight';
 import { latestEntry } from '@/domain/weight';
 import { DAY_SHORT, formatDateTime, formatShort, todayKey, WEEK_ORDER } from '@/lib/dates';
 import { formatKg, parsePositive, toInput } from '@/lib/format';
 import { useMutation, useQuery } from '@/state/db';
 import { space } from '@/theme/tokens';
+
+const OPTIONAL_FEATURES: { key: FeatureKey; label: string; description: string }[] = [
+  ...HABIT_FEATURES,
+  ...EXTRA_NUTRIENTS.map((n) => ({ key: n.key as FeatureKey, label: n.label, description: `Sumar ${n.label.toLowerCase()} (${n.unit}) a cada comida y al día` })),
+];
 
 export default function SettingsScreen() {
   const { data } = useQuery(async (db) => {
@@ -29,6 +36,7 @@ function SettingsForm({ profile, calories, protein, latest }: {
   protein: number;
   latest: { date: string; weight: number } | null;
 }) {
+  const c = useColors();
   const run = useMutation();
   const sync = useSyncState();
   const [name, setName] = useState(profile.name);
@@ -128,6 +136,46 @@ function SettingsForm({ profile, calories, protein, latest }: {
             format={(v) => `${v} s`}
           />
         </Row>
+      </Card>
+
+      <SectionHeader title="Seguimiento opcional" style={{ marginTop: space.xl }} />
+      <Card>
+        <T variant="caption" tone="dim" style={{ marginBottom: space.md }}>
+          Activá solo lo que necesites. Lo que dejes apagado no aparece en la app.
+        </T>
+        {OPTIONAL_FEATURES.map((f, i) => (
+          <View key={f.key}>
+            {i > 0 ? <Divider style={{ marginVertical: space.md }} /> : null}
+            <Row style={{ justifyContent: 'space-between' }}>
+              <View style={{ flex: 1, paddingRight: space.md }}>
+                <T variant="bodyMedium">{f.label}</T>
+                <T variant="caption" tone="dim">{f.description}</T>
+              </View>
+              <Switch
+                value={profile.features.includes(f.key)}
+                onValueChange={(on) =>
+                  run((db) => updateProfile(db, { features: on ? [...profile.features, f.key] : profile.features.filter((k) => k !== f.key) }), { silent: true })
+                }
+                trackColor={{ true: c.accent, false: c.track }}
+                thumbColor="#FFFFFF"
+                accessibilityLabel={f.label}
+              />
+            </Row>
+            {f.key === 'water' && profile.features.includes('water') ? (
+              <Row style={{ justifyContent: 'space-between', marginTop: space.md }}>
+                <T variant="label" tone="muted">Meta diaria</T>
+                <Stepper
+                  value={profile.waterGoalMl}
+                  onChange={(v) => run((db) => updateProfile(db, { waterGoalMl: v }), { silent: true })}
+                  min={500}
+                  max={6000}
+                  step={250}
+                  format={(v) => `${formatKg(v / 1000)} L`}
+                />
+              </Row>
+            ) : null}
+          </View>
+        ))}
       </Card>
 
       <SectionHeader title="Apariencia" style={{ marginTop: space.xl }} />

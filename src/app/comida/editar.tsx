@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { goBack } from '@/lib/nav';
 import { useEffect, useState } from 'react';
 import { Switch, View } from 'react-native';
+import { ExtraFields, extrasToTexts, textsToExtras, type ExtraTexts } from '@/components/ExtraFields';
 import { Field, confirm } from '@/components/ui/form';
 import { Loading, Screen } from '@/components/ui/layout';
 import { Button, Card, Chip, Row, T } from '@/components/ui/primitives';
@@ -10,6 +11,7 @@ import { MEAL_CATEGORIES, type MealCategory } from '@/domain/nutrition';
 import { parseNonNegative, toInput } from '@/lib/format';
 import { useParams } from '@/lib/params';
 import { useDb, useMutation } from '@/state/db';
+import { useFeatures } from '@/state/features';
 import { useColors } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
 
@@ -31,11 +33,14 @@ export default function EditMealScreen() {
   const [ingredients, setIngredients] = useState('');
   const [estimate, setEstimate] = useState(false);
   const [saving, setSaving] = useState(false);
+  const { features } = useFeatures();
+  const [extraTexts, setExtraTexts] = useState<ExtraTexts>({});
 
   useEffect(() => {
     if (!id) return;
     getMeal(db, id).then((m) => {
       if (m) {
+        setExtraTexts(extrasToTexts(m.extras));
         setName(m.name);
         setCategory(m.category);
         setKcal(toInput(m.calories, 0));
@@ -71,6 +76,7 @@ export default function EditMealScreen() {
             prepMinutes: prepMinutes === null ? null : Math.round(prepMinutes),
             notes,
             ingredients: ingredients.split('\n'),
+            extras: textsToExtras(extraTexts, features),
           },
           id,
         ),
@@ -120,6 +126,7 @@ export default function EditMealScreen() {
             <Field label="Proteína (1×)" value={prot} onChangeText={setProt} keyboardType="decimal-pad" suffix="g" error={prot && protein === null ? 'Número inválido' : null} />
           </View>
         </Row>
+        <ExtraFields enabled={features} value={extraTexts} onChange={setExtraTexts} />
         <Row style={{ justifyContent: 'space-between' }}>
           <View style={{ flex: 1 }}>
             <T variant="bodyMedium">Valores estimados</T>

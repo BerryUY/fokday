@@ -3,6 +3,7 @@ import { goBack } from '@/lib/nav';
 import { useState } from 'react';
 import { Switch, View } from 'react-native';
 import { DateChip } from '@/components/DatePicker';
+import { ExtraFields, textsToExtras, type ExtraTexts } from '@/components/ExtraFields';
 import { Field } from '@/components/ui/form';
 import { Screen } from '@/components/ui/layout';
 import { Button, Card, Chip, Row, T } from '@/components/ui/primitives';
@@ -12,6 +13,7 @@ import { MEAL_CATEGORIES, type MealCategory } from '@/domain/nutrition';
 import { formatKcal, parseNonNegative } from '@/lib/format';
 import { useParams } from '@/lib/params';
 import { useMutation } from '@/state/db';
+import { useFeatures } from '@/state/features';
 import { useColors } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
 
@@ -28,6 +30,8 @@ export default function ManualMealScreen() {
   const [notes, setNotes] = useState('');
   const [saveToCatalog, setSaveToCatalog] = useState(false);
   const [saving, setSaving] = useState(false);
+  const { features } = useFeatures();
+  const [extraTexts, setExtraTexts] = useState<ExtraTexts>({});
 
   const calories = parseNonNegative(kcal);
   const protein = parseNonNegative(prot);
@@ -36,12 +40,13 @@ export default function ManualMealScreen() {
   const save = async () => {
     if (!valid) return;
     setSaving(true);
+    const extras = textsToExtras(extraTexts, features);
     const ok = await run(
       async (db) => {
         if (saveToCatalog) {
-          await saveMeal(db, { name, category, calories: calories!, protein: protein!, isEstimate: true, ingredients: [], notes: null });
+          await saveMeal(db, { name, category, calories: calories!, protein: protein!, isEstimate: true, ingredients: [], notes: null, extras });
         }
-        return logMeal(db, { date, category, notes, manual: { name, calories: calories!, protein: protein! } });
+        return logMeal(db, { date, category, notes, manual: { name, calories: calories!, protein: protein!, extras } });
       },
       { success: `${name.trim()} registrado · ${formatKcal(calories ?? 0)} kcal` },
     );
@@ -67,6 +72,7 @@ export default function ManualMealScreen() {
             <Field label="Proteína aprox." value={prot} onChangeText={setProt} keyboardType="decimal-pad" suffix="g" error={prot && protein === null ? 'Número inválido' : null} />
           </View>
         </Row>
+        <ExtraFields enabled={features} value={extraTexts} onChange={setExtraTexts} />
         <View style={{ gap: 6 }}>
           <T variant="label" tone="muted">Momento del día</T>
           <Row style={{ flexWrap: 'wrap' }}>

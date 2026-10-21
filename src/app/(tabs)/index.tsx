@@ -5,6 +5,8 @@ import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSyncState } from '@/backup/service';
 import { WeekStrip } from '@/components/calendar';
+import { ExtraTotals } from '@/components/ExtraTotals';
+import { HabitsCard } from '@/components/HabitsCard';
 import { NutritionRings } from '@/components/nutrition';
 import { Loading, Screen } from '@/components/ui/layout';
 import { Badge, Button, Card, IconButton, PressableScale, Row, SectionHeader, T } from '@/components/ui/primitives';
@@ -73,8 +75,13 @@ export default function HomeScreen() {
             <T variant="caption" tone="dim">{totals.entries === 0 ? 'Nada registrado aún' : `${totals.entries} ${totals.entries === 1 ? 'registro' : 'registros'}`}</T>
           </Row>
           <NutritionRings calories={totals.calories} protein={totals.protein} calorieTarget={goal.calories} proteinTarget={goal.protein} />
+          <ExtraTotals extras={totals.extras} />
           <Button label="Registrar comida" icon="plus" onPress={() => router.push('/comidas')} style={{ marginTop: space.xl }} />
         </Card>
+      </Animated.View>
+
+      <Animated.View entering={FadeInDown.delay(100).duration(380)} style={{ marginTop: space.lg }}>
+        <HabitsCard date={today} />
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(140).duration(380)} style={{ marginTop: space.lg }}>
