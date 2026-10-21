@@ -9,7 +9,7 @@ import { Button, Card, Chip, Divider, IconButton, PressableScale, Row, SectionHe
 import { WeightGoalCard } from '@/components/weight';
 import { getProfile } from '@/data/settings';
 import { addMilestone, deleteMilestone, listMilestones, listWeights } from '@/data/weight';
-import { changeFromPrevious, changeOverDays, latestEntry, milestoneStatus, rollingAverage, weightProgress } from '@/domain/weight';
+import { changeFromPrevious, changeOverDays, latestEntry, milestoneStatus, rollingAverage, weightDirection, weightProgress } from '@/domain/weight';
 import { addDays, capitalize, formatLong, formatShortWithYear, todayKey } from '@/lib/dates';
 import { formatKg, formatSigned, parsePositive } from '@/lib/format';
 import { useMutation, useQuery } from '@/state/db';
@@ -37,7 +37,7 @@ export default function WeightScreen() {
   const from = range === 'all' ? null : addDays(todayKey(), -Number(range));
   const points = weights.filter((w) => !from || w.date >= from).map((w) => ({ date: w.date, value: w.weight }));
   const avg = rollingAverage(weights).filter((w) => !from || w.date >= from).map((w) => ({ date: w.date, value: w.weight }));
-  const statuses = milestoneStatus(milestones.map((m) => m.weight), weights);
+  const statuses = milestoneStatus(milestones.map((m) => m.weight), weights, weightDirection(profile.startWeight, profile.targetWeight));
   const prev = changeFromPrevious(weights);
   const week = changeOverDays(weights, 7);
   const month = changeOverDays(weights, 30);

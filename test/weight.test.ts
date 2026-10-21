@@ -5,6 +5,7 @@ import { createTestDb } from './helpers/db';
 describe('weight progress', () => {
   it('has no current weight until something is measured (no fake values)', () => {
     expect(weightProgress(57, 65, [])).toEqual({
+      direction: 'gain',
       start: 57, target: 65, current: null, gained: null, remaining: null, progress: null, reached: false,
     });
   });
@@ -79,5 +80,24 @@ describe('weight entries', () => {
     await addMilestone(db, 60, 'Renombrado');
     const ms = await listMilestones(db);
     expect(ms).toEqual([expect.objectContaining({ weight: 60, label: 'Renombrado' })]);
+  });
+});
+
+describe('weight goals in any direction', () => {
+  it('tracks losing weight', () => {
+    const p = weightProgress(80, 70, [{ date: '2026-09-01', weight: 80 }, { date: '2026-09-10', weight: 75 }]);
+    expect(p).toMatchObject({ direction: 'lose', gained: -5, remaining: 5, progress: 0.5, reached: false });
+    expect(weightProgress(80, 70, [{ date: '2026-09-20', weight: 69.8 }])).toMatchObject({ remaining: 0, progress: 1, reached: true });
+    expect(weightProgress(80, 70, [{ date: '2026-09-20', weight: 81 }])).toMatchObject({ progress: 0, remaining: 11, reached: false });
+  });
+
+  it('treats a target at the start weight as maintaining, within 1 kg', () => {
+    expect(weightProgress(70, 70, [{ date: '2026-09-01', weight: 70.8 }])).toMatchObject({ direction: 'maintain', reached: true, remaining: 0.8 });
+    expect(weightProgress(70, 70, [{ date: '2026-09-01', weight: 73 }])).toMatchObject({ direction: 'maintain', reached: false, remaining: 3 });
+  });
+
+  it('reaches lower milestones when losing weight', () => {
+    const status = milestoneStatus([78, 75], [{ date: '2026-09-01', weight: 79 }, { date: '2026-09-05', weight: 77.5 }], 'lose');
+    expect(status).toEqual([{ weight: 78, achievedOn: '2026-09-05' }, { weight: 75, achievedOn: null }]);
   });
 });

@@ -65,7 +65,6 @@ function SettingsForm({ profile, calories, protein, latest }: {
     run(
       async (db) => {
         if (!startValue || !targetValue) throw new Error('Revisá el peso de inicio y la meta.');
-        if (targetValue <= startValue) throw new Error('La meta tiene que ser mayor que el peso de inicio (objetivo: ganar peso).');
         await updateProfile(db, { name, startWeight: startValue, targetWeight: targetValue });
         if (kcalValue && protValue && (kcalValue !== calories || protValue !== protein)) await setGoalsFrom(db, todayKey(), kcalValue, protValue);
       },

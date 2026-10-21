@@ -2,13 +2,25 @@ import { addDays, type DateKey } from '@/lib/dates';
 
 export type WeightPoint = { date: DateKey; weight: number };
 
+export type WeightDirection = 'gain' | 'lose' | 'maintain';
+
+/** Which way the goal points. A target within 0.5 kg of the start means keeping the weight. */
+export function weightDirection(start: number, target: number): WeightDirection {
+  const d = target - start;
+  return Math.abs(d) < 0.5 ? 'maintain' : d > 0 ? 'gain' : 'lose';
+}
+
+/** Keeping the weight counts as on target within this margin (normal day-to-day variation). */
+export const MAINTAIN_MARGIN_KG = 1;
+
 export type WeightProgress = {
+  direction: WeightDirection;
   start: number;
   target: number;
   current: number | null;
   /** current − start (can be negative). null without measurements. */
   gained: number | null;
-  /** target − current, never below 0. */
+  /** Distance still to go toward the target, never below 0 (for maintaining: distance from the target). */
   remaining: number | null;
   /** 0..1 share of the start→target distance covered. */
   progress: number | null;
@@ -16,16 +28,22 @@ export type WeightProgress = {
 };
 
 export function weightProgress(start: number, target: number, entries: WeightPoint[]): WeightProgress {
+  const direction = weightDirection(start, target);
   const latest = latestEntry(entries);
   if (!latest) {
-    return { start, target, current: null, gained: null, remaining: null, progress: null, reached: false };
+    return { direction, start, target, current: null, gained: null, remaining: null, progress: null, reached: false };
   }
   const current = latest.weight;
-  const span = target - start;
   const gained = round1(current - start);
-  const remaining = round1(Math.max(0, target - current));
-  const progress = span > 0 ? clamp01((current - start) / span) : current >= target ? 1 : 0;
-  return { start, target, current, gained, remaining, progress, reached: current >= target };
+  if (direction === 'maintain') {
+    const off = round1(Math.abs(current - target));
+    const reached = off <= MAINTAIN_MARGIN_KG;
+    return { direction, start, target, current, gained, remaining: off, progress: reached ? 1 : clamp01(1 - (off - MAINTAIN_MARGIN_KG) / 5), reached };
+  }
+  const sign = direction === 'gain' ? 1 : -1;
+  const remaining = round1(Math.max(0, (target - current) * sign));
+  const progress = clamp01(((current - start) * sign) / Math.abs(target - start));
+  return { direction, start, target, current, gained, remaining, progress, reached: (current - target) * sign >= 0 };
 }
 
 export function latestEntry(entries: WeightPoint[]): WeightPoint | null {
@@ -80,12 +98,13 @@ export function changeFromPrevious(entries: WeightPoint[]): number | null {
 
 export type MilestoneStatus = { weight: number; achievedOn: DateKey | null };
 
-/** A milestone counts as reached on the first day a real measurement hit it. */
-export function milestoneStatus(milestoneWeights: number[], entries: WeightPoint[]): MilestoneStatus[] {
+/** A milestone counts as reached on the first day a real measurement hit it (going up, or down when losing weight). */
+export function milestoneStatus(milestoneWeights: number[], entries: WeightPoint[], direction: WeightDirection = 'gain'): MilestoneStatus[] {
   const sorted = sortByDate(entries);
+  const losing = direction === 'lose';
   return [...milestoneWeights]
-    .sort((a, b) => a - b)
-    .map((weight) => ({ weight, achievedOn: sorted.find((e) => e.weight >= weight)?.date ?? null }));
+    .sort((a, b) => (losing ? b - a : a - b))
+    .map((weight) => ({ weight, achievedOn: sorted.find((e) => (losing ? e.weight <= weight : e.weight >= weight))?.date ?? null }));
 }
 
 const round1 = (v: number) => Math.round(v * 10) / 10;

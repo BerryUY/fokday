@@ -16,6 +16,8 @@ export function WeightGoalCard({ progress, lastDate, onPress, onLog }: {
 }) {
   const c = useColors();
   const { current, target, start, gained, remaining } = progress;
+  // Kilos moved in the goal's direction (losing 2 kg toward a lower target shows as +2).
+  const towardGoal = (gained ?? 0) * (progress.direction === 'lose' ? -1 : 1);
   return (
     <Card onPress={onPress} style={{ padding: space.xl }}>
       <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -51,8 +53,21 @@ export function WeightGoalCard({ progress, lastDate, onPress, onLog }: {
 
       {current !== null ? (
         <Row style={{ marginTop: space.lg, gap: space.md }}>
-          <Stat label="Ganados" value={`${formatSigned(gained ?? 0)} kg`} color={(gained ?? 0) >= 0 ? c.accent : c.textMuted} />
-          <Stat label="Faltan" value={progress.reached ? '¡Meta alcanzada!' : `${formatKg(remaining ?? 0)} kg`} color={c.text} />
+          {progress.direction === 'maintain' ? (
+            <>
+              <Stat label="Cambio" value={`${formatSigned(gained ?? 0)} kg`} color={c.text} />
+              <Stat label="Estado" value={progress.reached ? 'En tu peso' : `A ${formatKg(remaining ?? 0)} kg`} color={progress.reached ? c.accent : c.text} />
+            </>
+          ) : (
+            <>
+              <Stat
+                label={progress.direction === 'lose' ? 'Bajados' : 'Ganados'}
+                value={`${formatSigned(towardGoal)} kg`}
+                color={towardGoal >= 0 ? c.accent : c.textMuted}
+              />
+              <Stat label="Faltan" value={progress.reached ? '¡Meta alcanzada!' : `${formatKg(remaining ?? 0)} kg`} color={c.text} />
+            </>
+          )}
         </Row>
       ) : onLog ? (
         <View style={{ marginTop: space.lg }}>
