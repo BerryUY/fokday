@@ -1,8 +1,10 @@
 import type { DataTable } from '@/db/schema';
 import { BACKUP_FORMAT, type BackupEnvelope, type Snapshot } from './snapshot';
 
-/** Where the personal backup API lives and the token that unlocks it. Stored in SecureStore. */
+/** Where the backup API lives and the personal token that unlocks this person's backups. Stored in SecureStore. */
 export type CloudConfig = { url: string; token: string };
+
+export type CloudProfile = { id: string; name: string; plan: string; createdAt: string };
 
 export type CloudBackupMeta = {
   id: string;
@@ -30,7 +32,7 @@ export function normalizeBaseUrl(url: string): string {
   return url.trim().replace(/\/+$/, '').replace(/\/api$/, '');
 }
 
-async function request<T>(config: CloudConfig, path: string, init: RequestInit = {}, fetchImpl: FetchLike = fetch): Promise<T> {
+async function request<T>(config: { url: string; token?: string }, path: string, init: RequestInit = {}, fetchImpl: FetchLike = fetch): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   let res: Response;
@@ -38,7 +40,7 @@ async function request<T>(config: CloudConfig, path: string, init: RequestInit =
     res = await fetchImpl(`${normalizeBaseUrl(config.url)}/api/${path}`, {
       ...init,
       signal: controller.signal,
-      headers: { Authorization: `Bearer ${config.token}`, 'Content-Type': 'application/json', ...(init.headers ?? {}) },
+      headers: { ...(config.token ? { Authorization: `Bearer ${config.token}` } : {}), 'Content-Type': 'application/json', ...(init.headers ?? {}) },
     });
   } catch (e) {
     throw new ApiError(controller.signal.aborted ? 'El servidor tardó demasiado en responder.' : 'No se pudo conectar con el servidor de respaldo.', null);
@@ -64,8 +66,18 @@ async function request<T>(config: CloudConfig, path: string, init: RequestInit =
 }
 
 export const cloudApi = {
+  /** Creates this person's profile. The returned token is shown only once: the app stores it right away. */
+  createProfile(url: string, inviteCode: string, name: string, fetchImpl?: FetchLike) {
+    return request<{ profile: CloudProfile; token: string }>(
+      { url },
+      'profiles',
+      { method: 'POST', body: JSON.stringify({ inviteCode, name }) },
+      fetchImpl,
+    );
+  },
+
   status(config: CloudConfig, fetchImpl?: FetchLike) {
-    return request<{ ok: true; count: number; latest: CloudBackupMeta | null }>(config, 'status', {}, fetchImpl);
+    return request<{ ok: true; profile: CloudProfile; count: number; latest: CloudBackupMeta | null }>(config, 'status', {}, fetchImpl);
   },
 
   list(config: CloudConfig, fetchImpl?: FetchLike) {

@@ -1,10 +1,14 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 
 /**
  * Backup API logic, independent of Vercel and Postgres so it can be unit-tested.
- * One user, one token, versioned full snapshots. Nothing here ever deletes the
- * newest backups: pruning only removes the oldest beyond the retention limit.
+ * Each person has a profile with its own secret token (only its hash is stored) and
+ * versioned full snapshots that nobody else can read. Profiles are created with an
+ * invite code. Nothing here ever deletes the newest backups: pruning only removes the
+ * oldest beyond the retention limit.
  */
+
+export type Profile = { id: string; name: string; plan: string; createdAt: string };
 
 export type BackupMeta = {
   id: string;
@@ -22,19 +26,22 @@ export type NewBackup = Omit<BackupMeta, 'receivedAt'> & { payload: string };
 
 export interface BackupStore {
   ensureSchema(): Promise<void>;
-  count(): Promise<number>;
-  list(limit: number): Promise<BackupMeta[]>;
-  get(id: string | 'latest'): Promise<(BackupMeta & { payload: string }) | null>;
+  countProfiles(): Promise<number>;
+  createProfile(profile: { id: string; name: string; tokenHash: string }): Promise<Profile>;
+  findProfileByTokenHash(tokenHash: string): Promise<Profile | null>;
+  count(profileId: string): Promise<number>;
+  list(profileId: string, limit: number): Promise<BackupMeta[]>;
+  get(profileId: string, id: string | 'latest'): Promise<(BackupMeta & { payload: string }) | null>;
   /** Inserts unless the id exists. Returns the stored receivedAt either way. */
-  insert(backup: NewBackup): Promise<{ inserted: boolean; receivedAt: string }>;
-  /** Deletes all but the newest `keep` backups. */
-  prune(keep: number): Promise<number>;
+  insert(profileId: string, backup: NewBackup): Promise<{ inserted: boolean; receivedAt: string }>;
+  /** Deletes all but the profile's newest `keep` backups. */
+  prune(profileId: string, keep: number): Promise<number>;
 }
 
 export type ApiRequest = { method: string; headers: Record<string, string | string[] | undefined>; body: unknown; id?: string };
 export type ApiResponse = { status: number; json?: unknown; raw?: string };
 
-export type Env = { token: string | undefined; maxBackups: number };
+export type Env = { inviteCode: string | undefined; maxBackups: number; maxProfiles: number };
 
 /** Vercel rejects request bodies over 4.5 MB; stay a little under. */
 export const MAX_PAYLOAD_BYTES = 4_400_000;
@@ -43,35 +50,56 @@ const HEX64 = /^[0-9a-f]{64}$/;
 
 const sha256 = (s: string) => createHash('sha256').update(s, 'utf8').digest();
 
-export function checkAuth(header: string | string[] | undefined, token: string | undefined): ApiResponse | null {
-  if (!token || token.length < 32) {
-    return { status: 500, json: { error: 'El servidor no tiene configurado MOMENTUM_API_TOKEN (mínimo 32 caracteres).' } };
-  }
+const tokenHash = (token: string) => sha256(token).toString('hex');
+
+// Compare fixed-length digests so the check takes the same time for any input.
+const sameSecret = (a: string, b: string) => timingSafeEqual(sha256(a), sha256(b));
+
+/** Finds the profile that owns the Bearer token, or the 401 to answer with. */
+export async function authenticate(header: string | string[] | undefined, store: BackupStore): Promise<{ profile: Profile } | { denied: ApiResponse }> {
   const value = Array.isArray(header) ? header[0] : header;
-  const given = value?.startsWith('Bearer ') ? value.slice(7) : '';
-  // Compare fixed-length digests so the check takes the same time for any input.
-  if (!given || !timingSafeEqual(sha256(given), sha256(token))) {
-    return { status: 401, json: { error: 'Token inválido.' } };
-  }
-  return null;
+  const given = value?.startsWith('Bearer ') ? value.slice(7).trim() : '';
+  if (given.length < 32) return { denied: { status: 401, json: { error: 'Token inválido.' } } };
+  await store.ensureSchema();
+  const profile = await store.findProfileByTokenHash(tokenHash(given));
+  return profile ? { profile } : { denied: { status: 401, json: { error: 'Token inválido.' } } };
 }
 
-export async function handleStatus(req: ApiRequest, store: BackupStore, env: Env): Promise<ApiResponse> {
-  const denied = checkAuth(req.headers.authorization, env.token);
-  if (denied) return denied;
-  if (req.method !== 'GET') return { status: 405, json: { error: 'Método no permitido.' } };
+/** Creates a profile (and its secret token, shown to the person only once). Needs the owner's invite code. */
+export async function handleProfiles(req: ApiRequest, store: BackupStore, env: Env): Promise<ApiResponse> {
+  if (req.method !== 'POST') return { status: 405, json: { error: 'Método no permitido.' } };
+  if (!env.inviteCode || env.inviteCode.length < 8) {
+    return { status: 500, json: { error: 'El servidor no tiene configurado INVITE_CODE (mínimo 8 caracteres).' } };
+  }
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  if (typeof body.inviteCode !== 'string' || !sameSecret(body.inviteCode.trim(), env.inviteCode)) {
+    return { status: 403, json: { error: 'El código de invitación no es válido.' } };
+  }
+  const name = typeof body.name === 'string' ? body.name.trim().slice(0, 60) : '';
   await store.ensureSchema();
-  const [count, latest] = await Promise.all([store.count(), store.list(1)]);
-  return { status: 200, json: { ok: true, count, latest: latest[0] ?? null } };
+  if ((await store.countProfiles()) >= env.maxProfiles) {
+    return { status: 403, json: { error: 'Se alcanzó el máximo de perfiles de este servidor.' } };
+  }
+  const token = `mom_${randomBytes(32).toString('hex')}`;
+  const profile = await store.createProfile({ id: randomUUID(), name: name || 'Sin nombre', tokenHash: tokenHash(token) });
+  return { status: 201, json: { profile, token } };
+}
+
+export async function handleStatus(req: ApiRequest, store: BackupStore, _env: Env): Promise<ApiResponse> {
+  const auth = await authenticate(req.headers.authorization, store);
+  if ('denied' in auth) return auth.denied;
+  if (req.method !== 'GET') return { status: 405, json: { error: 'Método no permitido.' } };
+  const [count, latest] = await Promise.all([store.count(auth.profile.id), store.list(auth.profile.id, 1)]);
+  return { status: 200, json: { ok: true, profile: auth.profile, count, latest: latest[0] ?? null } };
 }
 
 export async function handleBackups(req: ApiRequest, store: BackupStore, env: Env): Promise<ApiResponse> {
-  const denied = checkAuth(req.headers.authorization, env.token);
-  if (denied) return denied;
-  await store.ensureSchema();
+  const auth = await authenticate(req.headers.authorization, store);
+  if ('denied' in auth) return auth.denied;
+  const profileId = auth.profile.id;
 
   if (req.method === 'GET') {
-    return { status: 200, json: { backups: await store.list(50) } };
+    return { status: 200, json: { backups: await store.list(profileId, 50) } };
   }
   if (req.method !== 'POST') return { status: 405, json: { error: 'Método no permitido.' } };
 
@@ -90,7 +118,7 @@ export async function handleBackups(req: ApiRequest, store: BackupStore, env: En
     return { status: 400, json: { error: 'El respaldo llegó dañado (checksum no coincide). Se reintentará.' } };
   }
 
-  const result = await store.insert({
+  const result = await store.insert(profileId, {
     id,
     deviceId: String(deviceId ?? ''),
     schemaVersion: Number(schemaVersion) || 0,
@@ -101,18 +129,17 @@ export async function handleBackups(req: ApiRequest, store: BackupStore, env: En
     createdAt,
     payload,
   });
-  if (result.inserted) await store.prune(env.maxBackups);
+  if (result.inserted) await store.prune(profileId, env.maxBackups);
   return { status: result.inserted ? 201 : 200, json: { id, duplicate: !result.inserted, receivedAt: result.receivedAt } };
 }
 
-export async function handleBackupById(req: ApiRequest, store: BackupStore, env: Env): Promise<ApiResponse> {
-  const denied = checkAuth(req.headers.authorization, env.token);
-  if (denied) return denied;
+export async function handleBackupById(req: ApiRequest, store: BackupStore, _env: Env): Promise<ApiResponse> {
+  const auth = await authenticate(req.headers.authorization, store);
+  if ('denied' in auth) return auth.denied;
   if (req.method !== 'GET') return { status: 405, json: { error: 'Método no permitido.' } };
   const id = req.id ?? '';
   if (id !== 'latest' && !UUID.test(id)) return { status: 400, json: { error: 'id inválido.' } };
-  await store.ensureSchema();
-  const backup = await store.get(id);
+  const backup = await store.get(auth.profile.id, id);
   if (!backup) return { status: 404, json: { error: 'No hay ningún respaldo con ese id.' } };
   const { payload, ...meta } = backup;
   // The snapshot is sent byte-for-byte as stored, so the app's checksum check is exact.

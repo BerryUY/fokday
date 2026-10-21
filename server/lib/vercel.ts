@@ -3,7 +3,11 @@ import type { ApiRequest, ApiResponse, BackupStore, Env } from './handlers';
 import { createNeonStore } from './neonStore';
 
 export function env(): Env {
-  return { token: process.env.MOMENTUM_API_TOKEN, maxBackups: Math.max(5, Number(process.env.MAX_BACKUPS) || 60) };
+  return {
+    inviteCode: process.env.INVITE_CODE,
+    maxBackups: Math.max(5, Number(process.env.MAX_BACKUPS) || 60),
+    maxProfiles: Math.max(1, Number(process.env.MAX_PROFILES) || 50),
+  };
 }
 
 /** Thin adapter: Vercel request → pure handler → Vercel response. */
