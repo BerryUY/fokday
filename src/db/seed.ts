@@ -18,6 +18,8 @@ export const SETTING_DEFAULTS: Record<string, string> = {
   'training.days': '[]',
   'appearance.theme': 'dark',
   'workout.default_rest': '90',
+  'features.enabled': '[]',
+  'water.goal_ml': '2500',
   'catalog.version': '0',
 };
 

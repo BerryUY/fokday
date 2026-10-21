@@ -13,7 +13,27 @@ export type Profile = {
   trainingDays: number[];
   theme: ThemePreference;
   defaultRestSeconds: number;
+  /** Optional trackers the person turned on (see FEATURE_KEYS). Everything is off by default. */
+  features: FeatureKey[];
+  waterGoalMl: number;
 };
+
+export const HABIT_FEATURES = [
+  { key: 'water', label: 'Agua', description: 'Cuántos litros tomaste en el día' },
+  { key: 'creatine', label: 'Creatina', description: 'Marcar si la tomaste hoy' },
+] as const;
+
+export const FEATURE_KEYS = ['water', 'creatine', 'carbs', 'fat', 'fiber', 'dairy'] as const;
+export type FeatureKey = (typeof FEATURE_KEYS)[number];
+
+function parseFeatures(raw: string | null): FeatureKey[] {
+  try {
+    const parsed = JSON.parse(raw ?? '[]');
+    return Array.isArray(parsed) ? FEATURE_KEYS.filter((k) => parsed.includes(k)) : [];
+  } catch {
+    return [];
+  }
+}
 
 export async function getSetting(db: Db, key: string): Promise<string | null> {
   const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM settings WHERE key = ?', [key]);
@@ -50,6 +70,8 @@ export async function getProfile(db: Db): Promise<Profile> {
     trainingDays: parseDays(map['training.days']),
     theme: theme === 'light' || theme === 'system' ? theme : 'dark',
     defaultRestSeconds: Number(map['workout.default_rest']) || 90,
+    features: parseFeatures(map['features.enabled']),
+    waterGoalMl: Number(map['water.goal_ml']) || 2500,
   };
 }
 
@@ -61,6 +83,8 @@ export async function updateProfile(db: Db, patch: Partial<Profile>): Promise<vo
     if (patch.trainingDays !== undefined) await setSetting(db, 'training.days', JSON.stringify([...new Set(patch.trainingDays)].sort()));
     if (patch.theme !== undefined) await setSetting(db, 'appearance.theme', patch.theme);
     if (patch.defaultRestSeconds !== undefined) await setSetting(db, 'workout.default_rest', String(Math.round(patch.defaultRestSeconds)));
+    if (patch.features !== undefined) await setSetting(db, 'features.enabled', JSON.stringify(FEATURE_KEYS.filter((k) => patch.features!.includes(k))));
+    if (patch.waterGoalMl !== undefined) await setSetting(db, 'water.goal_ml', String(Math.round(patch.waterGoalMl)));
   });
 }
 
@@ -86,23 +110,22 @@ export async function completeOnboarding(db: Db, input: OnboardingInput, today: 
   if (!(input.currentWeight >= 20 && input.currentWeight <= 300)) throw new Error('Ingresá un peso actual válido en kg (entre 20 y 300).');
   if (!(input.targetWeight >= 20 && input.targetWeight <= 300)) throw new Error('Ingresá una meta válida en kg (entre 20 y 300).');
   if (!(input.calories > 0) || !(input.protein > 0)) throw new Error('Los objetivos tienen que ser mayores a cero.');
-  await db.withTransactionAsync(async () => {
-    await updateProfile(db, {
-      name: input.name,
-      startWeight: input.currentWeight,
-      targetWeight: input.targetWeight,
-      trainingDays: input.trainingDays,
-    });
-    // Replaces the factory goal for every day: there is no history yet on a fresh install.
-    await setGoalsFrom(db, INITIAL_GOAL_DATE, input.calories, input.protein);
-    const now = nowIso();
-    await db.runAsync(
-      `INSERT INTO weight_entries (id, date, weight_kg, notes, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?)
-       ON CONFLICT (date) DO UPDATE SET weight_kg = excluded.weight_kg, updated_at = excluded.updated_at`,
-      [newId(), today, input.currentWeight, now, now],
-    );
-    await setSetting(db, 'onboarding.done', '1');
+  // Not one transaction (the helpers open their own); the flag goes last, so a failure just shows the form again.
+  await updateProfile(db, {
+    name: input.name,
+    startWeight: input.currentWeight,
+    targetWeight: input.targetWeight,
+    trainingDays: input.trainingDays,
   });
+  // Replaces the factory goal for every day: there is no history yet on a fresh install.
+  await setGoalsFrom(db, INITIAL_GOAL_DATE, input.calories, input.protein);
+  const now = nowIso();
+  await db.runAsync(
+    `INSERT INTO weight_entries (id, date, weight_kg, notes, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?)
+     ON CONFLICT (date) DO UPDATE SET weight_kg = excluded.weight_kg, updated_at = excluded.updated_at`,
+    [newId(), today, input.currentWeight, now, now],
+  );
+  await setSetting(db, 'onboarding.done', '1');
 }
 
 // ---- Nutrition goals (versioned by date so past days keep the goal they had) ----
