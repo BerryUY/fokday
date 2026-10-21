@@ -6,8 +6,7 @@ La idea es que la usen solo conocidos: se publica en el **canal de prueba intern
 
 1. Crear la cuenta de desarrollador en <https://play.google.com/console> (pago único de US$25 y verificación de identidad).
 2. Crear la app: nombre **Momentum**, idioma **Español (Latinoamérica)**, tipo **App**, **Gratis**.
-3. Desplegar el servidor (ver `README.md` → "Backup API") y completar en `server/public/privacidad.html` tu email de contacto. La política queda publicada en `https://<tu-servidor>.vercel.app/privacidad.html`.
-4. Poner esa misma dirección del servidor en `app.json` → `expo.extra.backupApiUrl`, para que la app la tenga incorporada.
+3. El servidor ya está en Supabase y la app ya tiene su dirección. Completá tu email de contacto en `docs/privacidad.html` y publicala en una dirección pública (por ejemplo GitHub Pages desde la carpeta `docs/`, o Netlify arrastrando el archivo). Esa URL es la política de privacidad para Play.
 
 ## 2. Generar el paquete para la tienda
 
@@ -62,11 +61,12 @@ Revisalas antes de enviar: las preguntas exactas pueden cambiar.
   - Finalidad: funcionalidad de la app (respaldo y recuperación). No se comparten con terceros.
   - Cifrado en tránsito: sí (HTTPS). El usuario puede pedir que se borren: sí.
 - **Apps de salud:** si la consola pide la declaración de apps de salud, marcá seguimiento de actividad física y nutrición, y aclará que no es un dispositivo médico.
-- **Política de privacidad:** `https://<tu-servidor>.vercel.app/privacidad.html`.
+- **Política de privacidad:** la URL donde publiques `docs/privacidad.html`.
+- **Eliminación de la cuenta:** desde la app, Ajustes → Datos y respaldo → Eliminar mi perfil de la nube; o por email al contacto de la política de privacidad.
 
 ## 5. Invitar a tus conocidos
 
-Prueba → Prueba interna → Testers: creá una lista con sus emails de Google y compartí el link de adhesión. Lo abren desde el teléfono, aceptan y la instalan desde Play Store. Para la nube, pasales tu `INVITE_CODE`.
+Prueba → Prueba interna → Testers: creá una lista con sus emails de Google y compartí el link de adhesión. Lo abren desde el teléfono, aceptan y la instalan desde Play Store. Para la nube, pasales tu código de invitación (está en `codigo-invitacion.txt`, que no se sube a GitHub).
 
 ## Más adelante: plan pago
 

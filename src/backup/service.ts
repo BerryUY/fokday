@@ -10,9 +10,10 @@ import { cloudApi, normalizeBaseUrl, type CloudConfig } from './api';
 import { getSyncInfo, runBackup, setLinked, type BackupOutcome, type SyncDeps, type SyncInfo } from './sync';
 
 /**
- * Runs backups in the background of the UI (all async, never blocks a screen):
- * when connectivity returns, when the app comes to the foreground, a little after
- * any change, and on a slow timer. Failures retry with backoff; local data is never touched.
+ * Runs backups in the background of the UI (all async, never blocks a screen). The phone's
+ * data is always the source of truth, so uploads are spaced out to keep the server idle:
+ * when the app goes to the background (at most hourly) and otherwise every few hours while
+ * it is open. Failures retry with backoff; local data is never touched.
  */
 
 const URL_KEY = 'momentum_backup_url';
@@ -118,6 +119,21 @@ function schedule(delay: number) {
   timer = setTimeout(() => void backupNow(), delay);
 }
 
+/** Automatic uploads happen at most this often while the app is open… */
+const OPEN_GAP_MS = 6 * 60 * 60_000;
+/** …and at most this often when leaving the app, which is when changes usually end. */
+const LEAVE_GAP_MS = 60 * 60_000;
+
+/** Uploads only if there are changes and the last backup is older than the gap (or failed). */
+async function autoBackup(gapMs: number) {
+  if (!db) return;
+  const info = await getSyncInfo(db);
+  if (!info.linked || !info.pendingChanges) return;
+  const last = info.lastBackupAt ? Date.parse(info.lastBackupAt) : 0;
+  if (!info.lastError && Date.now() - last < gapMs) return;
+  await backupNow();
+}
+
 /** Runs a backup now. Manual runs report every outcome; automatic ones stay quiet. */
 export async function backupNow(manual = false): Promise<BackupOutcome | null> {
   if (!db || state.running) return null;
@@ -147,17 +163,15 @@ export function startBackupService(database: Db): () => void {
     const online = !!s.isConnected && s.isInternetReachable !== false;
     const cameBack = online && !state.online;
     setState({ online });
-    if (cameBack) schedule(3_000);
+    if (cameBack) setTimeout(() => void autoBackup(OPEN_GAP_MS), 3_000);
   });
   const appState = AppState.addEventListener('change', (s) => {
-    if (s === 'active') schedule(2_000);
+    if (s === 'background') void autoBackup(LEAVE_GAP_MS);
+    else if (s === 'active') setTimeout(() => void autoBackup(OPEN_GAP_MS), 5_000);
   });
-  const unsubData = subscribeData(() => {
-    void refreshState();
-    schedule(20_000);
-  });
-  const interval = setInterval(() => void backupNow(), 15 * 60_000);
-  schedule(4_000);
+  const unsubData = subscribeData(() => void refreshState());
+  const interval = setInterval(() => void autoBackup(OPEN_GAP_MS), 30 * 60_000);
+  setTimeout(() => void autoBackup(OPEN_GAP_MS), 5_000);
   return () => {
     unsubNet();
     appState.remove();

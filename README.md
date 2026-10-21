@@ -1,6 +1,6 @@
 # Momentum
 
-Android fitness tracker for a small group of people (the owner and friends): nutrition (with the plan from plancomidas.netlify.app built in), gym attendance, routines with per-day exercises, live workouts, free activities (walks, cycling), body weight toward a goal (up, down or maintain), optional trackers (water, creatine, carbs, fat, fiber, dairy), local reminders, statistics and history. A short step-by-step welcome sets each person up. Works fully offline; each person can back up to Neon PostgreSQL through their own profile. All UI text is in Spanish (Uruguay).
+Android fitness tracker for a small group of people (the owner and friends): nutrition (with the plan from plancomidas.netlify.app built in), gym attendance, routines with per-day exercises, live workouts, free activities (walks, cycling), body weight toward a goal (up, down or maintain), optional trackers (water, creatine, carbs, fat, fiber, dairy), local reminders, statistics and history. A short step-by-step welcome sets each person up. Works fully offline; each person can back up to Supabase through their own profile. All UI text is in Spanish (Uruguay).
 
 Publishing to Google Play (internal testing): see [docs/play-store.md](docs/play-store.md).
 
@@ -11,17 +11,17 @@ Android app (Expo SDK 58, React Native, TypeScript, Expo Router)
  ├─ SQLite (expo-sqlite) ← primary database, every action is saved here first
  │   meals · meal_logs · routines · sessions · sets · attendance · weight · goals · notes …
  └─ Backup service (only when online)
-      └─ HTTPS + per-profile token → Vercel Function (server/) → Neon PostgreSQL (profiles + backups)
+      └─ HTTPS + per-profile token → Supabase Edge Function `momentum` → Postgres (profiles, backup list) + private Storage (gzip snapshots)
 ```
 
 - **Local-first.** Every screen reads and writes SQLite. Nothing waits on the network, and the app never needs the API to work.
 - **Backups are full, versioned snapshots.** SQLite triggers bump a `local_revision` counter on every write. When it is ahead of the last backed-up revision and the phone is online, the app uploads a checksummed JSON snapshot of all tables. The server stores each one as a new version (keeps the last 60 by default).
 - **No duplicates.** A retry reuses the same backup id and the server ignores ids it already has. Restores replace tables inside one transaction, so sync retries can never duplicate meal logs.
 - **No silent overwrites.** Restoring is always a manual, confirmed action. It shows what the backup contains and warns if local changes would be lost. A local safety copy is written first. After a reinstall, automatic backups stay paused until you decide whether to restore the cloud backup or keep the phone's data.
-- **Profiles and security.** No passwords. A person creates a profile with the owner's invite code (`INVITE_CODE`); the server returns a secret token that the app keeps in SecureStore and shows once as the *código de recuperación*. The server stores only its SHA-256 hash, and every backup belongs to one profile, so nobody can read anyone else's backups. Database credentials never ship in the APK.
+- **Profiles and security.** No passwords. A person creates a profile with the owner's invite code (its SHA-256 lives in the `momentum_config` table); the server returns a secret token that the app keeps in SecureStore and shows once as the *código de recuperación*. The server stores only its SHA-256 hash, and every backup belongs to one profile, so nobody can read anyone else's backups. Database credentials never ship in the APK.
 
 Decisions you may want to know about:
-- **Backend: Vercel Functions** (the fallback you named) with Neon's HTTP driver. It's a small, well-documented setup on both free tiers.
+- **Backend: Supabase** (Edge Function + Postgres + Storage, one free project). Tables have RLS on with no policies and the bucket is private, so only the function's secret key reaches the data. Snapshots are stored gzip-compressed; each profile keeps its 3 newest backups plus one per day for a week. The app uploads when you leave it (at most hourly) and every 6 hours while open, so the server stays mostly idle.
 - **Styling: no NativeWind.** It adds Babel/Metro configuration risk that I couldn't verify on a device for SDK 58. Instead there is a typed design-token system (`src/theme`) with dark and light palettes.
 - **Charts: custom SVG on `react-native-svg`.** The line chart, bars, rings and heatmap are small components with touch-to-inspect. This gives full control of the look and adds no heavy chart dependency.
 - **Dates** are stored as `YYYY-MM-DD` keys in America/Montevideo time, so a meal logged at 23:30 counts for that day, not the UTC one.
@@ -36,7 +36,7 @@ src/domain/         pure calculations (nutrition totals, streaks, weight progres
 src/db/             schema + migrations, seeding, database client
 src/backup/         snapshot export/import, sync logic, background service, JSON/CSV files
 src/data/catalog.ts the meal plan (16 meals + guidance) extracted from plancomidas.netlify.app
-server/             backup API (Vercel Functions + Neon)
+supabase/           backup API (Edge Function `momentum`) and its SQL migration
 test/               Jest tests (run against a real SQLite engine)
 ```
 
@@ -56,33 +56,20 @@ The local database needs no setup. It is created on first launch, migrated with 
 
 To try native code on a phone during development: `npx eas-cli@latest build -p android --profile development`, install that APK, then run `npx expo start`.
 
-## 1. Neon database
+## 1–2. Backup server (Supabase)
 
-1. Create a free account at https://neon.tech and a new project (region: São Paulo, `sa-east-1`, is the closest to Uruguay).
-2. In the project dashboard, open **Connect** and copy the connection string (`postgresql://…?sslmode=require`).
-3. Creating tables is optional: the API creates `momentum_backups` on first use. To do it by hand, run `server/schema.sql` in Neon's SQL Editor.
+Already set up in the Supabase project `momentum` (`eqvyjnhkhyqzwurdtumh`, São Paulo). To recreate it elsewhere:
 
-## 2. Backup API (Vercel)
+1. Create a Supabase project and run `supabase/migrations/*.sql` (SQL Editor or `supabase db push`).
+2. Deploy the function with JWT verification off (the app sends its own token): `supabase functions deploy momentum --no-verify-jwt`.
+3. Set the invite code: generate one (`node -e "console.log(require('crypto').randomBytes(9).toString('base64url'))"`), keep it in `codigo-invitacion.txt` (git-ignored), and store only its hash:
+   `insert into momentum_config values ('invite_code_sha256', '<sha256 hex>') on conflict (key) do update set value = excluded.value;`
+   Changing the code later only affects new profiles.
+4. Put `https://<project>.supabase.co/functions/v1/momentum` in `app.json` → `expo.extra.backupApiUrl` and build again.
 
-1. Generate an invite code. You'll give it to the people you want to use the app:
-   ```bash
-   node -e "console.log(require('crypto').randomBytes(9).toString('base64url'))"
-   ```
-2. Deploy `server/`, either way:
-   - **Dashboard:** go to vercel.com → *Add New Project* → import this repo → set **Root Directory** to `server`.
-   - **CLI:** `cd server && npx vercel@latest` (link a new project), then `npx vercel@latest deploy --prod`.
-3. In Vercel → Project → *Settings → Environment Variables* (Production), add:
-   | Name | Value |
-   |---|---|
-   | `DATABASE_URL` | the Neon connection string |
-   | `INVITE_CODE` | the code from step 1 (min. 8 characters) |
-   | `MAX_PROFILES` | optional, default `50` |
-   | `MAX_BACKUPS` | optional, versions kept per profile, default `60` |
-   Redeploy after adding them.
-4. Put the server address in `app.json` → `expo.extra.backupApiUrl` (for example `https://momentum-api.vercel.app`) and build again. The welcome screen and settings then only ask for the invite code.
-5. Fill in your contact email in `server/public/privacidad.html`; it is published at `/privacidad.html` and is the privacy policy URL for Google Play.
+Limits live in `momentum_config`: `max_profiles` (default 50) and `min_upload_interval_seconds` (default 60, a guard against a client stuck in a loop).
 
-Endpoints: `POST /api/profiles` (create, needs the invite code), `GET /api/status`, `GET /api/backups` (list), `POST /api/backups` (upload), `GET /api/backups/latest` or `/api/backups/<id>` (download). Every endpoint except profile creation needs `Authorization: Bearer <profile token>`.
+Endpoints under `/api/`: `POST profiles` (create, needs the invite code), `DELETE profiles/me` (delete profile and all backups), `POST profiles/me/token` (new recovery code), `GET status`, `GET backups`, `POST backups`, `GET backups/latest` or `backups/<id>`. Everything except creating a profile needs `Authorization: Bearer <profile token>`.
 
 ## 3. Connect the app
 
@@ -96,7 +83,7 @@ Either type the invite code on the last-but-one step of the welcome screen, or l
 Failed uploads retry with backoff (30 s, 2 min, 10 min, 30 min) and never touch local data.
 
 The same screen also has:
-- **Exportar / Importar respaldo (JSON):** a full local backup that doesn't depend on Neon. It's validated with a checksum before anything is replaced.
+- **Exportar / Importar respaldo (JSON):** a full local backup that doesn't depend on the server. It's validated with a checksum before anything is replaced.
 - **Exportar CSV:** meals, weight, workout sets or attendance, for the last 30 or 90 days or everything.
 - **Copias automáticas:** safety copies taken before any restore or reset (the last 5 are kept).
 - **Borrar todos mis datos:** asks for confirmation twice and saves a safety copy first.
@@ -123,15 +110,14 @@ If you have a local Android SDK + JDK 17 and want to skip the cloud queue, `npm 
 ## Restoring after reinstall or on a new phone
 
 1. Install the app and open **Ajustes → Datos y respaldo → Crear mi perfil o conectar → Ya tengo un perfil** with your *código de recuperación* (also on the welcome screen: *Ya tengo un respaldo*).
-2. The app finds the backups in Neon and offers **Restaurar el último respaldo** (or *Mantener los datos de este teléfono*). Older versions are available under **Restaurar desde la nube**.
+2. The app finds the backups in the cloud and offers **Restaurar el último respaldo** (or *Mantener los datos de este teléfono*). Older versions are available under **Restaurar desde la nube**.
 3. If the API isn't available, use **Importar respaldo (JSON)** with a file you exported.
 
 ## Free-tier notes (check current limits on each provider's pricing page)
 
-- **Size:** each backup is a full snapshot. A year of heavy use is around 1–2 MB of JSON, and Postgres compresses large text values automatically. With 60 versions kept, that stays well within Neon's free storage. Lower `MAX_BACKUPS` if you ever get close.
-- **Request limit:** Vercel limits function request bodies to about 4.5 MB. The API rejects anything over 4.4 MB with a clear message. That's many years of data away; if you ever hit it, export JSON locally and lower history in the app.
-- **Cold starts:** Neon's free compute suspends when idle, so the first backup after a pause can take a few seconds. The app has a 45 s timeout and retries automatically.
-- **When backups run:** only while the app is open or in the foreground; there is no background job when the app is closed. Opening the app once online is enough.
+- **Size:** each backup is a full snapshot, stored gzip-compressed. A year of heavy use is a few MB of JSON before compression, and each profile keeps about 10 copies.
+- **Supabase Free:** 500 MB database, 1 GB file storage, 5 GB egress and 500,000 Edge Function invocations per month; a project with no activity for a week is paused (unpause it from the dashboard). Check the current numbers on supabase.com/pricing.
+- **Request limit:** the API rejects snapshots over 4.4 MB with a clear message. That's many years of data away.
 
 ## Tests
 

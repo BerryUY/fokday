@@ -206,6 +206,42 @@ export default function BackupScreen() {
                 onPress={async () => setRecovery(await getRecoveryCode())}
               />
               <Button
+                label="Cambiar código de recuperación"
+                icon="refresh-cw"
+                variant="ghost"
+                size="sm"
+                loading={busy === 'rotate'}
+                onPress={async () => {
+                  if (!(await confirm('Cambiar código', 'Se genera un código nuevo y el anterior deja de funcionar. Vas a tener que guardar el nuevo.', 'Cambiar'))) return;
+                  await withBusy('rotate', async () => {
+                    const cfg = await getCloudConfig();
+                    if (!cfg) return;
+                    const { token: fresh } = await cloudApi.rotateToken(cfg);
+                    await saveCloudConfig({ url: cfg.url, token: fresh });
+                    setRecovery(fresh);
+                  });
+                }}
+              />
+              <Button
+                label="Eliminar mi perfil de la nube"
+                icon="trash-2"
+                variant="ghost"
+                size="sm"
+                loading={busy === 'delete-profile'}
+                onPress={async () => {
+                  if (!(await confirm('Eliminar perfil de la nube', 'Se borran tu perfil y todos tus respaldos del servidor. Los datos de este teléfono no se tocan.', 'Continuar', true))) return;
+                  if (!(await confirm('¿Seguro?', 'No se puede deshacer.', 'Eliminar', true))) return;
+                  await withBusy('delete-profile', async () => {
+                    const cfg = await getCloudConfig();
+                    if (!cfg) return;
+                    await cloudApi.deleteProfile(cfg);
+                    await clearCloudConfig();
+                    await setLinked(db, false);
+                    toast.show('Perfil eliminado de la nube');
+                  });
+                }}
+              />
+              <Button
                 label="Desconectar"
                 variant="ghost"
                 size="sm"
