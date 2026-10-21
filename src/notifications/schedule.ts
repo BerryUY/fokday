@@ -26,6 +26,7 @@ async function ensureChannel() {
   if (Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
     name: 'Recordatorios',
+    // eslint-disable-next-line import/namespace -- re-exported enum the import plugin can't follow; tsc checks it
     importance: Notifications.AndroidImportance.DEFAULT,
   });
 }

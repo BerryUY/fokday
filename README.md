@@ -1,6 +1,8 @@
 # Momentum
 
-Personal Android fitness tracker for one person: nutrition (with the plan from plancomidas.netlify.app built in), gym attendance, routines and live workouts, body weight toward 65 kg, statistics and history. Works fully offline; backs up to Neon PostgreSQL automatically when there is internet. All UI text is in Spanish (Uruguay).
+Android fitness tracker for a small group of people (the owner and friends): nutrition (with the plan from plancomidas.netlify.app built in), gym attendance, routines with per-day exercises, live workouts, free activities (walks, cycling), body weight toward a goal (up, down or maintain), optional trackers (water, creatine, carbs, fat, fiber, dairy), local reminders, statistics and history. A short step-by-step welcome sets each person up. Works fully offline; each person can back up to Neon PostgreSQL through their own profile. All UI text is in Spanish (Uruguay).
+
+Publishing to Google Play (internal testing): see [docs/play-store.md](docs/play-store.md).
 
 ## Architecture
 
@@ -9,14 +11,14 @@ Android app (Expo SDK 58, React Native, TypeScript, Expo Router)
  ├─ SQLite (expo-sqlite) ← primary database, every action is saved here first
  │   meals · meal_logs · routines · sessions · sets · attendance · weight · goals · notes …
  └─ Backup service (only when online)
-      └─ HTTPS + personal token → Vercel Function (server/) → Neon PostgreSQL
+      └─ HTTPS + per-profile token → Vercel Function (server/) → Neon PostgreSQL (profiles + backups)
 ```
 
 - **Local-first.** Every screen reads and writes SQLite. Nothing waits on the network, and the app never needs the API to work.
 - **Backups are full, versioned snapshots.** SQLite triggers bump a `local_revision` counter on every write. When it is ahead of the last backed-up revision and the phone is online, the app uploads a checksummed JSON snapshot of all tables. The server stores each one as a new version (keeps the last 60 by default).
 - **No duplicates.** A retry reuses the same backup id and the server ignores ids it already has. Restores replace tables inside one transaction, so sync retries can never duplicate meal logs.
 - **No silent overwrites.** Restoring is always a manual, confirmed action. It shows what the backup contains and warns if local changes would be lost. A local safety copy is written first. After a reinstall, automatic backups stay paused until you decide whether to restore the cloud backup or keep the phone's data.
-- **Security.** No login UI. The API needs `Authorization: Bearer <MOMENTUM_API_TOKEN>`. The token lives in SecureStore on the phone and in Vercel env vars on the server. Database credentials never ship in the APK.
+- **Profiles and security.** No passwords. A person creates a profile with the owner's invite code (`INVITE_CODE`); the server returns a secret token that the app keeps in SecureStore and shows once as the *código de recuperación*. The server stores only its SHA-256 hash, and every backup belongs to one profile, so nobody can read anyone else's backups. Database credentials never ship in the APK.
 
 Decisions you may want to know about:
 - **Backend: Vercel Functions** (the fallback you named) with Neon's HTTP driver. It's a small, well-documented setup on both free tiers.
@@ -62,27 +64,29 @@ To try native code on a phone during development: `npx eas-cli@latest build -p a
 
 ## 2. Backup API (Vercel)
 
-1. Generate your personal token. Keep it in a password manager; you'll need it again after reinstalling:
+1. Generate an invite code. You'll give it to the people you want to use the app:
    ```bash
-   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   node -e "console.log(require('crypto').randomBytes(9).toString('base64url'))"
    ```
 2. Deploy `server/`, either way:
-   - **Dashboard:** push this repo to GitHub, then go to vercel.com → *Add New Project* → import it → set **Root Directory** to `server`.
+   - **Dashboard:** go to vercel.com → *Add New Project* → import this repo → set **Root Directory** to `server`.
    - **CLI:** `cd server && npx vercel@latest` (link a new project), then `npx vercel@latest deploy --prod`.
 3. In Vercel → Project → *Settings → Environment Variables* (Production), add:
    | Name | Value |
    |---|---|
    | `DATABASE_URL` | the Neon connection string |
-   | `MOMENTUM_API_TOKEN` | the token from step 1 (min. 32 characters) |
-   | `MAX_BACKUPS` | optional, default `60` |
+   | `INVITE_CODE` | the code from step 1 (min. 8 characters) |
+   | `MAX_PROFILES` | optional, default `50` |
+   | `MAX_BACKUPS` | optional, versions kept per profile, default `60` |
    Redeploy after adding them.
-4. Check it: `curl -H "Authorization: Bearer <token>" https://<your-app>.vercel.app/api/status` should return `{"ok":true,"count":0,...}`.
+4. Put the server address in `app.json` → `expo.extra.backupApiUrl` (for example `https://momentum-api.vercel.app`) and build again. The welcome screen and settings then only ask for the invite code.
+5. Fill in your contact email in `server/public/privacidad.html`; it is published at `/privacidad.html` and is the privacy policy URL for Google Play.
 
-Endpoints: `GET /api/status`, `GET /api/backups` (list), `POST /api/backups` (upload), `GET /api/backups/latest` or `/api/backups/<id>` (download).
+Endpoints: `POST /api/profiles` (create, needs the invite code), `GET /api/status`, `GET /api/backups` (list), `POST /api/backups` (upload), `GET /api/backups/latest` or `/api/backups/<id>` (download). Every endpoint except profile creation needs `Authorization: Bearer <profile token>`.
 
 ## 3. Connect the app
 
-In the app: **⚙ (Inicio) → Datos y respaldo → Configurar conexión**. Enter the URL (`https://<your-app>.vercel.app`) and the token, then tap **Probar y conectar**. From then on it backs up by itself:
+Either type the invite code on the last-but-one step of the welcome screen, or later in **⚙ (Inicio) → Datos y respaldo → Crear mi perfil o conectar → Soy nuevo**. The app creates the profile, shows the *código de recuperación* once (save it in a password manager) and from then on backs up by itself:
 - a few seconds after connectivity returns,
 - when the app comes to the foreground,
 - about 20 s after a change,
@@ -118,7 +122,7 @@ If you have a local Android SDK + JDK 17 and want to skip the cloud queue, `npm 
 
 ## Restoring after reinstall or on a new phone
 
-1. Install the APK and open **Ajustes → Datos y respaldo → Configurar conexión** with the same URL and token.
+1. Install the app and open **Ajustes → Datos y respaldo → Crear mi perfil o conectar → Ya tengo un perfil** with your *código de recuperación* (also on the welcome screen: *Ya tengo un respaldo*).
 2. The app finds the backups in Neon and offers **Restaurar el último respaldo** (or *Mantener los datos de este teléfono*). Older versions are available under **Restaurar desde la nube**.
 3. If the API isn't available, use **Importar respaldo (JSON)** with a file you exported.
 
@@ -138,4 +142,5 @@ If you have a local Android SDK + JDK 17 and want to skip the cloud queue, `npm 
 - `attendance.test.ts`: streaks that respect training days, rest days, extra sessions, consistency, duplicate prevention, finishing/cancelling/deleting workouts, history surviving routine edits, progression.
 - `migrations.test.ts`: fresh schema, idempotency, rollback on failure, newer-database guard, foreign keys, seed-once without overwriting edits.
 - `backup.test.ts`: snapshot round-trip, tamper/foreign/newer/incomplete detection, atomic restore, offline behavior, failed uploads, retry without duplicates, reinstall restore, newer-local-data warning.
-- `server.test.ts`: token checks, checksum validation, version pruning, and an end-to-end phone → API → new phone restore.
+- `server.test.ts`: invite-code signup, per-profile tokens (only hashes stored), private backups per profile, checksum validation, version pruning, and an end-to-end phone → API → new phone restore.
+- `optional.test.ts`, `days-activities.test.ts`, `reminders.test.ts`, `onboarding.test.ts`: optional trackers, routine exercises by weekday, free activities, reminder planning and onboarding suggestions.

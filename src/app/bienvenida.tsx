@@ -119,7 +119,12 @@ export default function WelcomeScreen() {
   };
 
   const footer: Record<StepKey, ReactNode> = {
-    hola: <Button label="Empecemos" icon="arrow-right" size="lg" onPress={next} />,
+    hola: (
+      <View style={{ gap: space.sm }}>
+        <Button label="Empecemos" icon="arrow-right" size="lg" onPress={next} />
+        <Button label="Ya tengo un respaldo" icon="cloud" variant="ghost" size="sm" onPress={() => router.push('/ajustes/respaldo')} />
+      </View>
+    ),
     nombre: <Button label="Continuar" size="lg" onPress={next} disabled={!name.trim()} />,
     objetivo: <Button label="Continuar" size="lg" onPress={next} disabled={!goal} />,
     peso: <Button label="Continuar" size="lg" onPress={next} />,
@@ -426,8 +431,8 @@ function Tile({ icon, title, selected, onPress }: { icon: IconName; title: strin
 /** Big number with −/+ (0,5 kg steps) that can also be typed. */
 function WeightPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const c = useColors();
-  const [text, setText] = useState(formatKg(value));
-  useEffect(() => setText(formatKg(value)), [value]);
+  // While typing, the field shows the draft; otherwise it always reflects the current value.
+  const [draft, setDraft] = useState<string | null>(null);
   const set = (v: number) => {
     haptic('light');
     onChange(Math.min(300, Math.max(30, Math.round(v * 2) / 2)));
@@ -437,12 +442,13 @@ function WeightPicker({ value, onChange }: { value: number; onChange: (v: number
       <RoundButton icon="minus" label="Restar medio kilo" onPress={() => set(value - 0.5)} />
       <View style={{ alignItems: 'center', minWidth: 140 }}>
         <TextInput
-          value={text}
-          onChangeText={setText}
+          value={draft ?? formatKg(value)}
+          onChangeText={setDraft}
+          onFocus={() => setDraft(formatKg(value))}
           onEndEditing={() => {
-            const v = parsePositive(text);
+            const v = parsePositive(draft ?? '');
             if (v) set(v);
-            else setText(formatKg(value));
+            setDraft(null);
           }}
           keyboardType="decimal-pad"
           selectTextOnFocus

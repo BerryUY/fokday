@@ -42,7 +42,7 @@ async function request<T>(config: { url: string; token?: string }, path: string,
       signal: controller.signal,
       headers: { ...(config.token ? { Authorization: `Bearer ${config.token}` } : {}), 'Content-Type': 'application/json', ...(init.headers ?? {}) },
     });
-  } catch (e) {
+  } catch {
     throw new ApiError(controller.signal.aborted ? 'El servidor tardó demasiado en responder.' : 'No se pudo conectar con el servidor de respaldo.', null);
   } finally {
     clearTimeout(timer);

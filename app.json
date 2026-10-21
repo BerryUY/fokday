@@ -2,7 +2,7 @@
   "expo": {
     "name": "Momentum",
     "slug": "momentum",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "scheme": "momentum",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "uy.santiago.momentum",
-      "versionCode": 1,
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#0A0A0B",
         "foregroundImage": "./assets/android-icon-foreground.png",

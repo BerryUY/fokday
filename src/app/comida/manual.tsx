@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { goBack } from '@/lib/nav';
 import { useState } from 'react';
 import { Switch, View } from 'react-native';

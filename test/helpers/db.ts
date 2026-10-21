@@ -2,7 +2,6 @@ import { prepareDatabase } from '@/db/migrate';
 import type { Db, SqlValue } from '@/db/types';
 
 /* Node's built-in SQLite, loaded through getBuiltinModule so Jest's resolver doesn't need to know it. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const { DatabaseSync } = (process as any).getBuiltinModule('node:sqlite');
 
 const plain = <T>(row: unknown): T => (row ? ({ ...(row as object) } as T) : (row as T));

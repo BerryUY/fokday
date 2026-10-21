@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { goBack } from '@/lib/nav';
 import { useEffect, useState } from 'react';
 import { ScrollView, View } from 'react-native';
