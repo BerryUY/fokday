@@ -12,7 +12,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { haptic } from '@/state/toast';
 import { useColors } from '@/theme/ThemeProvider';
 import { font, radius, space, type, type Palette, type TypeVariant } from '@/theme/tokens';
@@ -65,7 +65,7 @@ export function PressableScale({ style, children, onPressIn, onPressOut, scaleTo
         onPressIn?.(e);
       }}
       onPressOut={(e) => {
-        scale.value = withSpring(1, { damping: 14, stiffness: 260 });
+        scale.value = withTiming(1, { duration: 120 });
         onPressOut?.(e);
       }}
       style={[style, animated]}

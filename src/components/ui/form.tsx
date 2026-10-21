@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { forwardRef, type ComponentRef, type ReactNode } from 'react';
-import { Alert, Modal, Platform, Pressable, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/theme/ThemeProvider';
@@ -68,14 +68,18 @@ export function Sheet({ visible, onClose, title, children }: { visible: boolean;
       <Animated.View entering={FadeIn.duration(160)} style={[StyleSheet.absoluteFill, { backgroundColor: c.overlay }]}>
         <Pressable style={{ flex: 1 }} onPress={onClose} accessibilityLabel="Cerrar" />
       </Animated.View>
-      <Animated.View
-        entering={SlideInDown.springify().damping(22).stiffness(220)}
-        style={[styles.sheet, { backgroundColor: c.surface, paddingBottom: insets.bottom + space.lg }]}
-      >
-        <View style={[styles.grabber, { backgroundColor: c.border }]} />
-        {title ? <T variant="h2" style={{ marginBottom: space.lg }}>{title}</T> : null}
-        {children}
-      </Animated.View>
+      <KeyboardAvoidingView behavior="padding" pointerEvents="box-none" style={styles.sheetWrap}>
+        <Animated.View
+          entering={SlideInDown.duration(220)}
+          style={[styles.sheet, { backgroundColor: c.surface, paddingBottom: insets.bottom + space.lg }]}
+        >
+          <View style={[styles.grabber, { backgroundColor: c.border }]} />
+          {title ? <T variant="h2" style={{ marginBottom: space.lg }}>{title}</T> : null}
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} bounces={false}>
+            {children}
+          </ScrollView>
+        </Animated.View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -98,11 +102,8 @@ const styles = StyleSheet.create({
   input: { flex: 1, height: 52, fontFamily: font.medium, fontSize: 16 },
   stepper: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, padding: 4 },
   stepBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  sheetWrap: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     paddingHorizontal: space.xl,
