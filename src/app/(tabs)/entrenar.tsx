@@ -7,7 +7,8 @@ import { Field, Sheet } from '@/components/ui/form';
 import { EmptyState, ListRow, Loading, Screen, TabHeader } from '@/components/ui/layout';
 import { Badge, Button, Card, Divider, IconButton, Row, SectionHeader, T } from '@/components/ui/primitives';
 import { getAttendance, getAttendanceStats, markAttendance, removeAttendance } from '@/data/attendance';
-import { listExercises, listRoutines, saveRoutine } from '@/data/routines';
+import { activityLabel, listActivities } from '@/data/activities';
+import { getRoutineForWeekday, listExercises, listRoutines, saveRoutine } from '@/data/routines';
 import { getActiveSession, listSessions, listTrainedExercises, startSession } from '@/data/workouts';
 import { DAY_SHORT, formatDuration, formatMinutes, formatShort, todayKey, weekday, WEEK_ORDER } from '@/lib/dates';
 import { formatNumber } from '@/lib/format';
@@ -23,7 +24,7 @@ export default function TrainScreen() {
   const [newName, setNewName] = useState('');
 
   const { data } = useQuery(async (db) => {
-    const [routines, active, stats, attendance, sessions, exercises, trained] = await Promise.all([
+    const [routines, active, stats, attendance, sessions, exercises, trained, todayRoutine, activities] = await Promise.all([
       listRoutines(db),
       getActiveSession(db),
       getAttendanceStats(db, today),
@@ -31,13 +32,16 @@ export default function TrainScreen() {
       listSessions(db, null, today),
       listExercises(db),
       listTrainedExercises(db),
+      getRoutineForWeekday(db, weekday(today)),
+      listActivities(db, undefined, today, 5),
     ]);
-    return { routines, active, stats, attendance, sessions: sessions.slice(0, 5), exerciseCount: exercises.length, trained: trained.slice(0, 6) };
+    return { routines, active, stats, attendance, sessions: sessions.slice(0, 5), exerciseCount: exercises.length, trained: trained.slice(0, 6), todayRoutine, activities };
   }, [today]);
 
   if (!data) return <Screen tab><Loading /></Screen>;
 
-  const todayRoutine = data.routines.find((r) => r.weekdays.includes(weekday(today)));
+  // Counts here are for today's weekday only (exercises tagged for other days are left out).
+  const todayRoutine = data.todayRoutine;
   const start = async (routineId: string | null) => {
     const id = await run((db) => startSession(db, today, routineId));
     if (id) router.push('/sesion/activa');
@@ -95,6 +99,7 @@ export default function TrainScreen() {
                 onPress={() => router.push({ pathname: '/rutina/[id]', params: { id: todayRoutine.id } })}
               />
             ) : null}
+            <Button label="Registrar caminata, bici u otra actividad" icon="activity" variant="secondary" onPress={() => router.push('/actividad/nueva')} />
             <Row gap={space.sm}>
               <Button label="Entrenamiento libre" icon="zap" variant="secondary" style={{ flex: 1 }} onPress={() => start(null)} />
               <Button
@@ -173,6 +178,26 @@ export default function TrainScreen() {
             })}
           </Row>
         </Card>
+      ) : null}
+
+      {data.activities.length > 0 ? (
+        <View style={{ marginTop: space.xl }}>
+          <SectionHeader title="Otras actividades" action="Registrar" onAction={() => router.push('/actividad/nueva')} />
+          <Card padded={false} style={{ paddingVertical: space.xs }}>
+            {data.activities.map((a, i) => (
+              <View key={a.id}>
+                {i > 0 ? <Divider style={{ marginHorizontal: space.lg }} /> : null}
+                <ListRow
+                  icon="activity"
+                  iconTone="protein"
+                  title={activityLabel(a.type)}
+                  subtitle={`${formatShort(a.date)} · ${a.minutes} min${a.distanceKm ? ' · ' + formatNumber(a.distanceKm) + ' km' : ''}`}
+                  onPress={() => router.push({ pathname: '/actividad/nueva', params: { id: a.id } })}
+                />
+              </View>
+            ))}
+          </Card>
+        </View>
       ) : null}
 
       <View style={{ marginTop: space.xl }}>
