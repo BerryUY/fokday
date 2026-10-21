@@ -3,7 +3,7 @@ import { Switch, View } from 'react-native';
 import { Card, Chip, Row, T } from '@/components/ui/primitives';
 import { ProgressBar } from '@/components/ui/progress';
 import { addWater, getHabits, setCreatine } from '@/data/habits';
-import { formatKg } from '@/lib/format';
+import { formatLiters } from '@/lib/format';
 import { useMutation, useQuery } from '@/state/db';
 import { useFeatures } from '@/state/features';
 import { useColors } from '@/theme/ThemeProvider';
@@ -21,7 +21,7 @@ export function HabitsCard({ date }: { date: string }) {
   const { data } = useQuery((db) => getHabits(db, date), [date]);
   if (!showWater && !showCreatine) return null;
   const habits = data ?? { creatine: false, waterMl: 0 };
-  const liters = (ml: number) => formatKg(Math.round(ml / 100) / 10);
+  const liters = formatLiters;
 
   return (
     <Card>

@@ -53,3 +53,8 @@ export function toInput(value: number | null | undefined, decimals = 1): string 
 }
 
 export const round1 = (v: number) => Math.round(v * 10) / 10;
+
+/** Liters from milliliters with up to two decimals and a decimal comma: 2750 → "2,75", 2500 → "2,5". */
+export function formatLiters(ml: number): string {
+  return String(Number((ml / 1000).toFixed(2))).replace('.', ',');
+}

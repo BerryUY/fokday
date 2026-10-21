@@ -14,7 +14,7 @@ import { useColors } from '@/theme/ThemeProvider';
 import { listWeights, saveWeight } from '@/data/weight';
 import { latestEntry } from '@/domain/weight';
 import { DAY_SHORT, formatDateTime, formatShort, todayKey, WEEK_ORDER } from '@/lib/dates';
-import { formatKg, parsePositive, toInput } from '@/lib/format';
+import { formatKg, formatLiters, parsePositive, toInput } from '@/lib/format';
 import { useDb, useMutation, useQuery } from '@/state/db';
 import { useToast } from '@/state/toast';
 import { space } from '@/theme/tokens';
@@ -187,7 +187,7 @@ function SettingsForm({ profile, calories, protein, latest }: {
                   min={500}
                   max={6000}
                   step={250}
-                  format={(v) => `${formatKg(v / 1000)} L`}
+                  format={(v) => `${formatLiters(v)} L`}
                 />
               </Row>
             ) : null}
