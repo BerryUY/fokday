@@ -77,7 +77,7 @@ export default function ActiveSessionScreen() {
     if (!ok) return;
     setFinishing(true);
     if (notes !== null) await updateSessionNotes(db, session.id, notes);
-    const done = await run((d) => finishSession(d, session.id), { success: '¡Entrenamiento guardado! Asistencia registrada.' });
+    const done = await run((d) => finishSession(d, session.id), { success: '¡Entrenamiento guardado! Un día más en tu racha.' });
     setFinishing(false);
     if (done !== undefined) router.replace({ pathname: '/sesion/[id]', params: { id: session.id } });
   };

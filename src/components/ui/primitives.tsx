@@ -136,7 +136,16 @@ export function Button({ label, onPress, variant = 'primary', icon, loading, dis
       ) : (
         <>
           {icon && <Feather name={icon} size={size === 'sm' ? 15 : 18} color={fg} />}
-          <Text style={[styles.buttonText, { color: fg, fontSize: size === 'sm' ? 14 : size === 'lg' ? 17 : 15 }]}>{label}</Text>
+          {/* One line that shrinks to fit: a fixed-height button must never wrap or clip its label (large system fonts included). */}
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+            maxFontSizeMultiplier={1.3}
+            style={[styles.buttonText, { color: fg, fontSize: size === 'sm' ? 14 : size === 'lg' ? 17 : 15, flexShrink: 1 }]}
+          >
+            {label}
+          </Text>
         </>
       )}
     </PressableScale>

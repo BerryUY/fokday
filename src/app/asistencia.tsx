@@ -93,20 +93,20 @@ export default function AttendanceScreen() {
             ))}
             {sel ? (
               <Button
-                label="Quitar asistencia"
+                label="Desmarcar este día"
                 icon="x"
                 variant="danger"
                 onPress={async () => {
-                  await run((db) => removeAttendance(db, selected), { success: 'Asistencia quitada' });
+                  await run((db) => removeAttendance(db, selected), { success: 'Listo, lo desmarqué' });
                   setSelected(null);
                 }}
               />
             ) : (
               <Button
-                label="Marcar que fui"
+                label="Ese día fui"
                 icon="check"
                 onPress={async () => {
-                  await run((db) => markAttendance(db, selected), { success: 'Asistencia registrada' });
+                  await run((db) => markAttendance(db, selected), { success: '¡Bien ahí! Día marcado' });
                   setSelected(null);
                 }}
               />

@@ -77,7 +77,7 @@ export default function TrainScreen() {
       <Card style={{ padding: space.xl }}>
         <Row style={{ justifyContent: 'space-between' }}>
           <T variant="overline" tone="dim">Hoy · {DAY_SHORT[weekday(today)]}</T>
-          {data.attendance ? <Badge label="Asistencia registrada" /> : null}
+          {data.attendance ? <Badge label="Hoy fuiste" /> : null}
         </Row>
         <T variant="title" style={{ marginTop: space.sm }}>{todayRoutine ? todayRoutine.name : 'Sin rutina para hoy'}</T>
         <T variant="label" tone="muted" style={{ marginTop: 2 }}>
@@ -99,17 +99,17 @@ export default function TrainScreen() {
                 onPress={() => router.push({ pathname: '/rutina/[id]', params: { id: todayRoutine.id } })}
               />
             ) : null}
-            <Button label="Registrar caminata, bici u otra actividad" icon="activity" variant="secondary" onPress={() => router.push('/actividad/nueva')} />
+            <Button label="Caminata, bici u otra actividad" icon="activity" variant="secondary" onPress={() => router.push('/actividad/nueva')} />
             <Row gap={space.sm}>
-              <Button label="Entrenamiento libre" icon="zap" variant="secondary" style={{ flex: 1 }} onPress={() => start(null)} />
+              <Button label="Entreno libre" icon="zap" variant="secondary" style={{ flex: 1 }} onPress={() => start(null)} />
               <Button
-                label={data.attendance ? 'Quitar asistencia' : 'Marcar asistencia'}
+                label={data.attendance ? 'Desmarcar' : 'Ya fui'}
                 icon={data.attendance ? 'x' : 'check'}
                 variant="secondary"
                 style={{ flex: 1 }}
                 onPress={() =>
                   run((db) => (data.attendance ? removeAttendance(db, today) : markAttendance(db, today)), {
-                    success: data.attendance ? 'Asistencia quitada' : 'Asistencia de hoy registrada',
+                    success: data.attendance ? 'Listo, lo desmarqué' : '¡Bien ahí! Hoy cuenta como día de gym',
                   })
                 }
               />

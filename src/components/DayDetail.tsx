@@ -78,9 +78,9 @@ export function DayDetail({ date }: { date: DateKey }) {
         {data.sessions.length > 0 ? <Divider style={{ marginBottom: space.md }} /> : null}
         {!isFuture ? (
           data.attendance ? (
-            <Button label="Quitar asistencia" icon="x" variant="ghost" size="sm" onPress={() => run((db) => removeAttendance(db, date), { success: 'Asistencia quitada' })} />
+            <Button label="Desmarcar este día" icon="x" variant="ghost" size="sm" onPress={() => run((db) => removeAttendance(db, date), { success: 'Listo, lo desmarqué' })} />
           ) : (
-            <Button label="Marcar que fui al gym" icon="check" variant="secondary" size="sm" onPress={() => run((db) => markAttendance(db, date), { success: 'Asistencia registrada' })} />
+            <Button label="Ese día fui" icon="check" variant="secondary" size="sm" onPress={() => run((db) => markAttendance(db, date), { success: '¡Bien ahí! Día marcado' })} />
           )
         ) : null}
       </Card>
