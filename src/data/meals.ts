@@ -1,5 +1,5 @@
 import type { Db, SqlValue } from '@/db/types';
-import { scaleNutrition, sumDailyTotals, type DailyTotals, type MealCategory } from '@/domain/nutrition';
+import { parseExtras, scaleNutrition, serializeExtras, sumDailyTotals, type DailyTotals, type Extras, type MealCategory } from '@/domain/nutrition';
 import { nowIso, type DateKey } from '@/lib/dates';
 import { newId } from '@/lib/ids';
 
@@ -22,9 +22,12 @@ export type Meal = {
   isCustom: boolean;
   sortOrder: number;
   ingredients: string[];
+  /** Optional nutrients per portion (carbs, fat…). Empty unless the person tracks them. */
+  extras: Extras;
 };
 
-type MealRow = Omit<Meal, 'isEstimate' | 'isFavorite' | 'isCustom' | 'ingredients'> & {
+type MealRow = Omit<Meal, 'isEstimate' | 'isFavorite' | 'isCustom' | 'ingredients' | 'extras'> & {
+  extrasRaw: string | null;
   isEstimate: number;
   isFavorite: number;
   isCustom: number;
@@ -32,7 +35,7 @@ type MealRow = Omit<Meal, 'isEstimate' | 'isFavorite' | 'isCustom' | 'ingredient
 
 const MEAL_COLUMNS = `id, seed_key AS seedKey, code, name, category, calories, protein, is_estimate AS isEstimate,
   prep_minutes AS prepMinutes, prep_label AS prepLabel, notes, tag, is_favorite AS isFavorite,
-  is_custom AS isCustom, sort_order AS sortOrder`;
+  is_custom AS isCustom, sort_order AS sortOrder, extras AS extrasRaw`;
 
 async function attachIngredients(db: Db, rows: MealRow[]): Promise<Meal[]> {
   if (rows.length === 0) return [];
@@ -43,8 +46,9 @@ async function attachIngredients(db: Db, rows: MealRow[]): Promise<Meal[]> {
   );
   const byMeal = new Map<string, string[]>();
   for (const i of ingredients) byMeal.set(i.mealId, [...(byMeal.get(i.mealId) ?? []), i.text]);
-  return rows.map((r) => ({
+  return rows.map(({ extrasRaw, ...r }) => ({
     ...r,
+    extras: parseExtras(extrasRaw),
     isEstimate: !!r.isEstimate,
     isFavorite: !!r.isFavorite,
     isCustom: !!r.isCustom,
@@ -92,6 +96,7 @@ export type MealInput = {
   prepMinutes?: number | null;
   notes?: string | null;
   ingredients: string[];
+  extras?: Extras;
 };
 
 function validateMeal(input: MealInput) {
@@ -107,20 +112,20 @@ export async function saveMeal(db: Db, input: MealInput, id?: string): Promise<s
   await db.withTransactionAsync(async () => {
     if (id) {
       await db.runAsync(
-        `UPDATE meals SET name = ?, category = ?, calories = ?, protein = ?, is_estimate = ?, prep_minutes = ?, notes = ?, updated_at = ?
+        `UPDATE meals SET name = ?, category = ?, calories = ?, protein = ?, is_estimate = ?, prep_minutes = ?, notes = ?, extras = ?, updated_at = ?
          WHERE id = ?`,
         [input.name.trim(), input.category, input.calories, input.protein, input.isEstimate ? 1 : 0, input.prepMinutes ?? null,
-          input.notes?.trim() || null, now, id],
+          input.notes?.trim() || null, serializeExtras(input.extras), now, id],
       );
       await db.runAsync('DELETE FROM meal_ingredients WHERE meal_id = ?', [id]);
     } else {
       const order = await db.getFirstAsync<{ n: number }>('SELECT coalesce(max(sort_order), 0) + 1 AS n FROM meals WHERE category = ?', [input.category]);
       await db.runAsync(
         `INSERT INTO meals (id, seed_key, code, name, category, calories, protein, is_estimate, prep_minutes, prep_label, notes, tag,
-           is_favorite, is_custom, is_archived, sort_order, created_at, updated_at)
-         VALUES (?, NULL, NULL, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, 0, 1, 0, ?, ?, ?)`,
+           is_favorite, is_custom, is_archived, sort_order, extras, created_at, updated_at)
+         VALUES (?, NULL, NULL, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, 0, 1, 0, ?, ?, ?, ?)`,
         [mealId, input.name.trim(), input.category, input.calories, input.protein, input.isEstimate ? 1 : 0, input.prepMinutes ?? null,
-          input.notes?.trim() || null, order?.n ?? 0, now, now],
+          input.notes?.trim() || null, order?.n ?? 0, serializeExtras(input.extras), now, now],
       );
     }
     const lines = input.ingredients.map((l) => l.trim()).filter(Boolean);
@@ -156,13 +161,15 @@ export type MealLog = {
   isEstimate: boolean;
   notes: string | null;
   loggedAt: string;
+  /** Optional nutrients for ONE portion; multiply by `portion` for the logged amount. */
+  extras: Extras;
 };
 
 const LOG_COLUMNS = `id, log_date AS logDate, category, meal_id AS mealId, name, portion, base_calories AS baseCalories,
-  base_protein AS baseProtein, calories, protein, is_estimate AS isEstimate, notes, logged_at AS loggedAt`;
+  base_protein AS baseProtein, calories, protein, is_estimate AS isEstimate, notes, logged_at AS loggedAt, extras AS extrasRaw`;
 
-type LogRow = Omit<MealLog, 'isEstimate'> & { isEstimate: number };
-const toLog = (r: LogRow): MealLog => ({ ...r, isEstimate: !!r.isEstimate });
+type LogRow = Omit<MealLog, 'isEstimate' | 'extras'> & { isEstimate: number; extrasRaw: string | null };
+const toLog = ({ extrasRaw, ...r }: LogRow): MealLog => ({ ...r, isEstimate: !!r.isEstimate, extras: parseExtras(extrasRaw) });
 
 export type LogMealInput = {
   date: DateKey;
@@ -170,8 +177,8 @@ export type LogMealInput = {
   portion?: number;
   notes?: string | null;
 } & (
-  | { meal: Pick<Meal, 'id' | 'name' | 'calories' | 'protein' | 'isEstimate'> }
-  | { manual: { name: string; calories: number; protein: number } }
+  | { meal: Pick<Meal, 'id' | 'name' | 'calories' | 'protein' | 'isEstimate'> & { extras?: Extras } }
+  | { manual: { name: string; calories: number; protein: number; extras?: Extras } }
 );
 
 /** Stores a snapshot of the meal's name and nutrition at logging time. */
@@ -179,8 +186,8 @@ export async function logMeal(db: Db, input: LogMealInput): Promise<MealLog> {
   const portion = input.portion ?? 1;
   if (!(portion > 0)) throw new Error('La porción tiene que ser mayor a cero.');
   const source = 'meal' in input
-    ? { mealId: input.meal.id, name: input.meal.name, calories: input.meal.calories, protein: input.meal.protein, isEstimate: input.meal.isEstimate }
-    : { mealId: null, name: input.manual.name.trim(), calories: input.manual.calories, protein: input.manual.protein, isEstimate: true };
+    ? { mealId: input.meal.id, name: input.meal.name, calories: input.meal.calories, protein: input.meal.protein, isEstimate: input.meal.isEstimate, extras: input.meal.extras ?? {} }
+    : { mealId: null, name: input.manual.name.trim(), calories: input.manual.calories, protein: input.manual.protein, isEstimate: true, extras: input.manual.extras ?? {} };
   if (!source.name) throw new Error('Poné un nombre para la comida.');
   if (!(source.calories >= 0) || !(source.protein >= 0)) throw new Error('Calorías y proteína no pueden ser negativas.');
 
@@ -200,12 +207,13 @@ export async function logMeal(db: Db, input: LogMealInput): Promise<MealLog> {
     isEstimate: source.isEstimate,
     notes: input.notes?.trim() || null,
     loggedAt: now,
+    extras: parseExtras(serializeExtras(source.extras)),
   };
   await db.runAsync(
     `INSERT INTO meal_logs (id, log_date, category, meal_id, name, portion, base_calories, base_protein, calories, protein,
-       is_estimate, notes, logged_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       is_estimate, notes, logged_at, extras, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [log.id, log.logDate, log.category, log.mealId, log.name, log.portion, log.baseCalories, log.baseProtein, log.calories, log.protein,
-      log.isEstimate ? 1 : 0, log.notes, now, now, now],
+      log.isEstimate ? 1 : 0, log.notes, now, serializeExtras(log.extras), now, now],
   );
   return log;
 }
@@ -248,9 +256,9 @@ export async function repeatMealLog(db: Db, id: string): Promise<MealLog> {
   const copy: MealLog = { ...log, id: newId(), loggedAt: now };
   await db.runAsync(
     `INSERT INTO meal_logs (id, log_date, category, meal_id, name, portion, base_calories, base_protein, calories, protein,
-       is_estimate, notes, logged_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       is_estimate, notes, logged_at, extras, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [copy.id, copy.logDate, copy.category, copy.mealId, copy.name, copy.portion, copy.baseCalories, copy.baseProtein, copy.calories,
-      copy.protein, copy.isEstimate ? 1 : 0, copy.notes, now, now, now],
+      copy.protein, copy.isEstimate ? 1 : 0, copy.notes, now, serializeExtras(copy.extras), now, now],
   );
   return copy;
 }
@@ -288,9 +296,9 @@ export async function duplicateDay(db: Db, from: DateKey, to: DateKey): Promise<
     for (const l of logs) {
       await db.runAsync(
         `INSERT INTO meal_logs (id, log_date, category, meal_id, name, portion, base_calories, base_protein, calories, protein,
-           is_estimate, notes, logged_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           is_estimate, notes, logged_at, extras, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [newId(), to, l.category, l.mealId, l.name, l.portion, l.baseCalories, l.baseProtein, l.calories, l.protein,
-          l.isEstimate ? 1 : 0, l.notes, now, now, now],
+          l.isEstimate ? 1 : 0, l.notes, now, serializeExtras(l.extras), now, now],
       );
     }
   });
