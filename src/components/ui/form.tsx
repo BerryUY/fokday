@@ -5,6 +5,7 @@ import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/theme/ThemeProvider';
 import { font, radius, space } from '@/theme/tokens';
+import { showConfirm } from './dialog';
 import { PressableScale, T } from './primitives';
 
 export const Field = forwardRef<ComponentRef<typeof TextInput>, TextInputProps & { label?: string; suffix?: string; hint?: string; large?: boolean; error?: string | null }>(
@@ -84,8 +85,10 @@ export function Sheet({ visible, onClose, title, children }: { visible: boolean;
   );
 }
 
-/** Native confirmation dialog (window.confirm on web previews). */
+/** Confirmation dialog in the app's own style (native alert only if the host is not mounted yet). */
 export function confirm(title: string, message: string, confirmLabel = 'Confirmar', destructive = false): Promise<boolean> {
+  const styled = showConfirm(title, message, confirmLabel, destructive);
+  if (styled) return styled;
   if (Platform.OS === 'web') {
     return Promise.resolve(typeof window !== 'undefined' ? window.confirm(`${title}\n\n${message}`) : false);
   }

@@ -14,6 +14,7 @@ import { useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { startBackupService } from '@/backup/service';
+import { DialogHost } from '@/components/ui/dialog';
 import { getProfile, type ThemePreference } from '@/data/settings';
 import { openAppDatabase } from '@/db/client';
 import type { Db } from '@/db/types';
@@ -77,6 +78,7 @@ function ThemedApp() {
     <ThemeProvider preference={preference}>
       <ToastProvider>
         <Navigator />
+        <DialogHost />
       </ToastProvider>
     </ThemeProvider>
   );
