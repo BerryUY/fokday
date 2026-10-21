@@ -101,7 +101,7 @@ export default function TrainScreen() {
             ) : null}
             <Button label="Caminata, bici u otra actividad" icon="activity" variant="secondary" onPress={() => router.push('/actividad/nueva')} />
             <Row gap={space.sm}>
-              <Button label="Entreno libre" icon="zap" variant="secondary" style={{ flex: 1 }} onPress={() => start(null)} />
+              <Button label="Entreno libre" variant="secondary" style={{ flex: 1 }} onPress={() => start(null)} />
               <Button
                 label={data.attendance ? 'Desmarcar' : 'Ya fui'}
                 icon={data.attendance ? 'x' : 'check'}
