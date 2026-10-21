@@ -23,10 +23,10 @@ const V1_TABLES = [
   'daily_notes',
 ] as const;
 
-export const DATA_TABLES = [...V1_TABLES, 'daily_habits'] as const;
+export const DATA_TABLES = [...V1_TABLES, 'daily_habits', 'activities'] as const;
 
 /** Schema version that introduced a table: older backups simply don't have it. */
-export const TABLE_ADDED_IN: Partial<Record<(typeof DATA_TABLES)[number], number>> = { daily_habits: 2 };
+export const TABLE_ADDED_IN: Partial<Record<(typeof DATA_TABLES)[number], number>> = { daily_habits: 2, activities: 2 };
 
 export type DataTable = (typeof DATA_TABLES)[number];
 
@@ -244,10 +244,12 @@ function revisionTriggers(tables: readonly string[]): string {
 
 export type Migration = { version: number; name: string; sql: string };
 
-// Optional tracking: extra nutrients per meal (JSON, per base portion) and a daily habits row (creatine, water).
+// Optional tracking: extra nutrients per meal (JSON, per base portion), a daily habits row (creatine, water),
+// free activities (walks, cycling…) and the weekdays a routine exercise belongs to (JSON array, NULL = every day).
 const V2 = `
 ALTER TABLE meals ADD COLUMN extras TEXT;
 ALTER TABLE meal_logs ADD COLUMN extras TEXT;
+ALTER TABLE routine_exercises ADD COLUMN days TEXT;
 
 CREATE TABLE daily_habits (
   date TEXT PRIMARY KEY NOT NULL,
@@ -255,11 +257,23 @@ CREATE TABLE daily_habits (
   water_ml INTEGER NOT NULL DEFAULT 0 CHECK (water_ml >= 0),
   updated_at TEXT NOT NULL
 );
+
+CREATE TABLE activities (
+  id TEXT PRIMARY KEY NOT NULL,
+  date TEXT NOT NULL,
+  type TEXT NOT NULL,
+  minutes INTEGER NOT NULL CHECK (minutes > 0),
+  distance_km REAL,
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX idx_activities_date ON activities (date);
 `;
 
 export const MIGRATIONS: Migration[] = [
   { version: 1, name: 'initial schema', sql: V1 + '\n' + revisionTriggers(V1_TABLES) },
-  { version: 2, name: 'optional tracking', sql: V2 + '\n' + revisionTriggers(['daily_habits']) },
+  { version: 2, name: 'optional tracking and activities', sql: V2 + '\n' + revisionTriggers(['daily_habits', 'activities']) },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

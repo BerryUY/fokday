@@ -98,16 +98,20 @@ export type RoutineExercise = {
   repsMax: number | null;
   restSeconds: number | null;
   notes: string | null;
+  /** Weekdays (0 = domingo) this exercise belongs to; empty means every day the routine is done. */
+  days: number[];
 };
 
 export type Routine = RoutineSummary & { exercises: RoutineExercise[] };
 
-export async function listRoutines(db: Db): Promise<RoutineSummary[]> {
+/** Counts reflect only the exercises that apply on `forWeekday` when one is given. */
+export async function listRoutines(db: Db, forWeekday?: number): Promise<RoutineSummary[]> {
   const rows = await db.getAllAsync<Omit<RoutineSummary, 'weekdays'>>(
     `SELECT r.id, r.name, r.notes, count(re.id) AS exerciseCount, coalesce(sum(re.sets), 0) AS totalSets
      FROM workout_routines r LEFT JOIN routine_exercises re ON re.routine_id = r.id
+       AND (? IS NULL OR re.days IS NULL OR EXISTS (SELECT 1 FROM json_each(re.days) WHERE value = ?))
      GROUP BY r.id ORDER BY r.sort_order, r.created_at`,
-    [],
+    [forWeekday ?? null, forWeekday ?? null],
   );
   const schedule = await db.getAllAsync<{ weekday: number; routineId: string }>('SELECT weekday, routine_id AS routineId FROM routine_schedule', []);
   return rows.map((r) => ({ ...r, weekdays: schedule.filter((s) => s.routineId === r.id).map((s) => s.weekday).sort() }));
@@ -116,20 +120,21 @@ export async function listRoutines(db: Db): Promise<RoutineSummary[]> {
 export async function getRoutine(db: Db, id: string): Promise<Routine | null> {
   const summary = (await listRoutines(db)).find((r) => r.id === id);
   if (!summary) return null;
-  const exercises = await db.getAllAsync<RoutineExercise>(
+  const rows = await db.getAllAsync<Omit<RoutineExercise, 'days'> & { daysRaw: string | null }>(
     `SELECT re.id, re.exercise_id AS exerciseId, e.name, e.muscle_group AS muscleGroup, re.position, re.sets,
-       re.reps_min AS repsMin, re.reps_max AS repsMax, re.rest_seconds AS restSeconds, re.notes
+       re.reps_min AS repsMin, re.reps_max AS repsMax, re.rest_seconds AS restSeconds, re.notes, re.days AS daysRaw
      FROM routine_exercises re JOIN exercises e ON e.id = re.exercise_id
      WHERE re.routine_id = ? ORDER BY re.position`,
     [id],
   );
+  const exercises = rows.map(({ daysRaw, ...r }) => ({ ...r, days: parseDays(daysRaw) }));
   return { ...summary, exercises };
 }
 
 export async function getRoutineForWeekday(db: Db, weekday: number): Promise<RoutineSummary | null> {
   const row = await db.getFirstAsync<{ routineId: string }>('SELECT routine_id AS routineId FROM routine_schedule WHERE weekday = ?', [weekday]);
   if (!row) return null;
-  return (await listRoutines(db)).find((r) => r.id === row.routineId) ?? null;
+  return (await listRoutines(db, weekday)).find((r) => r.id === row.routineId) ?? null;
 }
 
 export async function saveRoutine(db: Db, input: { name: string; notes?: string | null }, id?: string): Promise<string> {
@@ -175,7 +180,28 @@ export type RoutineExerciseInput = {
   repsMax: number | null;
   restSeconds: number | null;
   notes: string | null;
+  /** Weekdays this exercise is done; empty or missing = every day. */
+  days?: number[];
 };
+
+function parseDays(raw: string | null): number[] {
+  try {
+    const parsed = JSON.parse(raw ?? '[]');
+    return Array.isArray(parsed) ? parsed.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6).sort() : [];
+  } catch {
+    return [];
+  }
+}
+
+function serializeDays(days: number[] | undefined): string | null {
+  const clean = [...new Set((days ?? []).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort();
+  return clean.length === 0 || clean.length === 7 ? null : JSON.stringify(clean);
+}
+
+/** Exercises to do on a weekday: the ones tagged for it plus the untagged ones. */
+export function exercisesForWeekday<T extends { days: number[] }>(exercises: T[], weekday: number): T[] {
+  return exercises.filter((e) => e.days.length === 0 || e.days.includes(weekday));
+}
 
 function validateTargets(input: RoutineExerciseInput) {
   if (!(input.sets >= 1 && input.sets <= 20)) throw new Error('Las series tienen que estar entre 1 y 20.');
@@ -190,9 +216,9 @@ export async function addRoutineExercise(db: Db, routineId: string, exerciseId: 
   const id = newId();
   const pos = await db.getFirstAsync<{ n: number }>('SELECT coalesce(max(position), -1) + 1 AS n FROM routine_exercises WHERE routine_id = ?', [routineId]);
   await db.runAsync(
-    `INSERT INTO routine_exercises (id, routine_id, exercise_id, position, sets, reps_min, reps_max, rest_seconds, notes, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, routineId, exerciseId, pos?.n ?? 0, input.sets, input.repsMin, input.repsMax, input.restSeconds, input.notes?.trim() || null, now, now],
+    `INSERT INTO routine_exercises (id, routine_id, exercise_id, position, sets, reps_min, reps_max, rest_seconds, notes, days, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, routineId, exerciseId, pos?.n ?? 0, input.sets, input.repsMin, input.repsMax, input.restSeconds, input.notes?.trim() || null, serializeDays(input.days), now, now],
   );
   return id;
 }
@@ -200,8 +226,8 @@ export async function addRoutineExercise(db: Db, routineId: string, exerciseId: 
 export async function updateRoutineExercise(db: Db, id: string, input: RoutineExerciseInput): Promise<void> {
   validateTargets(input);
   await db.runAsync(
-    'UPDATE routine_exercises SET sets = ?, reps_min = ?, reps_max = ?, rest_seconds = ?, notes = ?, updated_at = ? WHERE id = ?',
-    [input.sets, input.repsMin, input.repsMax, input.restSeconds, input.notes?.trim() || null, nowIso(), id],
+    'UPDATE routine_exercises SET sets = ?, reps_min = ?, reps_max = ?, rest_seconds = ?, notes = ?, days = ?, updated_at = ? WHERE id = ?',
+    [input.sets, input.repsMin, input.repsMax, input.restSeconds, input.notes?.trim() || null, serializeDays(input.days), nowIso(), id],
   );
 }
 

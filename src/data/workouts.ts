@@ -1,8 +1,8 @@
 import type { Db } from '@/db/types';
-import { nowIso, type DateKey } from '@/lib/dates';
+import { nowIso, weekday, type DateKey } from '@/lib/dates';
 import { newId } from '@/lib/ids';
 import { markAttendance } from './attendance';
-import { getExercise, getRoutine } from './routines';
+import { exercisesForWeekday, getExercise, getRoutine } from './routines';
 
 export type SessionStatus = 'in_progress' | 'completed';
 export type ExerciseStatus = 'pending' | 'done' | 'skipped';
@@ -112,8 +112,11 @@ async function insertWorkoutExercise(
   return id;
 }
 
-/** Starts a session from a routine (or empty). Only one session can be in progress. */
-export async function startSession(db: Db, date: DateKey, routineId: string | null): Promise<string> {
+/**
+ * Starts a session from a routine (or empty). Only one session can be in progress.
+ * Only the exercises that apply on `onWeekday` (default: the weekday of `date`) are added.
+ */
+export async function startSession(db: Db, date: DateKey, routineId: string | null, onWeekday: number = weekday(date)): Promise<string> {
   const active = await getActiveSession(db);
   if (active) return active.id;
   const routine = routineId ? await getRoutine(db, routineId) : null;
@@ -125,7 +128,7 @@ export async function startSession(db: Db, date: DateKey, routineId: string | nu
        VALUES (?, ?, ?, ?, 'in_progress', ?, NULL, NULL, NULL, ?, ?)`,
       [id, routine?.id ?? null, routine?.name ?? null, date, now, now, now],
     );
-    for (const [i, ex] of (routine?.exercises ?? []).entries()) {
+    for (const [i, ex] of exercisesForWeekday(routine?.exercises ?? [], onWeekday).entries()) {
       await insertWorkoutExercise(db, id, i, ex);
     }
   });
