@@ -1,17 +1,24 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
+import { createCloudProfile, defaultApiUrl } from '@/backup/service';
 import { Field } from '@/components/ui/form';
 import { Screen } from '@/components/ui/layout';
 import { Button, Card, Chip, Row, T } from '@/components/ui/primitives';
 import { completeOnboarding, isOnboarded } from '@/data/settings';
 import { DAY_SHORT, todayKey, WEEK_ORDER } from '@/lib/dates';
 import { parsePositive } from '@/lib/format';
-import { useMutation, useQuery } from '@/state/db';
+import { useDb, useMutation, useQuery } from '@/state/db';
+import { useToast } from '@/state/toast';
 import { space } from '@/theme/tokens';
 
 export default function WelcomeScreen() {
+  const db = useDb();
   const run = useMutation();
+  const toast = useToast();
+  const apiUrl = defaultApiUrl();
+  const finishing = useRef(false);
+  const [invite, setInvite] = useState('');
   const { data: onboarded } = useQuery((db) => isOnboarded(db), []);
   const [name, setName] = useState('');
   const [current, setCurrent] = useState('');
@@ -22,7 +29,7 @@ export default function WelcomeScreen() {
 
   // Restoring a backup from this screen marks setup as done: leave once that happens.
   useEffect(() => {
-    if (onboarded) router.replace('/');
+    if (onboarded && !finishing.current) router.replace('/');
   }, [onboarded]);
 
   const currentValue = parsePositive(current);
@@ -35,11 +42,25 @@ export default function WelcomeScreen() {
 
   const start = async () => {
     if (!valid) return;
+    finishing.current = true;
     const ok = await run(
       (db) => completeOnboarding(db, { name, currentWeight: currentValue!, targetWeight: targetValue!, calories: kcalValue!, protein: protValue!, trainingDays: days }, todayKey()),
       { success: '¡Listo! Empecemos' },
     );
-    if (ok !== undefined) router.replace('/');
+    if (ok === undefined) {
+      finishing.current = false;
+      return;
+    }
+    if (invite.trim() && apiUrl) {
+      try {
+        await createCloudProfile(db, { url: apiUrl, inviteCode: invite, name });
+        router.replace({ pathname: '/ajustes/respaldo', params: { nuevo: '1' } });
+        return;
+      } catch (e) {
+        toast.show(`${e instanceof Error ? e.message : 'No se pudo crear el perfil.'} Podés crearlo después en Ajustes → Datos y respaldo.`, 'error');
+      }
+    }
+    router.replace('/');
   };
 
   return (
@@ -75,6 +96,16 @@ export default function WelcomeScreen() {
             ))}
           </Row>
         </View>
+        {apiUrl ? (
+          <Field
+            label="Código de invitación (opcional)"
+            value={invite}
+            onChangeText={setInvite}
+            placeholder="Para guardar tus datos en la nube"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        ) : null}
         <Card tone="alt">
           <T variant="caption" tone="muted">
             Las calorías y la proteína de arriba son valores de ejemplo: cambialos por los tuyos. Tus datos viven en este teléfono y funcionan sin internet.

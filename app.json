@@ -66,7 +66,8 @@
       },
       "eas": {
         "projectId": "16417576-ddbb-4a19-b5cd-a4453a715d85"
-      }
+      },
+      "backupApiUrl": ""
     }
   }
 }

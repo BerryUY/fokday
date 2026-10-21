@@ -1,12 +1,13 @@
 import NetInfo from '@react-native-community/netinfo';
+import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { useSyncExternalStore } from 'react';
 import { AppState, Platform } from 'react-native';
 import type { Db } from '@/db/types';
 import { newId } from '@/lib/ids';
 import { subscribeData } from '@/state/dataBus';
-import { normalizeBaseUrl, type CloudConfig } from './api';
-import { getSyncInfo, runBackup, type BackupOutcome, type SyncDeps, type SyncInfo } from './sync';
+import { cloudApi, normalizeBaseUrl, type CloudConfig } from './api';
+import { getSyncInfo, runBackup, setLinked, type BackupOutcome, type SyncDeps, type SyncInfo } from './sync';
 
 /**
  * Runs backups in the background of the UI (all async, never blocks a screen):
@@ -34,6 +35,30 @@ export async function saveCloudConfig(config: CloudConfig): Promise<void> {
   await secure.set(URL_KEY, normalizeBaseUrl(config.url));
   await secure.set(TOKEN_KEY, config.token.trim());
   refreshState();
+}
+
+/** Address of the backup server baked into the app (app.json → extra.backupApiUrl); empty until the server is deployed. */
+export function defaultApiUrl(): string {
+  const value = Constants.expoConfig?.extra?.backupApiUrl;
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+/** The personal token doubles as the recovery code: with it, a new phone can reach the same backups. */
+export async function getRecoveryCode(): Promise<string | null> {
+  return secure.get(TOKEN_KEY);
+}
+
+/**
+ * Creates this person's profile on the server with an invite code and links the phone to it.
+ * The phone's data is the source of truth for a brand-new profile, so automatic backups start right away.
+ */
+export async function createCloudProfile(database: Db, input: { url: string; inviteCode: string; name: string }): Promise<void> {
+  const url = normalizeBaseUrl(input.url);
+  if (!/^https:\/\//.test(url)) throw new Error('La dirección del servidor tiene que empezar con https://');
+  const { token } = await cloudApi.createProfile(url, input.inviteCode.trim(), input.name);
+  await saveCloudConfig({ url, token });
+  await setLinked(database, true);
+  void backupNow(true);
 }
 
 export async function clearCloudConfig(): Promise<void> {

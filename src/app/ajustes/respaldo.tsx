@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Share, View } from 'react-native';
 import { cloudApi, normalizeBaseUrl, type CloudBackupMeta } from '@/backup/api';
 import { buildCsv, CSV_KINDS, type CsvKind } from '@/backup/csv';
 import { exportCsv, exportJsonBackup, listSafetyCopies, pickJsonBackup, readSafetyCopy, saveSafetyCopy, shareSafetyCopy } from '@/backup/files';
-import { backupNow, clearCloudConfig, getCloudConfig, refreshSyncState, saveCloudConfig, syncDeps, useSyncState } from '@/backup/service';
+import { backupNow, clearCloudConfig, createCloudProfile, defaultApiUrl, getCloudConfig, getRecoveryCode, refreshSyncState, saveCloudConfig, syncDeps, useSyncState } from '@/backup/service';
 import { countUserRecords, hasUserChanges, type BackupEnvelope } from '@/backup/snapshot';
 import { applyRestore, prepareCloudRestore, setLinked } from '@/backup/sync';
 import { Field, Sheet, confirm } from '@/components/ui/form';
 import { ListRow, Screen } from '@/components/ui/layout';
 import { Badge, Button, Card, Chip, Divider, Row, SectionHeader, T } from '@/components/ui/primitives';
 import { resetAllData } from '@/data/reset';
+import { getProfile } from '@/data/settings';
+import { useParams } from '@/lib/params';
 import { addDays, formatDateTime, todayKey } from '@/lib/dates';
 import { useDb, useMutation } from '@/state/db';
 import { notifyDataChanged } from '@/state/dataBus';
@@ -30,6 +32,11 @@ export default function BackupScreen() {
   const [setupOpen, setSetupOpen] = useState(false);
   const [url, setUrl] = useState('');
   const [token, setToken] = useState('');
+  const [mode, setMode] = useState<'new' | 'existing'>('new');
+  const [invite, setInvite] = useState('');
+  const [recovery, setRecovery] = useState<string | null>(null);
+  const apiUrl = defaultApiUrl();
+  const justOnboarded = useParams().string('nuevo') === '1';
   const [busy, setBusy] = useState<string | null>(null);
   const [cloudList, setCloudList] = useState<CloudBackupMeta[] | null>(null);
   const [linkChoice, setLinkChoice] = useState<{ count: number; latest: CloudBackupMeta } | null>(null);
@@ -41,6 +48,11 @@ export default function BackupScreen() {
     getCloudConfig().then((cfg) => setHost(cfg ? cfg.url.replace(/^https?:\/\//, '').split('/')[0] : null)).catch(() => setHost(null));
     void refreshSyncState();
   }, [sync.configured]);
+
+  // Coming from the welcome screen with a fresh profile: show the recovery code once.
+  useEffect(() => {
+    if (justOnboarded && sync.configured) getRecoveryCode().then(setRecovery).catch(() => {});
+  }, [justOnboarded, sync.configured]);
 
   const withBusy = async (key: string, fn: () => Promise<void>) => {
     setBusy(key);
@@ -72,9 +84,19 @@ export default function BackupScreen() {
     return true;
   };
 
+  const createProfile = () =>
+    withBusy('profile', async () => {
+      const profile = await getProfile(db);
+      await createCloudProfile(db, { url: apiUrl || url, inviteCode: invite, name: profile.name });
+      setSetupOpen(false);
+      setInvite('');
+      setRecovery(await getRecoveryCode());
+      toast.show('Perfil creado');
+    });
+
   const connect = () =>
     withBusy('connect', async () => {
-      const config = { url: normalizeBaseUrl(url), token: token.trim() };
+      const config = { url: normalizeBaseUrl(apiUrl || url), token: token.trim() };
       if (!/^https:\/\//.test(config.url)) throw new Error('La dirección tiene que empezar con https://');
       const status = await cloudApi.status(config);
       await saveCloudConfig(config);
@@ -137,12 +159,12 @@ export default function BackupScreen() {
           </View>
         ) : (
           <T variant="label" tone="muted" style={{ marginTop: space.md }}>
-            Conectá tu API personal (Vercel + Neon) con tu token para tener copias automáticas y poder recuperar todo si cambiás de teléfono. Los pasos están en el README.
+            Creá tu perfil con el código de invitación que te pasaron y tus datos se copian solos a la nube, para recuperarlos si cambiás de teléfono. Si ya tenías un perfil, conectalo con tu código de recuperación.
           </T>
         )}
         <View style={{ gap: space.sm, marginTop: space.lg }}>
           {!sync.configured ? (
-            <Button label="Configurar conexión" icon="link" onPress={() => setSetupOpen(true)} />
+            <Button label="Crear mi perfil o conectar" icon="link" onPress={() => setSetupOpen(true)} />
           ) : !sync.info?.linked ? (
             <Button label="Revisar respaldos de la nube" icon="cloud" loading={busy === 'link'} onPress={resumeLink} />
           ) : (
@@ -178,11 +200,17 @@ export default function BackupScreen() {
                 }
               />
               <Button
+                label="Ver mi código de recuperación"
+                icon="key"
+                variant="secondary"
+                onPress={async () => setRecovery(await getRecoveryCode())}
+              />
+              <Button
                 label="Desconectar"
                 variant="ghost"
                 size="sm"
                 onPress={async () => {
-                  if (!(await confirm('Desconectar', 'Se borra la dirección y el token de este teléfono. Tus respaldos en la nube no se tocan.', 'Desconectar', true))) return;
+                  if (!(await confirm('Desconectar', 'Se borra la conexión de este teléfono. Tus respaldos en la nube no se tocan, pero vas a necesitar tu código de recuperación para volver a conectarte.', 'Desconectar', true))) return;
                   await clearCloudConfig();
                   await setLinked(db, false);
                   void refreshSyncState();
@@ -288,12 +316,39 @@ export default function BackupScreen() {
         />
       </Card>
 
-      <Sheet visible={setupOpen} onClose={() => setSetupOpen(false)} title="Conectar respaldo">
+      <Sheet visible={setupOpen} onClose={() => setSetupOpen(false)} title="Respaldo en la nube">
         <View style={{ gap: space.lg }}>
-          <Field label="Dirección de tu API" value={url} onChangeText={setUrl} placeholder="https://momentum-api-tuusuario.vercel.app" autoCapitalize="none" autoCorrect={false} keyboardType="url" />
-          <Field label="Token personal" value={token} onChangeText={setToken} placeholder="El valor de MOMENTUM_API_TOKEN" autoCapitalize="none" autoCorrect={false} secureTextEntry />
-          <T variant="caption" tone="dim">El token se guarda cifrado en este teléfono (SecureStore) y nunca se incluye en los respaldos.</T>
-          <Button label="Probar y conectar" icon="link" loading={busy === 'connect'} disabled={!url.trim() || !token.trim()} onPress={connect} />
+          <Row>
+            <Chip label="Soy nuevo" selected={mode === 'new'} onPress={() => setMode('new')} />
+            <Chip label="Ya tengo un perfil" selected={mode === 'existing'} onPress={() => setMode('existing')} />
+          </Row>
+          {!apiUrl ? (
+            <Field label="Dirección del servidor" value={url} onChangeText={setUrl} placeholder="https://momentum-api.vercel.app" autoCapitalize="none" autoCorrect={false} keyboardType="url" />
+          ) : null}
+          {mode === 'new' ? (
+            <>
+              <Field label="Código de invitación" value={invite} onChangeText={setInvite} placeholder="El que te pasó quien administra la app" autoCapitalize="none" autoCorrect={false} />
+              <T variant="caption" tone="dim">Se crea un perfil solo tuyo: nadie más puede ver tus respaldos. Te damos un código de recuperación para volver a entrar desde otro teléfono.</T>
+              <Button label="Crear mi perfil" icon="user-plus" loading={busy === 'profile'} disabled={!(apiUrl || url.trim()) || !invite.trim()} onPress={createProfile} />
+            </>
+          ) : (
+            <>
+              <Field label="Código de recuperación" value={token} onChangeText={setToken} placeholder="El que te mostramos al crear tu perfil" autoCapitalize="none" autoCorrect={false} secureTextEntry />
+              <T variant="caption" tone="dim">Se guarda cifrado en este teléfono (SecureStore) y nunca se incluye en los respaldos.</T>
+              <Button label="Probar y conectar" icon="link" loading={busy === 'connect'} disabled={!(apiUrl || url.trim()) || !token.trim()} onPress={connect} />
+            </>
+          )}
+        </View>
+      </Sheet>
+
+      <Sheet visible={!!recovery} onClose={() => setRecovery(null)} title="Tu código de recuperación">
+        <View style={{ gap: space.lg }}>
+          <T variant="label" tone="muted">Guardalo en un lugar seguro, por ejemplo tu gestor de contraseñas. Si cambiás de teléfono o reinstalás la app, lo necesitás para recuperar tus datos. Quien tenga este código puede ver tus respaldos.</T>
+          <Card tone="alt">
+            <T variant="bodyMedium" selectable style={{ fontVariant: ['tabular-nums'] }}>{recovery}</T>
+          </Card>
+          <Button label="Compartir o copiar" icon="share" onPress={() => void Share.share({ message: recovery ?? '' })} />
+          <Button label="Ya lo guardé" variant="secondary" onPress={() => setRecovery(null)} />
         </View>
       </Sheet>
 
