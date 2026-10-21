@@ -32,6 +32,7 @@
       "output": "single"
     },
     "plugins": [
+      ["expo-notifications", { "icon": "./assets/notification-icon.png", "color": "#C8F560", "defaultChannel": "recordatorios" }],
       [
         "expo-router",
         {

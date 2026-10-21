@@ -16,6 +16,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { startBackupService } from '@/backup/service';
 import { DialogHost } from '@/components/ui/dialog';
 import { getProfile, type ThemePreference } from '@/data/settings';
+import { applyReminders } from '@/notifications/schedule';
 import { openAppDatabase } from '@/db/client';
 import type { Db } from '@/db/types';
 import { DbProvider, useDataVersion, useDb } from '@/state/db';
@@ -72,6 +73,12 @@ function ThemedApp() {
 
   useEffect(() => {
     getProfile(db).then((p) => setPreference(p.theme)).catch(() => {});
+  }, [db, version]);
+
+  // Keeps scheduled reminders in line with the settings (skipped when nothing changed).
+  useEffect(() => {
+    const timer = setTimeout(() => void applyReminders(db).catch(() => {}), 1500);
+    return () => clearTimeout(timer);
   }, [db, version]);
 
   return (

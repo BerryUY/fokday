@@ -99,5 +99,7 @@ writeFileSync(new URL('icon.png', dir), render(1024, { background: BG, scale: 1 
 writeFileSync(new URL('android-icon-foreground.png', dir), render(1024, { background: null, scale: 0.62 }));
 writeFileSync(new URL('android-icon-monochrome.png', dir), render(1024, { background: null, scale: 0.62, color: [255, 255, 255] }));
 writeFileSync(new URL('splash-icon.png', dir), render(512, { background: null, scale: 1 }));
+// Android status-bar icon: white shape on transparent, as the platform requires.
+writeFileSync(new URL('notification-icon.png', dir), render(96, { background: null, scale: 0.9, color: [255, 255, 255] }));
 writeFileSync(new URL('favicon.png', dir), render(64, { background: BG, scale: 1, cornerRadius: 0.22 }));
 console.log('Icons written to assets/');
