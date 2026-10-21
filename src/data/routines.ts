@@ -199,7 +199,8 @@ function serializeDays(days: number[] | undefined): string | null {
 }
 
 /** Exercises to do on a weekday: the ones tagged for it plus the untagged ones. */
-export function exercisesForWeekday<T extends { days: number[] }>(exercises: T[], weekday: number): T[] {
+export function exercisesForWeekday<T extends { days: number[] }>(exercises: T[], weekday: number | null): T[] {
+  if (weekday === null) return exercises;
   return exercises.filter((e) => e.days.length === 0 || e.days.includes(weekday));
 }
 

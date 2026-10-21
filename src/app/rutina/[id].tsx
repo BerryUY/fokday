@@ -8,6 +8,7 @@ import { EmptyState, Loading, Screen } from '@/components/ui/layout';
 import { Button, Card, Chip, IconButton, Row, SectionHeader, T } from '@/components/ui/primitives';
 import {
   deleteRoutine,
+  exercisesForWeekday,
   formatReps,
   getRoutine,
   moveRoutineExercise,
@@ -18,7 +19,7 @@ import {
   type RoutineExercise,
 } from '@/data/routines';
 import { getActiveSession, startSession } from '@/data/workouts';
-import { DAY_SHORT, todayKey, WEEK_ORDER } from '@/lib/dates';
+import { DAY_SHORT, todayKey, weekday, WEEK_ORDER } from '@/lib/dates';
 import { parsePositive } from '@/lib/format';
 import { useParams } from '@/lib/params';
 import { useMutation, useQuery } from '@/state/db';
@@ -29,6 +30,8 @@ export default function RoutineScreen() {
   const run = useMutation();
   const [editing, setEditing] = useState<RoutineExercise | null>(null);
   const [renaming, setRenaming] = useState(false);
+  // null = automatic: today's exercises when the routine splits them by day, otherwise all of them.
+  const [view, setView] = useState<number | 'all' | null>(null);
 
   const { data, loading } = useQuery(async (db) => ({ routine: await getRoutine(db, id), active: await getActiveSession(db) }), [id]);
   const routine = data?.routine;
@@ -41,8 +44,13 @@ export default function RoutineScreen() {
     run((db) => setRoutineWeekdays(db, routine.id, next));
   };
 
+  const splitByDay = routine.exercises.some((e) => e.days.length > 0);
+  const today = weekday(todayKey());
+  const shownDay: number | 'all' = view ?? (splitByDay ? today : 'all');
+  const shown = shownDay === 'all' ? routine.exercises : exercisesForWeekday(routine.exercises, shownDay);
+
   const start = async () => {
-    const sessionId = await run((db) => startSession(db, todayKey(), routine.id));
+    const sessionId = await run((db) => startSession(db, todayKey(), routine.id, shownDay === 'all' ? null : shownDay));
     if (sessionId) router.push('/sesion/activa');
   };
 
@@ -62,7 +70,7 @@ export default function RoutineScreen() {
         data?.active ? (
           <Button label="Continuar entrenamiento" icon="play" size="lg" onPress={() => router.push('/sesion/activa')} />
         ) : (
-          <Button label="Iniciar entrenamiento" icon="play" size="lg" onPress={start} disabled={routine.exercises.length === 0} />
+          <Button label={shownDay === 'all' ? 'Iniciar entrenamiento' : `Iniciar entrenamiento · ${DAY_SHORT[shownDay]}`} icon="play" size="lg" onPress={start} disabled={shown.length === 0} />
         )
       }
     >
@@ -104,8 +112,15 @@ export default function RoutineScreen() {
           </Card>
         ) : (
           <View style={{ gap: space.sm }}>
+            <Row style={{ flexWrap: 'wrap' }} gap={6}>
+              <Chip label="Todos" compact selected={shownDay === 'all'} onPress={() => setView('all')} />
+              {WEEK_ORDER.map((d) => (
+                <Chip key={d} label={DAY_SHORT[d]} compact selected={shownDay === d} onPress={() => setView(d)} />
+              ))}
+            </Row>
+            {shownDay !== 'all' && shown.length === 0 ? <T variant="label" tone="muted">Ese día no tiene ejercicios. Asignalos desde el lápiz de cada ejercicio.</T> : null}
             <T variant="caption" tone="dim">Tocá un ejercicio para cambiar series, repeticiones, descanso o notas. Usá las flechas para reordenar.{data?.active ? ' Los cambios valen desde el próximo entrenamiento; el que está en curso no cambia.' : ''}</T>
-            {routine.exercises.map((ex, i) => (
+            {shown.map((ex, i) => (
               <Animated.View key={ex.id} layout={LinearTransition.duration(220)} entering={FadeInDown.delay(i * 25)}>
                 <Card style={{ paddingVertical: space.md }} onPress={() => setEditing(ex)}>
                   <Row align="center" gap={space.md}>
@@ -116,6 +131,7 @@ export default function RoutineScreen() {
                         <T variant="label" tone="accent">{ex.sets} × {formatReps(ex.repsMin, ex.repsMax)}</T>
                         {ex.restSeconds ? <T variant="label" tone="muted">Descanso {ex.restSeconds} s</T> : null}
                       </Row>
+                      <T variant="caption" tone="dim" style={{ marginTop: 2 }}>{ex.days.length ? ex.days.map((d) => DAY_SHORT[d]).join(' · ') : 'Todos los días'}</T>
                       {ex.notes ? <T variant="caption" tone="muted" style={{ marginTop: 4 }}>{ex.notes}</T> : null}
                     </View>
                     <IconButton icon="edit-2" label={`Editar ${ex.name}`} size={32} onPress={() => setEditing(ex)} />
@@ -125,8 +141,8 @@ export default function RoutineScreen() {
                         icon="chevron-down"
                         label="Bajar"
                         size={32}
-                        onPress={i < routine.exercises.length - 1 ? () => run((db) => moveRoutineExercise(db, routine.id, ex.id, 1)) : undefined}
-                        style={i === routine.exercises.length - 1 && { opacity: 0.3 }}
+                        onPress={i < shown.length - 1 ? () => run((db) => moveRoutineExercise(db, routine.id, ex.id, 1)) : undefined}
+                        style={i === shown.length - 1 && { opacity: 0.3 }}
                       />
                     </View>
                   </Row>
@@ -173,7 +189,7 @@ export default function RoutineScreen() {
 function TargetsSheet({ exercise, onClose, onSave, onRemove }: {
   exercise: RoutineExercise;
   onClose: () => void;
-  onSave: (input: { sets: number; repsMin: number | null; repsMax: number | null; restSeconds: number | null; notes: string | null }) => void;
+  onSave: (input: { sets: number; repsMin: number | null; repsMax: number | null; restSeconds: number | null; notes: string | null; days: number[] }) => void;
   onRemove: () => void;
 }) {
   const [sets, setSets] = useState(exercise.sets);
@@ -182,6 +198,7 @@ function TargetsSheet({ exercise, onClose, onSave, onRemove }: {
   const [rest, setRest] = useState(exercise.restSeconds ?? 90);
   const [hasRest, setHasRest] = useState(exercise.restSeconds !== null);
   const [notes, setNotes] = useState(exercise.notes ?? '');
+  const [days, setDays] = useState<number[]>(exercise.days);
   const repsMin = min.trim() ? parsePositive(min) : null;
   const repsMax = max.trim() ? parsePositive(max) : null;
   return (
@@ -200,6 +217,15 @@ function TargetsSheet({ exercise, onClose, onSave, onRemove }: {
           {hasRest ? <Stepper value={rest} onChange={setRest} min={15} max={600} step={15} format={(v) => `${v} s`} /> : null}
         </Row>
         <Field label="Notas" value={notes} onChangeText={setNotes} placeholder="Técnica, máquina, agarre…" />
+        <View style={{ gap: 6 }}>
+          <T variant="bodyMedium">¿Qué días lo hacés?</T>
+          <T variant="caption" tone="dim">Si no marcás ninguno, aparece todos los días de la rutina.</T>
+          <Row style={{ flexWrap: 'wrap', marginTop: 4 }} gap={6}>
+            {WEEK_ORDER.map((d) => (
+              <Chip key={d} label={DAY_SHORT[d]} compact selected={days.includes(d)} onPress={() => setDays(days.includes(d) ? days.filter((x) => x !== d) : [...days, d])} />
+            ))}
+          </Row>
+        </View>
         <Button
           label="Guardar"
           onPress={() =>
@@ -209,6 +235,7 @@ function TargetsSheet({ exercise, onClose, onSave, onRemove }: {
               repsMax: repsMax === null ? null : Math.round(repsMax),
               restSeconds: hasRest ? rest : null,
               notes: notes || null,
+              days,
             })
           }
         />
