@@ -92,6 +92,7 @@ function Navigator() {
       <StatusBar style={c.scheme === 'dark' ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg }, animation: 'slide_from_right' }}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="bienvenida" options={{ gestureEnabled: false }} />
         <Stack.Screen name="sesion/activa" options={{ gestureEnabled: false }} />
       </Stack>
     </View>

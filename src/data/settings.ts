@@ -64,6 +64,47 @@ export async function updateProfile(db: Db, patch: Partial<Profile>): Promise<vo
   });
 }
 
+// ---- First-run setup ----
+
+/** False only on a fresh install that has not been through the welcome screen. Missing flag counts as done. */
+export async function isOnboarded(db: Db): Promise<boolean> {
+  const row = await db.getFirstAsync<{ value: string }>(`SELECT value FROM settings WHERE key = 'onboarding.done'`, []);
+  return row?.value !== '0';
+}
+
+export type OnboardingInput = {
+  name: string;
+  currentWeight: number;
+  targetWeight: number;
+  calories: number;
+  protein: number;
+  trainingDays: number[];
+};
+
+/** Saves the person's own profile, goals and first weigh-in, then marks setup as done. */
+export async function completeOnboarding(db: Db, input: OnboardingInput, today: DateKey): Promise<void> {
+  if (!(input.currentWeight >= 20 && input.currentWeight <= 300)) throw new Error('Ingresá un peso actual válido en kg (entre 20 y 300).');
+  if (!(input.targetWeight >= 20 && input.targetWeight <= 300)) throw new Error('Ingresá una meta válida en kg (entre 20 y 300).');
+  if (!(input.calories > 0) || !(input.protein > 0)) throw new Error('Los objetivos tienen que ser mayores a cero.');
+  await db.withTransactionAsync(async () => {
+    await updateProfile(db, {
+      name: input.name,
+      startWeight: input.currentWeight,
+      targetWeight: input.targetWeight,
+      trainingDays: input.trainingDays,
+    });
+    // Replaces the factory goal for every day: there is no history yet on a fresh install.
+    await setGoalsFrom(db, INITIAL_GOAL_DATE, input.calories, input.protein);
+    const now = nowIso();
+    await db.runAsync(
+      `INSERT INTO weight_entries (id, date, weight_kg, notes, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?)
+       ON CONFLICT (date) DO UPDATE SET weight_kg = excluded.weight_kg, updated_at = excluded.updated_at`,
+      [newId(), today, input.currentWeight, now, now],
+    );
+    await setSetting(db, 'onboarding.done', '1');
+  });
+}
+
 // ---- Nutrition goals (versioned by date so past days keep the goal they had) ----
 
 export type NutritionGoal = { effectiveFrom: DateKey; calories: number; protein: number };

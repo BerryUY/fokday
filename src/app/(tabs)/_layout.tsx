@@ -1,8 +1,11 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Redirect } from 'expo-router';
 import { Tabs, type BottomTabBarProps } from 'expo-router/js-tabs';
 import type { ComponentProps } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { isOnboarded } from '@/data/settings';
+import { useQuery } from '@/state/db';
 import { haptic } from '@/state/toast';
 import { useColors } from '@/theme/ThemeProvider';
 import { font, radius } from '@/theme/tokens';
@@ -54,6 +57,9 @@ function TabBar({ state, navigateToTab }: BottomTabBarProps) {
 
 export default function TabsLayout() {
   const c = useColors();
+  const { data: onboarded } = useQuery((db) => isOnboarded(db), []);
+  if (onboarded === undefined) return null;
+  if (!onboarded) return <Redirect href="/bienvenida" />;
   return (
     <Tabs
       tabBar={(props) => <TabBar {...props} />}
@@ -83,6 +89,6 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   item: { flex: 1, alignItems: 'center', gap: 3 },
-  iconPill: { width: 52, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  iconPill: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   label: { fontFamily: font.semibold, fontSize: 11 },
 });

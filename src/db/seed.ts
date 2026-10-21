@@ -35,6 +35,8 @@ export async function seedDatabase(db: Db, catalog: CatalogMeal[] = CATALOG, cat
 
   await db.withTransactionAsync(async () => {
     const now = nowIso();
+    // Fresh installs go through the welcome screen; databases that already existed are treated as set up.
+    await db.runAsync('INSERT OR IGNORE INTO settings (key, value, updated_at) VALUES (?, ?, ?)', ['onboarding.done', firstRun ? '0' : '1', now]);
     for (const [key, value] of Object.entries(SETTING_DEFAULTS)) {
       await db.runAsync('INSERT OR IGNORE INTO settings (key, value, updated_at) VALUES (?, ?, ?)', [key, value, now]);
     }
