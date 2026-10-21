@@ -22,6 +22,49 @@ export const PORTIONS = [0.5, 1, 1.5, 2] as const;
 
 export type Nutrition = { calories: number; protein: number };
 
+/** Optional nutrients: each person turns on only the ones they want to follow. */
+export const EXTRA_NUTRIENTS = [
+  { key: 'carbs', label: 'Carbohidratos', unit: 'g' },
+  { key: 'fat', label: 'Grasas', unit: 'g' },
+  { key: 'fiber', label: 'Fibra', unit: 'g' },
+  { key: 'dairy', label: 'Lácteos', unit: 'porc.' },
+] as const;
+
+export type ExtraKey = (typeof EXTRA_NUTRIENTS)[number]['key'];
+export type Extras = Partial<Record<ExtraKey, number>>;
+
+const EXTRA_KEYS: string[] = EXTRA_NUTRIENTS.map((e) => e.key);
+
+export function parseExtras(raw: string | null | undefined): Extras {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const out: Extras = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      if (EXTRA_KEYS.includes(k) && typeof v === 'number' && Number.isFinite(v) && v > 0) out[k as ExtraKey] = v;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+/** Stores only positive known values; null when there is nothing to store. */
+export function serializeExtras(extras: Extras | null | undefined): string | null {
+  const clean: Extras = {};
+  for (const k of EXTRA_KEYS as ExtraKey[]) {
+    const v = extras?.[k];
+    if (typeof v === 'number' && Number.isFinite(v) && v > 0) clean[k] = Math.round(v * 10) / 10;
+  }
+  return Object.keys(clean).length ? JSON.stringify(clean) : null;
+}
+
+export function scaleExtras(base: Extras, portion: number): Extras {
+  const out: Extras = {};
+  for (const k of EXTRA_KEYS as ExtraKey[]) if (base[k]) out[k] = Math.round(base[k]! * portion * 10) / 10;
+  return out;
+}
+
 /** Calories are kept as whole kcal and protein with one decimal; that is the precision the plan uses. */
 export function scaleNutrition(base: Nutrition, portion: number): Nutrition {
   return {
@@ -30,10 +73,12 @@ export function scaleNutrition(base: Nutrition, portion: number): Nutrition {
   };
 }
 
-export type LoggedNutrition = Nutrition & { category: string };
+/** `extras` are per base portion; the logged amount is extras × portion. */
+export type LoggedNutrition = Nutrition & { category: string; extras?: Extras; portion?: number };
 
 export type DailyTotals = Nutrition & {
   entries: number;
+  extras: Extras;
   byCategory: Record<MealCategory, Nutrition & { entries: number }>;
 };
 
@@ -47,16 +92,20 @@ export function sumDailyTotals(logs: LoggedNutrition[]): DailyTotals {
   const byCategory = emptyByCategory();
   let calories = 0;
   let protein = 0;
+  const extras: Extras = {};
   for (const log of logs) {
     calories += log.calories;
     protein += log.protein;
+    const scaled = scaleExtras(log.extras ?? {}, log.portion ?? 1);
+    for (const k of Object.keys(scaled) as ExtraKey[]) extras[k] = (extras[k] ?? 0) + scaled[k]!;
     const bucket = byCategory[isMealCategory(log.category) ? log.category : 'extra'];
     bucket.calories += log.calories;
     bucket.protein += log.protein;
     bucket.entries += 1;
   }
   for (const key of CATEGORY_KEYS) byCategory[key].protein = Math.round(byCategory[key].protein * 10) / 10;
-  return { calories: Math.round(calories), protein: Math.round(protein * 10) / 10, entries: logs.length, byCategory };
+  for (const k of Object.keys(extras) as ExtraKey[]) extras[k] = Math.round(extras[k]! * 10) / 10;
+  return { calories: Math.round(calories), protein: Math.round(protein * 10) / 10, entries: logs.length, extras, byCategory };
 }
 
 export type GoalProgress = {

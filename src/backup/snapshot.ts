@@ -1,4 +1,4 @@
-import { DATA_TABLES, SCHEMA_VERSION, type DataTable } from '@/db/schema';
+import { DATA_TABLES, SCHEMA_VERSION, TABLE_ADDED_IN, type DataTable } from '@/db/schema';
 import type { Db, SqlValue } from '@/db/types';
 import { nowIso } from '@/lib/dates';
 import { sha256 } from '@/lib/ids';
@@ -70,6 +70,7 @@ const ORDER_BY: Partial<Record<DataTable, string>> = {
   routine_schedule: 'weekday',
   gym_attendance: 'date',
   daily_notes: 'date',
+  daily_habits: 'date',
 };
 
 export async function createSnapshot(db: Db, deviceId: string): Promise<Snapshot> {
@@ -119,6 +120,12 @@ export async function validateEnvelope(input: unknown): Promise<BackupEnvelope> 
   }
   if (!s.tables || typeof s.tables !== 'object') throw new BackupValidationError('El respaldo no tiene datos.');
   for (const table of DATA_TABLES) {
+    if (!Array.isArray(s.tables[table]) && (TABLE_ADDED_IN[table] ?? 0) > s.schemaVersion) {
+      // Backup written before this table existed: it simply has no rows.
+      s.tables[table] = [];
+      if (s.counts) s.counts[table] = 0;
+      continue;
+    }
     const rows = s.tables[table];
     if (!Array.isArray(rows)) throw new BackupValidationError(`Al respaldo le falta la tabla "${table}".`);
     if (s.counts && s.counts[table] !== rows.length) {
