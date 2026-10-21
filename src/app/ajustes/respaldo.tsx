@@ -4,6 +4,7 @@ import { cloudApi, normalizeBaseUrl, type CloudBackupMeta } from '@/backup/api';
 import { buildCsv, CSV_KINDS, type CsvKind } from '@/backup/csv';
 import { exportCsv, exportJsonBackup, listSafetyCopies, pickJsonBackup, readSafetyCopy, saveSafetyCopy, shareSafetyCopy } from '@/backup/files';
 import { backupNow, clearCloudConfig, createCloudProfile, defaultApiUrl, getCloudConfig, getRecoveryCode, refreshSyncState, saveCloudConfig, syncDeps, useSyncState } from '@/backup/service';
+import { chooseBackupFolder, disableFolderBackup, getFolderBackupInfo, writeFolderCopy, type FolderBackupInfo } from '@/backup/folderBackup';
 import { countUserRecords, hasUserChanges, type BackupEnvelope } from '@/backup/snapshot';
 import { applyRestore, prepareCloudRestore, setLinked } from '@/backup/sync';
 import { Field, Sheet, confirm } from '@/components/ui/form';
@@ -43,6 +44,9 @@ export default function BackupScreen() {
   const [csvKind, setCsvKind] = useState<CsvKind>('comidas');
   const [csvRange, setCsvRange] = useState<'30' | '90' | 'all'>('all');
   const [copies, setCopies] = useState(listSafetyCopies());
+  const [folder, setFolder] = useState<FolderBackupInfo>({ folderUri: null, lastAt: null, lastError: null });
+  const refreshFolder = () => void getFolderBackupInfo(db).then(setFolder).catch(() => {});
+  useEffect(refreshFolder, [db]);
 
   useEffect(() => {
     getCloudConfig().then((cfg) => setHost(cfg ? cfg.url.replace(/^https?:\/\//, '').split('/')[0] : null)).catch(() => setHost(null));
@@ -63,6 +67,7 @@ export default function BackupScreen() {
     } finally {
       setBusy(null);
       setCopies(listSafetyCopies());
+      refreshFolder();
       void refreshSyncState();
     }
   };
@@ -136,10 +141,18 @@ export default function BackupScreen() {
 
   return (
     <Screen title="Datos y respaldo">
+      <Card style={{ marginBottom: space.xl }}>
+        <T variant="h3">Tus datos están protegidos</T>
+        <T variant="caption" tone="dim" style={{ marginTop: 2, marginBottom: space.md }}>Todo vive en este teléfono. Estas copias te cuidan si lo perdés o desinstalás la app.</T>
+        <ProtectionRow on title="Copia de Android en Google Drive" detail="Automática cada noche, si tu teléfono tiene activada la copia de seguridad (Ajustes → Sistema → Copia de seguridad). Al reinstalar desde Play Store se restaura sola." />
+        <ProtectionRow on={!!folder.folderUri} title="Copia semanal en una carpeta" detail={folder.folderUri ? 'Activada' : 'Desactivada: activala más abajo'} />
+        <ProtectionRow on={sync.configured} title="Nube de Momentum" detail={sync.configured ? 'Activada' : 'Sin configurar'} last />
+      </Card>
+
       <SectionHeader title="Respaldo en la nube" />
       <Card>
         <Row style={{ justifyContent: 'space-between' }}>
-          <T variant="h3">Neon PostgreSQL</T>
+          <T variant="h3">Nube de Momentum</T>
           <Badge label={status.label} tone={status.tone} />
         </Row>
         {sync.configured ? (
@@ -254,6 +267,50 @@ export default function BackupScreen() {
               />
             </>
           ) : null}
+        </View>
+      </Card>
+
+      <SectionHeader title="Copia semanal automática" style={{ marginTop: space.xl }} />
+      <Card>
+        <T variant="label" tone="muted">
+          Una vez por semana se guarda una copia completa en una carpeta que elijas, por ejemplo Documentos o una carpeta de Google Drive. Queda fuera de la app, así que no se borra si la desinstalás. Se guardan las últimas 4.
+        </T>
+        {folder.folderUri ? (
+          <View style={{ gap: 4, marginTop: space.md }}>
+            <T variant="label" tone="muted">Última copia: {folder.lastAt ? formatDateTime(folder.lastAt) : 'todavía ninguna'}</T>
+            {folder.lastError ? <T variant="label" tone="danger">{folder.lastError}</T> : null}
+          </View>
+        ) : null}
+        <View style={{ gap: space.sm, marginTop: space.lg }}>
+          {folder.folderUri ? (
+            <>
+              <Button
+                label="Hacer una copia ahora"
+                icon="save"
+                variant="secondary"
+                loading={busy === 'folder-now'}
+                onPress={() =>
+                  withBusy('folder-now', async () => {
+                    const r = await writeFolderCopy(db, { force: true });
+                    toast.show(r === 'written' ? 'Copia guardada en tu carpeta' : 'No se pudo guardar la copia', r === 'written' ? 'success' : 'error');
+                  })
+                }
+              />
+              <Button label="Cambiar carpeta" icon="folder" variant="ghost" size="sm" onPress={() => withBusy('folder-pick', async () => void (await chooseBackupFolder(db)))} />
+              <Button label="Desactivar" variant="ghost" size="sm" onPress={() => withBusy('folder-off', () => disableFolderBackup(db))} />
+            </>
+          ) : (
+            <Button
+              label="Elegir carpeta y activar"
+              icon="folder-plus"
+              loading={busy === 'folder-pick'}
+              onPress={() =>
+                withBusy('folder-pick', async () => {
+                  if (await chooseBackupFolder(db)) toast.show('Listo: se guarda una copia cada semana');
+                })
+              }
+            />
+          )}
         </View>
       </Card>
 
@@ -460,4 +517,16 @@ export default function BackupScreen() {
 
 function countUserRecordsFromCounts(counts: CloudBackupMeta['counts']): number {
   return countUserRecords({ counts } as Parameters<typeof countUserRecords>[0]);
+}
+
+function ProtectionRow({ on, title, detail, last }: { on: boolean; title: string; detail: string; last?: boolean }) {
+  return (
+    <Row gap={space.md} align="flex-start" style={{ paddingVertical: space.sm, marginBottom: last ? 0 : 2 }}>
+      <Badge label={on ? 'Activa' : 'No'} tone={on ? 'accent' : 'muted'} />
+      <View style={{ flex: 1 }}>
+        <T variant="bodyMedium">{title}</T>
+        <T variant="caption" tone="dim">{detail}</T>
+      </View>
+    </Row>
+  );
 }

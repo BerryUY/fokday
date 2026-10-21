@@ -7,13 +7,13 @@ import { todayKey } from '@/lib/dates';
 import { newId } from '@/lib/ids';
 import { createSnapshot, getDeviceId, parseEnvelopeText, validateEnvelope, wrapSnapshot, type BackupEnvelope } from './snapshot';
 
-/** Local, Neon-independent backups: JSON export/import and CSV export via the Android share sheet. */
+/** Local, server-independent backups: JSON export/import and CSV export via the Android share sheet. */
 
 function stamp() {
   return new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 }
 
-async function buildEnvelope(db: Db): Promise<BackupEnvelope> {
+export async function buildEnvelope(db: Db): Promise<BackupEnvelope> {
   return wrapSnapshot(await createSnapshot(db, await getDeviceId(db, newId)));
 }
 

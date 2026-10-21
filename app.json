@@ -13,6 +13,7 @@
     },
     "android": {
       "package": "uy.santiago.momentum",
+      "allowBackup": true,
       "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#0A0A0B",

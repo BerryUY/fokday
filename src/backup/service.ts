@@ -7,6 +7,7 @@ import type { Db } from '@/db/types';
 import { newId } from '@/lib/ids';
 import { subscribeData } from '@/state/dataBus';
 import { cloudApi, normalizeBaseUrl, type CloudConfig } from './api';
+import { writeFolderCopy } from './folderBackup';
 import { getSyncInfo, runBackup, setLinked, type BackupOutcome, type SyncDeps, type SyncInfo } from './sync';
 
 /**
@@ -166,12 +167,17 @@ export function startBackupService(database: Db): () => void {
     if (cameBack) setTimeout(() => void autoBackup(OPEN_GAP_MS), 3_000);
   });
   const appState = AppState.addEventListener('change', (s) => {
-    if (s === 'background') void autoBackup(LEAVE_GAP_MS);
+    if (s === 'background') {
+      void autoBackup(LEAVE_GAP_MS);
+      if (db) void writeFolderCopy(db);
+    }
     else if (s === 'active') setTimeout(() => void autoBackup(OPEN_GAP_MS), 5_000);
   });
   const unsubData = subscribeData(() => void refreshState());
   const interval = setInterval(() => void autoBackup(OPEN_GAP_MS), 30 * 60_000);
   setTimeout(() => void autoBackup(OPEN_GAP_MS), 5_000);
+  // The weekly folder copy (if the person set one up) is checked once per launch too.
+  setTimeout(() => db && void writeFolderCopy(db), 15_000);
   return () => {
     unsubNet();
     appState.remove();
