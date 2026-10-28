@@ -5,6 +5,7 @@ import { StyleSheet, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { usePro } from '@/billing/pro';
 import { ProLock } from '@/components/ProGate';
+import { WeeklySummaryCard } from '@/components/WeeklySummaryCard';
 import { BarChart, type Bar } from '@/components/charts/BarChart';
 import { LineChart } from '@/components/charts/LineChart';
 import { ListRow, Loading, Screen, TabHeader } from '@/components/ui/layout';
@@ -42,6 +43,9 @@ export default function ProgressScreen() {
   return (
     <Screen tab>
       <TabHeader title="Progreso" subtitle="Tus datos reales" />
+      <View style={{ marginBottom: space.lg }}>
+        <WeeklySummaryCard showLock />
+      </View>
       <Segmented<RangeKey> options={RANGES.map((r) => ({ key: r.key, label: !pro && (r.key === '90d' || r.key === 'all') ? `${r.label} 🔒` : r.label }))} value={range} onChange={setRange} />
 
       {locked ? (

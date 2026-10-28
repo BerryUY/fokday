@@ -8,6 +8,8 @@ import { WeekStrip } from '@/components/calendar';
 import { ExtraTotals } from '@/components/ExtraTotals';
 import { HabitsCard } from '@/components/HabitsCard';
 import { TodoCard } from '@/components/TodoCard';
+import { WeeklySummaryCard } from '@/components/WeeklySummaryCard';
+import { usePro } from '@/billing/pro';
 import { NutritionRings } from '@/components/nutrition';
 import { Loading, Screen } from '@/components/ui/layout';
 import { Badge, Button, Card, IconButton, PressableScale, Row, SectionHeader, T } from '@/components/ui/primitives';
@@ -26,6 +28,7 @@ import { radius, space } from '@/theme/tokens';
 
 export default function HomeScreen() {
   const c = useColors();
+  const pro = usePro();
   const sync = useSyncState();
   const run = useMutation();
   const today = todayKey();
@@ -72,6 +75,12 @@ export default function HomeScreen() {
       <Animated.View entering={FadeInDown.delay(50).duration(320)} style={{ marginTop: space.lg }}>
         <TodoCard date={today} />
       </Animated.View>
+
+      {pro ? (
+        <Animated.View entering={FadeInDown.delay(60).duration(320)} style={{ marginTop: space.lg }}>
+          <WeeklySummaryCard />
+        </Animated.View>
+      ) : null}
 
       <Animated.View entering={FadeInDown.delay(70).duration(380)} style={{ marginTop: space.lg }}>
         <Card onPress={() => router.push('/comidas')} style={{ paddingVertical: space.xl }}>
