@@ -5,15 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>FokDay · Política de privacidad</title>
   <style>
-    :root { color-scheme: light dark; --bg: #f4f4f1; --fg: #0e0e10; --muted: #5e5e66; --accent: #5e8c0a; }
-    @media (prefers-color-scheme: dark) { :root { --bg: #09090a; --fg: #f5f5f4; --muted: #a1a1a6; --accent: #c8f560; } }
-    body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
-    main { max-width: 720px; margin: 0 auto; padding: 40px 16px 64px; }
-    h1 { font-size: 30px; line-height: 1.2; margin: 0 0 4px; }
+    :root { --bg: #ffffff; --fg: #111113; --muted: #5e5e66; --accent: #138a45; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #0b0c0e; --fg: #f5f5f4; --muted: #a1a1a6; --accent: #3df58a; } }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    main { max-width: 720px; margin: 0 auto; padding: 32px 16px 64px; }
+    h1 { font-size: 28px; line-height: 1.2; margin: 0 0 8px; }
     h2 { font-size: 19px; margin: 32px 0 8px; }
-    p, li { color: var(--fg); }
     .muted { color: var(--muted); }
     a { color: var(--accent); }
+    li { margin: 6px 0; }
   </style>
 </head>
 <body>
@@ -21,39 +21,51 @@
   <h1>Política de privacidad de FokDay</h1>
   <p class="muted">Última actualización: 28 de octubre de 2026</p>
 
-  <p>FokDay es una app para registrar comidas, entrenamientos, actividad física, hábitos y peso. Esta política explica qué datos usa, dónde se guardan y qué podés hacer con ellos.</p>
+  <p>FokDay es una app para registrar comidas, entrenamientos, actividad física, hábitos y peso. Esta política explica qué datos usa, dónde se guardan, con quién se comparten y qué podés hacer con ellos.</p>
 
   <h2>Qué datos guarda la app</h2>
   <ul>
-    <li>Lo que cargás vos: nombre, peso y metas, objetivos de calorías y proteína, comidas registradas, rutinas, entrenamientos, actividades, asistencia al gimnasio, hábitos (agua, creatina) y notas.</li>
-    <li>Tus preferencias: días de gimnasio, recordatorios, módulos opcionales y apariencia.</li>
+    <li><strong>Lo que cargás vos:</strong> nombre, peso y metas, objetivos de calorías y proteína, comidas registradas, rutinas, entrenamientos, actividades, asistencia al gimnasio, hábitos (agua, creatina), tareas del día y notas de comidas.</li>
+    <li><strong>Tus preferencias:</strong> días de gimnasio, módulos opcionales, tema y color, sonidos.</li>
+    <li><strong>Tu cuenta (opcional):</strong> si entrás con Google o con email, guardamos tu email, tu nombre y el método de ingreso. Sin cuenta, la app funciona igual y nada sale de tu teléfono.</li>
   </ul>
-  <p>La app no pide tu ubicación ni tus contactos. Solo usa la cámara o tus fotos si vos elegís sacar una foto de una comida. No usa publicidad ni herramientas de analítica o rastreo.</p>
-
-  <h2>Foto con IA</h2>
-  <p>Si usás la función «Foto con IA», la foto de tu comida se envía, reducida y cifrada (HTTPS), al servidor de FokDay, que la pasa a Google Gemini para estimar calorías y nutrientes. FokDay no guarda la foto. Como usamos el plan gratuito de Google, Google puede usar esas fotos para mejorar sus productos según sus propias condiciones. No mandes fotos donde se vean personas o datos privados. Si no usás esta función, ninguna foto sale de tu teléfono.</p>
-
-  <h2>Biblioteca de comidas compartidas</h2>
-  <p>Compartir una comida es opcional y está apagado por defecto. Si la compartís, otras personas con perfil ven su nombre, calorías, nutrientes e ingredientes, pero nunca quién la compartió. Podés quitarla cuando quieras, y borrar tu perfil borra todo lo que compartiste.</p>
+  <p>La app no pide tu ubicación ni tus contactos. Usa la cámara solo cuando vos elegís sacar una foto de una comida o escanear un código de barras.</p>
 
   <h2>Dónde se guardan</h2>
-  <p>Todo se guarda primero en tu teléfono y la app funciona sin internet.</p>
-  <p>Si creás un perfil en la nube (opcional, con un código de invitación), la app envía copias de respaldo de tus datos a un servidor propio de FokDay alojado en Supabase (región São Paulo), que las guarda comprimidas en un almacenamiento privado. Se envían cifradas en tránsito (HTTPS). Cada perfil tiene un código secreto propio; el servidor solo guarda una huella (hash) de ese código, y nadie más puede ver tus respaldos.</p>
+  <p>Todo se guarda primero en tu teléfono, y la app funciona sin internet.</p>
+  <p>Si entrás con tu cuenta, la app envía copias de respaldo de tus datos al servidor de FokDay, alojado en Supabase (región São Paulo, Brasil). Se envían cifradas (HTTPS) y se guardan comprimidas en un almacenamiento privado. Solo tu cuenta puede ver tus respaldos. La sesión de tu cuenta se guarda cifrada en tu teléfono.</p>
 
-  <h2>Para qué se usan</h2>
-  <p>Solo para que la app funcione: mostrarte tu progreso y, si activaste el respaldo, recuperar tus datos en otro teléfono. No se venden, no se comparten con terceros y no se usan para publicidad.</p>
+  <h2>Con quién se comparten (y para qué)</h2>
+  <ul>
+    <li><strong>Google (Gemini), foto con IA:</strong> si sacás una foto de una comida, la foto reducida se envía a Google Gemini para estimar calorías y nutrientes. FokDay no guarda la foto. Mientras usemos el plan gratuito de Google, Google puede usar esas fotos para mejorar sus productos según sus condiciones. No mandes fotos donde se vean personas o datos privados. El resumen semanal de Pro envía solo números de tu semana (promedios y conteos), nunca tus comidas ni tus notas.</li>
+    <li><strong>Open Food Facts, escáner:</strong> al escanear, se consulta el número del código de barras en esta base abierta de alimentos. No se envía ningún dato tuyo.</li>
+    <li><strong>Google (AdMob), videos con premio:</strong> si elegís mirar un video para ganar una foto o un escaneo extra, AdMob usa el identificador de publicidad de tu teléfono y datos del dispositivo para mostrar el video y, si lo aceptás, personalizarlo. Tu elección se pide la primera vez y se cambia en Ajustes → Privacidad de anuncios. Nunca mostramos banners ni anuncios que interrumpan.</li>
+    <li><strong>Google Play y RevenueCat, suscripción Pro:</strong> Google Play procesa el pago; RevenueCat recibe el identificador de tu cuenta FokDay y el estado de la compra para activar Pro. FokDay nunca ve los datos de tu tarjeta.</li>
+    <li><strong>Supabase:</strong> aloja las cuentas y los respaldos.</li>
+  </ul>
+  <p>No vendemos tus datos ni los usamos para publicidad propia.</p>
+
+  <h2>Biblioteca de comidas compartidas</h2>
+  <p>Compartir una comida es opcional y está apagado por defecto. Si la compartís, otras personas con cuenta ven su nombre, calorías, nutrientes e ingredientes, pero nunca quién la compartió. Podés quitarla cuando quieras.</p>
 
   <h2>Notificaciones</h2>
   <p>Los recordatorios son notificaciones locales que programa tu propio teléfono. No pasan por ningún servidor.</p>
 
   <h2>Cuánto tiempo se guardan</h2>
-  <p>En el teléfono, hasta que los borres desde Ajustes → Datos y respaldo → Borrar todos mis datos, o desinstales la app. En la nube se guardan las últimas versiones de respaldo de tu perfil; las más viejas se borran solas.</p>
+  <p>En el teléfono, hasta que los borres desde Ajustes → Datos y respaldo → Borrar todos mis datos, o desinstales la app. En la nube se guardan las últimas versiones de tus respaldos (las más viejas se borran solas), hasta que elimines tu cuenta. Los contadores diarios de uso (foto con IA, escáner y videos) se guardan para aplicar los límites de cada plan.</p>
 
   <h2>Tus derechos</h2>
-  <p>Podés exportar todos tus datos (JSON o CSV) desde la app, borrarlos del teléfono cuando quieras y borrar tu perfil y todos sus respaldos de la nube desde Ajustes → Datos y respaldo → Eliminar mi perfil de la nube, o pedirlo escribiendo al contacto de abajo.</p>
+  <ul>
+    <li>Exportar todos tus datos (JSON o CSV) desde la app.</li>
+    <li>Borrarlos del teléfono cuando quieras.</li>
+    <li>Eliminar tu cuenta y todo lo que hay en la nube desde Ajustes → tu cuenta → Eliminar mi cuenta, o siguiendo <a href="eliminar-cuenta.html">estas instrucciones</a>.</li>
+  </ul>
+
+  <h2>Seguridad</h2>
+  <p>Las comunicaciones van cifradas (HTTPS). Las bases de datos no son accesibles desde la app directamente: todo pasa por el servidor de FokDay, que verifica tu sesión en cada pedido. Las claves de los servicios nunca están dentro de la app.</p>
 
   <h2>Menores</h2>
-  <p>La app no está dirigida a menores de 13 años.</p>
+  <p>La app no está dirigida a menores de 18 años.</p>
 
   <h2>Contacto</h2>
   <p>Por consultas o para pedir el borrado de tus datos: <strong>[completar con tu email de contacto]</strong>.</p>

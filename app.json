@@ -2,7 +2,7 @@
   "expo": {
     "name": "FokDay",
     "slug": "momentum",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "scheme": "momentum",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,7 +14,7 @@
     "android": {
       "package": "uy.santiago.momentum",
       "allowBackup": true,
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#0B0C0E",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -94,7 +94,8 @@
           "microphonePermission": false,
           "recordAudioAndroid": false
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "extra": {
       "router": {
