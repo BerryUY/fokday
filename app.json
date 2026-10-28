@@ -42,6 +42,14 @@
         }
       ],
       [
+        "expo-camera",
+        {
+          "cameraPermission": "FokDay usa la cámara para escanear el código de barras de un producto y para sacarle una foto a tu comida.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",

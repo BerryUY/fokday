@@ -66,6 +66,7 @@ export default function ComidasScreen() {
         <>
           <View style={styles.actions}>
             <QuickAction icon="camera" label="Foto con IA" accent onPress={() => router.push({ pathname: '/comida/foto', params: { date } })} />
+            <QuickAction icon="maximize" label="Escanear" onPress={() => router.push({ pathname: '/comida/escanear', params: { date } })} />
             <QuickAction icon="zap" label="Sumar rápido" onPress={() => setQuickOpen(true)} />
             <QuickAction icon="globe" label="Biblioteca" onPress={() => router.push({ pathname: '/comida/biblioteca', params: { date } })} />
           </View>
@@ -191,7 +192,7 @@ export default function ComidasScreen() {
 }
 
 /** Big, friendly entry points: photo, quick numbers, community library. */
-function QuickAction({ icon, label, onPress, accent }: { icon: 'camera' | 'zap' | 'globe'; label: string; onPress: () => void; accent?: boolean }) {
+function QuickAction({ icon, label, onPress, accent }: { icon: 'camera' | 'zap' | 'globe' | 'maximize'; label: string; onPress: () => void; accent?: boolean }) {
   const c = useColors();
   return (
     <PressableScale onPress={onPress} hapticFeedback accessibilityRole="button" accessibilityLabel={label} style={[styles.action, { backgroundColor: accent ? c.accent : c.surface }]}>
@@ -228,8 +229,8 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md, marginTop: space.lg },
   tileWrap: { width: '47.8%', flexGrow: 1 },
   tileWide: { width: '100%' },
-  actions: { flexDirection: 'row', gap: space.sm, marginBottom: space.lg },
-  action: { flex: 1, minHeight: 84, borderRadius: radius.lg, padding: space.md, gap: space.sm, justifyContent: 'center', alignItems: 'center' },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginBottom: space.lg },
+  action: { flexBasis: '47%', flexGrow: 1, minHeight: 60, borderRadius: radius.lg, paddingHorizontal: space.lg, paddingVertical: space.md, gap: space.sm, flexDirection: 'row', alignItems: 'center' },
   tile: { borderRadius: radius.lg, padding: space.lg, minHeight: 128 },
   tileIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   fav: { width: 158, borderRadius: radius.lg, padding: space.md, justifyContent: 'space-between' },
