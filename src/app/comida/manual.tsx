@@ -8,7 +8,7 @@ import { Screen } from '@/components/ui/layout';
 import { Button, Card, Chip, Row, T } from '@/components/ui/primitives';
 import { LIGHT_DINNER_GUIDE } from '@/data/catalog';
 import { logMeal, saveMeal } from '@/data/meals';
-import { MEAL_CATEGORIES, type MealCategory } from '@/domain/nutrition';
+import { guessCategory, MEAL_CATEGORIES, type MealCategory } from '@/domain/nutrition';
 import { formatKcal, parseNonNegative } from '@/lib/format';
 import { useParams } from '@/lib/params';
 import { useMutation } from '@/state/db';
@@ -22,7 +22,7 @@ export default function ManualMealScreen() {
   const params = useParams();
   const run = useMutation();
   const [date, setDate] = useState(params.date());
-  const [category, setCategory] = useState<MealCategory>(params.category() ?? 'cena');
+  const [category, setCategory] = useState<MealCategory>(params.category() ?? guessCategory());
   const [name, setName] = useState('');
   const [kcal, setKcal] = useState('');
   const [prot, setProt] = useState('');

@@ -33,6 +33,7 @@
       "output": "single"
     },
     "plugins": [
+      ["expo-image-picker", { "cameraPermission": "Momentum usa la cámara para que saques una foto de tu comida y estime sus calorías.", "photosPermission": "Momentum usa tus fotos para estimar las calorías de una comida que elijas.", "microphonePermission": false }],
       ["expo-notifications", { "icon": "./assets/notification-icon.png", "color": "#C8F560", "defaultChannel": "recordatorios" }],
       [
         "expo-router",

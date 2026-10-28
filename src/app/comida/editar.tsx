@@ -12,6 +12,9 @@ import { parseNonNegative, toInput } from '@/lib/format';
 import { useParams } from '@/lib/params';
 import { useDb, useMutation } from '@/state/db';
 import { useFeatures } from '@/state/features';
+import { useCloudConfig } from '@/state/cloud';
+import { useToast } from '@/state/toast';
+import { cloudApi } from '@/backup/api';
 import { useColors } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
 
@@ -33,6 +36,9 @@ export default function EditMealScreen() {
   const [ingredients, setIngredients] = useState('');
   const [estimate, setEstimate] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [share, setShare] = useState(false);
+  const { config } = useCloudConfig();
+  const toast = useToast();
   const { features } = useFeatures();
   const [extraTexts, setExtraTexts] = useState<ExtraTexts>({});
 
@@ -83,6 +89,22 @@ export default function EditMealScreen() {
       { success: id ? 'Comida actualizada' : 'Comida creada' },
     );
     setSaving(false);
+    if (savedId && share && config) {
+      // Sharing is best effort: the food is already saved on the phone either way.
+      try {
+        await cloudApi.sharePublicFood(config, {
+          name: name.trim(),
+          category,
+          calories: calories!,
+          protein: protein!,
+          extras: textsToExtras(extraTexts, features),
+          ingredients: ingredients.split('\n').map((l) => l.trim()).filter(Boolean),
+        });
+        toast.show('Guardada y compartida en la biblioteca');
+      } catch (e) {
+        toast.show(`Se guardó, pero no se pudo compartir: ${e instanceof Error ? e.message : 'error'}`, 'error');
+      }
+    }
     if (savedId) goBack();
   };
 
@@ -134,6 +156,15 @@ export default function EditMealScreen() {
           </View>
           <Switch value={estimate} onValueChange={setEstimate} trackColor={{ true: c.accent, false: c.track }} thumbColor="#FFFFFF" />
         </Row>
+        {config ? (
+          <Row style={{ justifyContent: 'space-between' }}>
+            <View style={{ flex: 1 }}>
+              <T variant="bodyMedium">Compartir en la biblioteca pública</T>
+              <T variant="caption" tone="dim">Otras personas van a poder usarla. No se muestra tu nombre.</T>
+            </View>
+            <Switch value={share} onValueChange={setShare} trackColor={{ true: c.accent, false: c.track }} thumbColor="#FFFFFF" />
+          </Row>
+        ) : null}
         <Field label="Preparación (minutos, opcional)" value={prep} onChangeText={setPrep} keyboardType="numeric" suffix="min" />
         <Field
           label="Ingredientes (uno por línea)"

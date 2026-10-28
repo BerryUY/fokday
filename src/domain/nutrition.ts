@@ -134,3 +134,12 @@ export const GOAL_MET_THRESHOLD = 0.95;
 export function isGoalMet(consumed: number, target: number): boolean {
   return target > 0 && consumed / target >= GOAL_MET_THRESHOLD;
 }
+
+/** The meal moment that fits a time of day; always changeable before saving. */
+export function guessCategory(at: Date = new Date()): MealCategory {
+  const h = at.getHours() + at.getMinutes() / 60;
+  if (h >= 5 && h < 11) return 'desayuno';
+  if (h >= 11 && h < 16) return 'almuerzo';
+  if (h >= 16 && h < 20) return 'merienda';
+  return 'cena';
+}

@@ -11,7 +11,8 @@ import { Button, Card, Divider, IconButton, PressableScale, Row, SectionHeader, 
 import { PLAN_FOOTNOTE } from '@/data/catalog';
 import { duplicateDay, getLogsForDate, listMeals, logMeal } from '@/data/meals';
 import { getGoalForDate, setGoalsFrom } from '@/data/settings';
-import { MEAL_CATEGORIES, sumDailyTotals } from '@/domain/nutrition';
+import { guessCategory, MEAL_CATEGORIES, sumDailyTotals } from '@/domain/nutrition';
+import { QuickAddSheet } from '@/components/QuickAddSheet';
 import { addDays, formatRelative, todayKey } from '@/lib/dates';
 import { formatKcal, formatProtein, parsePositive, toInput } from '@/lib/format';
 import { useMutation, useQuery } from '@/state/db';
@@ -23,6 +24,7 @@ export default function ComidasScreen() {
   const run = useMutation();
   const [date, setDate] = useState(todayKey());
   const [goalsOpen, setGoalsOpen] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
   const previous = addDays(date, -1);
 
   const { data } = useQuery(async (db) => {
@@ -62,15 +64,21 @@ export default function ComidasScreen() {
         <Loading />
       ) : (
         <>
+          <View style={styles.actions}>
+            <QuickAction icon="camera" label="Foto con IA" accent onPress={() => router.push({ pathname: '/comida/foto', params: { date } })} />
+            <QuickAction icon="zap" label="Sumar rápido" onPress={() => setQuickOpen(true)} />
+            <QuickAction icon="globe" label="Biblioteca" onPress={() => router.push({ pathname: '/comida/biblioteca', params: { date } })} />
+          </View>
+
           <Card style={{ padding: space.xl }}>
             <NutritionBars calories={data.totals.calories} protein={data.totals.protein} calorieTarget={data.goal.calories} proteinTarget={data.goal.protein} />
           </Card>
 
           <View style={styles.grid}>
-            {MEAL_CATEGORIES.filter((cat) => cat.key !== 'extra').map((cat, i) => {
+            {MEAL_CATEGORIES.map((cat, i) => {
               const bucket = data.totals.byCategory[cat.key];
               return (
-                <Animated.View key={cat.key} entering={FadeInDown.delay(40 * i).duration(320)} style={styles.tileWrap}>
+                <Animated.View key={cat.key} entering={FadeInDown.delay(40 * i).duration(320)} style={cat.key === 'extra' ? styles.tileWide : styles.tileWrap}>
                   <PressableScale
                     onPress={() => router.push({ pathname: '/comida/categoria/[category]', params: { category: cat.key, date } })}
                     style={[styles.tile, { backgroundColor: c.surface }]}
@@ -93,22 +101,7 @@ export default function ComidasScreen() {
             })}
           </View>
 
-          <Row style={{ marginTop: space.md, gap: space.md }}>
-            <Button
-              label="Snack o extra"
-              icon="plus"
-              variant="secondary"
-              style={{ flex: 1 }}
-              onPress={() => router.push({ pathname: '/comida/categoria/[category]', params: { category: 'extra', date } })}
-            />
-            <Button
-              label="Otra comida"
-              icon="edit-3"
-              variant="secondary"
-              style={{ flex: 1 }}
-              onPress={() => router.push({ pathname: '/comida/manual', params: { date } })}
-            />
-          </Row>
+          <Button label="Algo que no está en la lista" icon="edit-3" variant="ghost" size="sm" style={{ marginTop: space.sm }} onPress={() => router.push({ pathname: '/comida/manual', params: { date } })} />
 
           {data.favorites.length > 0 ? (
             <View style={{ marginTop: space.xl }}>
@@ -129,7 +122,7 @@ export default function ComidasScreen() {
                         label={`Registrar ${m.name}`}
                         size={30}
                         tone="accent"
-                        onPress={() => run((db) => logMeal(db, { date, category: m.category, meal: m }), { success: `${m.name} registrado` })}
+                        onPress={() => run((db) => logMeal(db, { date, category: date === todayKey() ? guessCategory() : m.category, meal: m }), { success: `${m.name} registrado` })}
                       />
                     </Row>
                   </PressableScale>
@@ -183,6 +176,7 @@ export default function ComidasScreen() {
 
           <T variant="caption" tone="dim" style={{ marginTop: space.lg, textAlign: 'center' }}>{PLAN_FOOTNOTE}</T>
 
+          <QuickAddSheet visible={quickOpen} onClose={() => setQuickOpen(false)} date={date} />
           <GoalsSheet
             key={`${data.goal.calories}-${data.goal.protein}-${goalsOpen}`}
             visible={goalsOpen}
@@ -193,6 +187,17 @@ export default function ComidasScreen() {
         </>
       )}
     </Screen>
+  );
+}
+
+/** Big, friendly entry points: photo, quick numbers, community library. */
+function QuickAction({ icon, label, onPress, accent }: { icon: 'camera' | 'zap' | 'globe'; label: string; onPress: () => void; accent?: boolean }) {
+  const c = useColors();
+  return (
+    <PressableScale onPress={onPress} hapticFeedback accessibilityRole="button" accessibilityLabel={label} style={[styles.action, { backgroundColor: accent ? c.accent : c.surface }]}>
+      <Feather name={icon} size={22} color={accent ? c.accentText : c.accent} />
+      <T variant="label" color={accent ? c.accentText : c.text} numberOfLines={1} maxFontSizeMultiplier={1.2} style={{ fontWeight: '600' }}>{label}</T>
+    </PressableScale>
   );
 }
 
@@ -222,6 +227,9 @@ function GoalsSheet({ visible, onClose, calories, protein }: { visible: boolean;
 const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md, marginTop: space.lg },
   tileWrap: { width: '47.8%', flexGrow: 1 },
+  tileWide: { width: '100%' },
+  actions: { flexDirection: 'row', gap: space.sm, marginBottom: space.lg },
+  action: { flex: 1, minHeight: 84, borderRadius: radius.lg, padding: space.md, gap: space.sm, justifyContent: 'center', alignItems: 'center' },
   tile: { borderRadius: radius.lg, padding: space.lg, minHeight: 128 },
   tileIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   fav: { width: 158, borderRadius: radius.lg, padding: space.md, justifyContent: 'space-between' },

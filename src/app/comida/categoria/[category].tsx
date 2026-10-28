@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { MealCard } from '@/components/nutrition';
@@ -21,11 +22,13 @@ export default function CategoryScreen() {
   const run = useMutation();
 
   const { data } = useQuery(async (db) => {
-    const [meals, logs, goal] = await Promise.all([listMeals(db, { category }), getLogsForDate(db, date), getGoalForDate(db, date)]);
-    return { meals, goal, bucket: sumDailyTotals(logs).byCategory[category] };
+    const [all, logs, goal] = await Promise.all([listMeals(db), getLogsForDate(db, date), getGoalForDate(db, date)]);
+    const meals = all.filter((m) => m.category === category);
+    return { meals, others: all.filter((m) => m.category !== category), goal, bucket: sumDailyTotals(logs).byCategory[category] };
   }, [category, date]);
 
   const guidance = CATEGORY_GUIDANCE[category];
+  const [showOthers, setShowOthers] = useState(false);
 
   return (
     <Screen
@@ -84,6 +87,31 @@ export default function CategoryScreen() {
               ))}
             </View>
           )}
+
+          {data.others.length > 0 ? (
+            <View style={{ marginTop: space.lg, gap: space.md }}>
+              <Button
+                label={showOthers ? 'Ocultar comidas de otros momentos' : `Comidas de otros momentos (${data.others.length})`}
+                icon={showOthers ? 'chevron-up' : 'chevron-down'}
+                variant="secondary"
+                onPress={() => setShowOthers(!showOthers)}
+              />
+              {showOthers
+                ? data.others.map((meal, i) => (
+                    <Animated.View key={meal.id} entering={FadeInDown.delay(Math.min(i, 8) * 25).duration(240)}>
+                      <MealCard
+                        meal={meal}
+                        calorieTarget={data.goal.calories}
+                        onPress={() => router.push({ pathname: '/comida/[id]', params: { id: meal.id, date, category } })}
+                        onQuickLog={() =>
+                          run((db) => logMeal(db, { date, category, meal }), { success: `${meal.name} · ${formatKcal(meal.calories)} kcal registrado` })
+                        }
+                      />
+                    </Animated.View>
+                  ))
+                : null}
+            </View>
+          ) : null}
 
           {category === 'cena' ? (
             <Card style={{ marginTop: space.lg }}>

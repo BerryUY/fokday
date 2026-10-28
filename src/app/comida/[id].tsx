@@ -12,7 +12,8 @@ import { ProgressBar } from '@/components/ui/progress';
 import { Badge, Button, Card, Chip, IconButton, Row, SectionHeader, T } from '@/components/ui/primitives';
 import { getMeal, logMeal, setFavorite } from '@/data/meals';
 import { getGoalForDate } from '@/data/settings';
-import { MEAL_CATEGORIES, scaleNutrition, type MealCategory } from '@/domain/nutrition';
+import { guessCategory, MEAL_CATEGORIES, scaleNutrition, type MealCategory } from '@/domain/nutrition';
+import { todayKey } from '@/lib/dates';
 import { formatDecimal, formatKcal, formatPercent, formatProtein } from '@/lib/format';
 import { useParams } from '@/lib/params';
 import { useMutation, useQuery } from '@/state/db';
@@ -35,7 +36,8 @@ export default function MealDetailScreen() {
   if (loading && !data) return <Screen title=""><Loading /></Screen>;
   if (!meal) return <Screen title="Comida"><EmptyState icon="alert-circle" title="Esta comida ya no existe" /></Screen>;
 
-  const target = category ?? meal.category;
+  // Opened without a moment (favorites, search): today it defaults to the current moment of the day.
+  const target = category ?? (date === todayKey() ? guessCategory() : meal.category);
   const scaled = scaleNutrition(meal, portion);
 
   const register = async () => {
