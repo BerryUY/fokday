@@ -50,7 +50,20 @@ export default function ExercisesScreen() {
       title={pick ? 'Elegí un ejercicio' : 'Ejercicios'}
       right={<IconButton icon="plus" label="Nuevo ejercicio" onPress={() => router.push({ pathname: '/ejercicios/editar', params: {} })} />}
     >
-      <Field value={query} onChangeText={setQuery} placeholder="Buscar por nombre o grupo muscular" />
+      <Card
+        tone="accent"
+        style={{ marginBottom: space.md }}
+        onPress={() => router.push({ pathname: '/ejercicios/explorar', params: pick && target ? { pick, target } : {} })}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+          <IconBubble icon="image" tone="accent" size={40} />
+          <View style={{ flex: 1 }}>
+            <T variant="bodyMedium">Guía con fotos</T>
+            <T variant="caption" tone="muted">Más de 800 ejercicios con imágenes y cómo hacerlos</T>
+          </View>
+        </View>
+      </Card>
+      <Field value={query} onChangeText={setQuery} placeholder="Buscar en tu biblioteca" />
       {pick === 'routine' ? (
         <T variant="caption" tone="dim" style={{ marginTop: space.sm }}>Se agrega con 3 × 8–12. Después lo ajustás tocándolo en la rutina.</T>
       ) : null}
