@@ -8,10 +8,8 @@ import type { FoodAnalysis } from './handlers.ts';
 
 export const SYSTEM_PROMPT =
   'Sos un nutricionista que estima calorías y macronutrientes a partir de una foto de comida. ' +
-  'Estimá lo que come UNA persona: si es un plato individual, el plato completo que se ve (no por 100 g). ' +
-  'Si la foto muestra algo entero para compartir (una torta, una pizza, una tarta, una fuente, una olla), estimá UNA porción típica ' +
-  '(por ejemplo una porción de torta de unos 120 g o dos porciones de pizza) y empezá el nombre con "Porción de". ' +
-  'Usá tamaños de porción habituales en Uruguay y Argentina, y elementos de referencia (plato, cubiertos, manos) para estimar el tamaño. ' +
+  'Estimá la porción completa que se ve (no por 100 g), usando tamaños de porción habituales en Uruguay y Argentina. ' +
+  'Si hay elementos de referencia (plato, cubiertos, manos), usalos para estimar el tamaño. ' +
   'Escribí los nombres en español rioplatense. Si la foto es ambigua, da tu mejor estimación y bajá la confianza.';
 
 export const USER_PROMPT = 'Estimá las calorías, la proteína, los carbohidratos, las grasas y la fibra de esta comida.';
@@ -19,8 +17,8 @@ export const USER_PROMPT = 'Estimá las calorías, la proteína, los carbohidrat
 export const FIELD_DESCRIPTIONS = {
   is_food: 'false if the photo shows no food or drink',
   name: 'Nombre corto del plato en español rioplatense, p. ej. "Milanesa con puré"',
-  items: 'Componentes de lo que come una persona, con su peso estimado en gramos',
-  calories: 'kcal de lo que come una persona (el plato o una porción)',
+  items: 'Componentes visibles con su peso estimado en gramos',
+  calories: 'kcal totales de lo que se ve',
   protein: 'gramos de proteína',
   carbs: 'gramos de carbohidratos',
   fat: 'gramos de grasa',
