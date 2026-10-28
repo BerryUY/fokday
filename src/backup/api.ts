@@ -6,6 +6,21 @@ export type CloudConfig = { url: string; token: string };
 
 export type CloudProfile = { id: string; name: string; plan: string; createdAt: string };
 
+/**
+ * Today's allowance of a limited feature (AI photo, barcode). limit includes extras earned with
+ * videos; bonusLeft is how many more can be earned; videosPerExtra videos give one extra.
+ */
+export type Quota = { pro: boolean; used: number; limit: number; bonus: number; bonusLeft: number; videos: number; videosPerExtra: number };
+
+/** A packaged food found by barcode (Open Food Facts), values per 100 g. */
+export type BarcodeProduct = {
+  code: string;
+  name: string;
+  brand: string | null;
+  per100g: { calories: number; protein: number; carbs: number | null; fat: number | null; fiber: number | null };
+  servingGrams: number | null;
+};
+
 /** The AI's reading of a food photo (whole visible portion). */
 export type FoodAnalysis = {
   name: string;
@@ -79,7 +94,7 @@ async function request<T>(config: { url: string; token?: string }, path: string,
   if (!res.ok) {
     const serverMsg = (body as { error?: string } | null)?.error;
     const msg =
-      res.status === 401 ? 'El código de recuperación (token) no es válido. Revisalo en Ajustes → Datos y respaldo.'
+      res.status === 401 ? serverMsg ?? 'Tu sesión venció. Volvé a entrar con tu cuenta.'
       : res.status === 413 ? 'El respaldo es más grande de lo que acepta el servidor.'
       : serverMsg ?? `El servidor respondió con un error (${res.status}).`;
     throw new ApiError(msg, res.status);
@@ -99,7 +114,7 @@ export const cloudApi = {
   },
 
   status(config: CloudConfig, fetchImpl?: FetchLike) {
-    return request<{ ok: true; profile: CloudProfile; count: number; latest: CloudBackupMeta | null }>(config, 'status', {}, fetchImpl);
+    return request<{ ok: true; profile: CloudProfile; count: number; latest: CloudBackupMeta | null; pro: boolean; ai: Quota; barcode: Quota }>(config, 'status', {}, fetchImpl);
   },
 
   list(config: CloudConfig, fetchImpl?: FetchLike) {
@@ -108,7 +123,22 @@ export const cloudApi = {
 
   /** Sends a food photo (JPEG, base64) for the AI to estimate; needs a cloud profile. */
   analyzeFood(config: CloudConfig, jpegBase64: string, fetchImpl?: FetchLike) {
-    return request<{ food: FoodAnalysis; remaining: number }>(config, 'food/analyze', { method: 'POST', body: JSON.stringify({ image: jpegBase64 }) }, fetchImpl);
+    return request<{ food: FoodAnalysis; remaining: number; ai: Quota }>(config, 'food/analyze', { method: 'POST', body: JSON.stringify({ image: jpegBase64 }) }, fetchImpl);
+  },
+
+  /** Looks a barcode up within today's allowance; 404 when the product is unknown (not counted). */
+  lookupBarcode(config: CloudConfig, code: string, fetchImpl?: FetchLike) {
+    return request<{ product: BarcodeProduct; barcode: Quota }>(config, `food/barcode/${encodeURIComponent(code)}`, {}, fetchImpl);
+  },
+
+  /** With an account session: adopts this phone's older profile (and its backups) into the account. */
+  linkProfile(config: CloudConfig, legacyToken: string, fetchImpl?: FetchLike) {
+    return request<{ profile: CloudProfile; linked: true }>(config, 'profiles/link', { method: 'POST', body: JSON.stringify({ token: legacyToken }) }, fetchImpl);
+  },
+
+  /** Pro: a short AI summary of the week from its numbers. */
+  weeklySummary(config: CloudConfig, week: Record<string, unknown>, fetchImpl?: FetchLike) {
+    return request<{ text: string }>(config, 'ai/weekly-summary', { method: 'POST', body: JSON.stringify({ week }) }, fetchImpl);
   },
 
   searchPublicFoods(config: CloudConfig, query: string, fetchImpl?: FetchLike) {

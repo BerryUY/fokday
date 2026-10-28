@@ -3,9 +3,10 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypt
 
 /**
  * Backup API logic, independent of the runtime (Supabase Edge Functions) and of the
- * storage so it can be unit-tested. Each person has a profile with its own secret token
- * (only its hash is stored) and versioned full snapshots that nobody else can read.
- * Profiles are created with the owner's invite code.
+ * storage so it can be unit-tested. Each person has a profile and versioned full snapshots
+ * that nobody else can read. People sign in with a Supabase account (Google or email); the
+ * profile is created on first use. Older installs still use their own secret token (only its
+ * hash is stored) until they link it to an account.
  */
 
 export type Profile = { id: string; name: string; plan: string; createdAt: string };
@@ -26,8 +27,11 @@ export type NewBackup = Omit<BackupMeta, 'receivedAt'> & { payload: string };
 
 export interface BackupStore {
   countProfiles(): Promise<number>;
-  createProfile(profile: { id: string; name: string; tokenHash: string }): Promise<Profile>;
+  createProfile(profile: { id: string; name: string; tokenHash: string; authUserId?: string }): Promise<Profile>;
   findProfileByTokenHash(tokenHash: string): Promise<Profile | null>;
+  findProfileByAuthUser(authUserId: string): Promise<Profile | null>;
+  /** Attaches a Supabase account to an existing profile. */
+  setAuthUser(profileId: string, authUserId: string): Promise<void>;
   setTokenHash(profileId: string, tokenHash: string): Promise<void>;
   /** Removes the profile and every backup it owns. */
   deleteProfile(profileId: string): Promise<void>;
@@ -38,9 +42,11 @@ export interface BackupStore {
   /** Inserts unless the id exists. Returns the stored receivedAt either way. */
   insert(profileId: string, backup: NewBackup): Promise<{ inserted: boolean; receivedAt: string }>;
   remove(profileId: string, ids: string[]): Promise<void>;
-  /** AI photo analyses used by a profile on a UTC day (YYYY-MM-DD). */
-  aiUsage(profileId: string, day: string): Promise<number>;
-  addAiUsage(profileId: string, day: string): Promise<void>;
+  /** Uses of a limited feature on a UTC day (YYYY-MM-DD), and rewarded videos watched for it. */
+  usage(profileId: string, day: string, kind: QuotaKind): Promise<{ count: number; videos: number }>;
+  addUsage(profileId: string, day: string, kind: QuotaKind): Promise<void>;
+  /** Counts one rewarded video; false when that transaction was already counted. */
+  addVideo(profileId: string, day: string, kind: QuotaKind, transactionId: string): Promise<boolean>;
   /** Newest first; empty query lists the latest. */
   searchPublicFoods(query: string, limit: number): Promise<(PublicFood & { profileId: string })[]>;
   countPublicFoods(profileId: string): Promise<number>;
@@ -74,20 +80,60 @@ export type PublicFoodInput = {
 };
 export type PublicFood = PublicFoodInput & { id: string; createdAt: string; mine?: boolean };
 
-export type ApiRequest = { method: string; headers: Record<string, string | string[] | undefined>; body: unknown; id?: string; query?: Record<string, string> };
+export type ApiRequest = { method: string; headers: Record<string, string | string[] | undefined>; body: unknown; id?: string; query?: Record<string, string>; rawQuery?: string };
 export type ApiResponse = { status: number; json?: unknown; raw?: string };
 
+/** A signed-in Supabase account, as verified from its access token. */
+export type AuthUser = { id: string; email: string | null; name: string | null };
+
+/** Compact numbers of one week, built on the phone, for the Pro weekly summary. */
+export type WeekInput = Record<string, unknown>;
+
 export type Env = {
-  /** sha256 (hex) of the owner's invite code. Without it nobody can create profiles. */
+  /** sha256 (hex) of the owner's invite code (legacy sign-up without an account). */
   inviteCodeHash: string | undefined;
   maxProfiles: number;
   /** Automatic uploads closer together than this are refused (the app retries later). */
   minUploadIntervalSeconds: number;
-  /** AI photo analyses allowed per profile per day (keeps the AI bill bounded). */
-  aiDailyLimit?: number;
+  /** Daily limits per feature (AI photo, barcode); anything missing uses QUOTA_DEFAULTS. */
+  limits?: { [K in QuotaKind]?: Partial<LimitSet> };
+  /** Looks a barcode up in Open Food Facts; null when the product is unknown. */
+  lookupBarcode?: (code: string) => Promise<BarcodeProduct | null>;
   /** Reads a JPEG (base64) and estimates its nutrition. Missing when the server has no AI key. */
   analyzeFood?: (jpegBase64: string) => Promise<FoodAnalysis>;
+  /** Writes the Pro weekly summary from the week's numbers. */
+  summarizeWeek?: (week: WeekInput) => Promise<string>;
+  /** Checks a Supabase access token; null when it is invalid or expired. */
+  verifyAuthToken?: (jwt: string) => Promise<AuthUser | null>;
+  /** Removes the Supabase account itself (account deletion). */
+  deleteAuthUser?: (authUserId: string) => Promise<void>;
+  /** Whether this account has an active Pro subscription (RevenueCat). */
+  checkPro?: (authUserId: string) => Promise<boolean>;
+  /** Verifies a rewarded-video callback from AdMob (signature over the query string). */
+  verifyAdReward?: (rawQuery: string) => Promise<boolean>;
   now?: () => Date;
+};
+
+/**
+ * The limited features. Free: a few per day, plus extras earned with rewarded videos
+ * (videosPerExtra videos = 1 more, up to bonusMax extras). Pro: a high daily cap.
+ */
+export type QuotaKind = 'photo' | 'barcode' | 'summary';
+export type LimitSet = { free: number; bonusMax: number; videosPerExtra: number; pro: number };
+export const QUOTA_DEFAULTS: Record<QuotaKind, LimitSet> = {
+  photo: { free: 2, bonusMax: 3, videosPerExtra: 2, pro: 20 },
+  barcode: { free: 1, bonusMax: 5, videosPerExtra: 1, pro: 200 },
+  // The weekly summary is Pro only; a small cap keeps the shared AI quota safe from loops.
+  summary: { free: 0, bonusMax: 0, videosPerExtra: 1, pro: 3 },
+};
+
+/** A packaged food from Open Food Facts, values per 100 g. */
+export type BarcodeProduct = {
+  code: string;
+  name: string;
+  brand: string | null;
+  per100g: { calories: number; protein: number; carbs: number | null; fat: number | null; fiber: number | null };
+  servingGrams: number | null;
 };
 
 /** A ~1 MB JPEG is plenty for a food photo; the app sends ~100 KB. */
@@ -104,13 +150,77 @@ export const sha256Hex = (s: string) => sha256(s).toString('hex');
 const newToken = () => `mom_${randomBytes(32).toString('hex')}`;
 const denied401: ApiResponse = { status: 401, json: { error: 'Token inválido.' } };
 
-/** Finds the profile that owns the Bearer token, or the 401 to answer with. */
-export async function authenticate(header: string | string[] | undefined, store: BackupStore): Promise<{ profile: Profile } | { denied: ApiResponse }> {
+export type Authed = { profile: Profile; authUser: AuthUser | null };
+
+const bearer = (header: string | string[] | undefined) => {
   const value = Array.isArray(header) ? header[0] : header;
-  const given = value?.startsWith('Bearer ') ? value.slice(7).trim() : '';
+  return value?.startsWith('Bearer ') ? value.slice(7).trim() : '';
+};
+const isJwt = (token: string) => token.split('.').length === 3 && !token.startsWith('mom_');
+
+/**
+ * Finds the profile behind the Bearer credential, or the 401 to answer with. A Supabase
+ * access token finds (or creates, on first use) the account's profile; an older install's
+ * mom_ token finds its profile by hash.
+ */
+export async function authenticate(header: string | string[] | undefined, store: BackupStore, env?: Env): Promise<Authed | { denied: ApiResponse }> {
+  const given = bearer(header);
   if (given.length < 32) return { denied: denied401 };
+  if (isJwt(given)) {
+    const user = env?.verifyAuthToken ? await env.verifyAuthToken(given) : null;
+    if (!user) return { denied: { status: 401, json: { error: 'Tu sesión venció. Volvé a entrar.' } } };
+    const existing = await store.findProfileByAuthUser(user.id);
+    if (existing) return { profile: existing, authUser: user };
+    if (env && (await store.countProfiles()) >= env.maxProfiles) {
+      return { denied: { status: 403, json: { error: 'Se alcanzó el máximo de perfiles de este servidor.' } } };
+    }
+    const name = (user.name ?? user.email?.split('@')[0] ?? 'Sin nombre').slice(0, 60);
+    const profile = await store.createProfile({ id: randomUUID(), name, tokenHash: sha256Hex(newToken()), authUserId: user.id });
+    return { profile, authUser: user };
+  }
   const profile = await store.findProfileByTokenHash(sha256Hex(given));
-  return profile ? { profile } : { denied: denied401 };
+  return profile ? { profile, authUser: null } : { denied: denied401 };
+}
+
+/** Pro comes from the subscription (RevenueCat) or a manual grant (profiles.plan = 'pro'). */
+async function isPro(auth: Authed, env: Env): Promise<boolean> {
+  if (auth.profile.plan === 'pro') return true;
+  if (!auth.authUser || !env.checkPro) return false;
+  try {
+    return await env.checkPro(auth.authUser.id);
+  } catch {
+    return false;
+  }
+}
+
+const today = (env: Env) => (env.now ?? (() => new Date()))().toISOString().slice(0, 10);
+
+/** Today's allowance of one feature. bonus: extras earned; bonusLeft: extras still earnable; videos: watched today. */
+export type Quota = { pro: boolean; used: number; limit: number; bonus: number; bonusLeft: number; videos: number; videosPerExtra: number };
+
+const limitsFor = (env: Env, kind: QuotaKind): LimitSet => ({ ...QUOTA_DEFAULTS[kind], ...env.limits?.[kind] });
+
+async function quota(auth: Authed, store: BackupStore, env: Env, kind: QuotaKind, pro?: boolean): Promise<Quota> {
+  const { count, videos } = await store.usage(auth.profile.id, today(env), kind);
+  const isProNow = pro ?? (await isPro(auth, env));
+  const l = limitsFor(env, kind);
+  const videosPerExtra = Math.max(1, l.videosPerExtra);
+  const earned = Math.min(Math.floor(videos / videosPerExtra), l.bonusMax);
+  const limit = isProNow ? l.pro : l.free + earned;
+  // Videos need an account, so the reward can be credited to it.
+  const bonusLeft = isProNow || !auth.authUser ? 0 : Math.max(0, l.bonusMax - earned);
+  return { pro: isProNow, used: count, limit, bonus: earned, bonusLeft, videos, videosPerExtra };
+}
+
+/** The 429 message when a free allowance runs out. */
+function limitMessage(q: Quota, kind: QuotaKind, env: Env): string {
+  const what = kind === 'photo' ? { many: 'fotos con IA', one: 'una foto más' } : { many: 'escaneos de código de barras', one: 'un escaneo más' };
+  if (q.pro) return 'Llegaste al máximo de ' + what.many + ' de hoy. Mañana se renueva.';
+  if (q.bonusLeft > 0) {
+    const n = q.videosPerExtra - (q.videos % q.videosPerExtra);
+    return 'Ya usaste tus ' + what.many + ' gratis de hoy. Mirá ' + (n === 1 ? 'un video corto' : n + ' videos cortos') + ' y ganá ' + what.one + ', o pasate a Pro.';
+  }
+  return 'Ya usaste tus ' + what.many + ' de hoy. Mañana se renuevan; con Pro tenés ' + (kind === 'barcode' ? 'ilimitados' : limitsFor(env, kind).pro + ' por día') + '.';
 }
 
 /**
@@ -155,12 +265,14 @@ export async function handleCreateProfile(req: ApiRequest, store: BackupStore, e
 }
 
 /** DELETE profiles/me removes the profile and all its backups; POST profiles/me/token issues a new token. */
-export async function handleMe(req: ApiRequest, store: BackupStore, _env: Env, action: 'delete' | 'rotate'): Promise<ApiResponse> {
-  const auth = await authenticate(req.headers.authorization, store);
+export async function handleMe(req: ApiRequest, store: BackupStore, env: Env, action: 'delete' | 'rotate'): Promise<ApiResponse> {
+  const auth = await authenticate(req.headers.authorization, store, env);
   if ('denied' in auth) return auth.denied;
   if (action === 'delete') {
     if (req.method !== 'DELETE') return { status: 405, json: { error: 'Método no permitido.' } };
     await store.deleteProfile(auth.profile.id);
+    // Deleting the account also removes the sign-in itself (Google Play asks for full deletion).
+    if (auth.authUser && env.deleteAuthUser) await env.deleteAuthUser(auth.authUser.id);
     return { status: 200, json: { deleted: true } };
   }
   if (req.method !== 'POST') return { status: 405, json: { error: 'Método no permitido.' } };
@@ -169,16 +281,22 @@ export async function handleMe(req: ApiRequest, store: BackupStore, _env: Env, a
   return { status: 200, json: { token } };
 }
 
-export async function handleStatus(req: ApiRequest, store: BackupStore, _env: Env): Promise<ApiResponse> {
-  const auth = await authenticate(req.headers.authorization, store);
+export async function handleStatus(req: ApiRequest, store: BackupStore, env: Env): Promise<ApiResponse> {
+  const auth = await authenticate(req.headers.authorization, store, env);
   if ('denied' in auth) return auth.denied;
   if (req.method !== 'GET') return { status: 405, json: { error: 'Método no permitido.' } };
-  const [count, latest] = await Promise.all([store.count(auth.profile.id), store.list(auth.profile.id, 1)]);
-  return { status: 200, json: { ok: true, profile: auth.profile, count, latest: latest[0] ?? null } };
+  const pro = await isPro(auth, env);
+  const [count, latest, ai, barcode] = await Promise.all([
+    store.count(auth.profile.id),
+    store.list(auth.profile.id, 1),
+    quota(auth, store, env, 'photo', pro),
+    quota(auth, store, env, 'barcode', pro),
+  ]);
+  return { status: 200, json: { ok: true, profile: auth.profile, count, latest: latest[0] ?? null, pro, ai, barcode } };
 }
 
 export async function handleBackups(req: ApiRequest, store: BackupStore, env: Env): Promise<ApiResponse> {
-  const auth = await authenticate(req.headers.authorization, store);
+  const auth = await authenticate(req.headers.authorization, store, env);
   if ('denied' in auth) return auth.denied;
   const profileId = auth.profile.id;
 
@@ -232,8 +350,8 @@ export async function handleBackups(req: ApiRequest, store: BackupStore, env: En
   return { status: result.inserted ? 201 : 200, json: { id, duplicate: !result.inserted, receivedAt: result.receivedAt } };
 }
 
-export async function handleBackupById(req: ApiRequest, store: BackupStore, _env: Env): Promise<ApiResponse> {
-  const auth = await authenticate(req.headers.authorization, store);
+export async function handleBackupById(req: ApiRequest, store: BackupStore, env: Env): Promise<ApiResponse> {
+  const auth = await authenticate(req.headers.authorization, store, env);
   if ('denied' in auth) return auth.denied;
   if (req.method !== 'GET') return { status: 405, json: { error: 'Método no permitido.' } };
   const id = req.id ?? '';
@@ -251,11 +369,15 @@ export async function handleRequest(path: string, req: ApiRequest, store: Backup
   if (clean === 'profiles') return handleCreateProfile(req, store, env);
   if (clean === 'profiles/me') return handleMe(req, store, env, 'delete');
   if (clean === 'profiles/me/token') return handleMe(req, store, env, 'rotate');
+  if (clean === 'profiles/link') return handleLink(req, store, env);
+  if (clean === 'ads/reward') return handleAdReward(req, store, env);
+  if (clean === 'ai/weekly-summary') return handleWeeklySummary(req, store, env);
   if (clean === 'status') return handleStatus(req, store, env);
   if (clean === 'backups') return handleBackups(req, store, env);
   if (clean.startsWith('backups/')) return handleBackupById({ ...req, id: decodeURIComponent(clean.slice('backups/'.length)) }, store, env);
   if (clean === 'food/analyze') return handleAnalyzeFood(req, store, env);
   if (clean === 'food/library') return handlePublicFoods(req, store, env);
+  if (clean.startsWith('food/barcode/')) return handleBarcode({ ...req, id: decodeURIComponent(clean.slice('food/barcode/'.length)) }, store, env);
   if (clean.startsWith('food/library/')) return handleDeletePublicFood({ ...req, id: decodeURIComponent(clean.slice('food/library/'.length)) }, store, env);
   return { status: 404, json: { error: 'Ruta desconocida.' } };
 }
@@ -266,7 +388,7 @@ const num = (v: unknown, max: number): number | null => (typeof v === 'number' &
 
 /** POST food/analyze { image: base64 JPEG } → { food: FoodAnalysis, remaining } */
 export async function handleAnalyzeFood(req: ApiRequest, store: BackupStore, env: Env): Promise<ApiResponse> {
-  const auth = await authenticate(req.headers.authorization, store);
+  const auth = await authenticate(req.headers.authorization, store, env);
   if ('denied' in auth) return auth.denied;
   if (req.method !== 'POST') return { status: 405, json: { error: 'Método no permitido.' } };
   if (!env.analyzeFood) return { status: 503, json: { error: 'El análisis con IA todavía no está activado en el servidor.' } };
@@ -274,12 +396,9 @@ export async function handleAnalyzeFood(req: ApiRequest, store: BackupStore, env
   if (typeof image !== 'string' || image.length < 100 || image.length > MAX_IMAGE_BASE64 || !/^[A-Za-z0-9+/=]+$/.test(image)) {
     return { status: 400, json: { error: 'La foto no es válida o es demasiado grande.' } };
   }
-  const day = (env.now ?? (() => new Date()))().toISOString().slice(0, 10);
-  const limit = env.aiDailyLimit ?? 30;
-  const used = await store.aiUsage(auth.profile.id, day);
-  if (used >= limit) {
-    return { status: 429, json: { error: 'Llegaste a las ' + limit + ' fotos con IA de hoy. Mañana se renueva; mientras tanto podés cargarla a mano.' } };
-  }
+  const day = today(env);
+  const q = await quota(auth, store, env, 'photo');
+  if (q.used >= q.limit) return { status: 429, json: { error: limitMessage(q, 'photo', env), ai: q } };
   let food: FoodAnalysis;
   try {
     food = await env.analyzeFood(image);
@@ -287,8 +406,9 @@ export async function handleAnalyzeFood(req: ApiRequest, store: BackupStore, env
     const message = e instanceof Error && e.message.startsWith('IA:') ? e.message.slice(3).trim() : 'No pudimos analizar la foto. Probá de nuevo.';
     return { status: 502, json: { error: message } };
   }
-  await store.addAiUsage(auth.profile.id, day);
-  return { status: 200, json: { food, remaining: Math.max(0, limit - used - 1) } };
+  await store.addUsage(auth.profile.id, day, 'photo');
+  const ai = { ...q, used: q.used + 1 };
+  return { status: 200, json: { food, remaining: Math.max(0, ai.limit - ai.used), ai } };
 }
 
 function validatePublicFood(body: unknown): PublicFoodInput | string {
@@ -313,8 +433,8 @@ function validatePublicFood(body: unknown): PublicFoodInput | string {
 }
 
 /** GET food/library?q= searches; POST shares one of your foods. */
-export async function handlePublicFoods(req: ApiRequest, store: BackupStore, _env: Env): Promise<ApiResponse> {
-  const auth = await authenticate(req.headers.authorization, store);
+export async function handlePublicFoods(req: ApiRequest, store: BackupStore, env: Env): Promise<ApiResponse> {
+  const auth = await authenticate(req.headers.authorization, store, env);
   if ('denied' in auth) return auth.denied;
   if (req.method === 'GET') {
     const q = (req.query?.q ?? '').trim().slice(0, 60);
@@ -332,11 +452,104 @@ export async function handlePublicFoods(req: ApiRequest, store: BackupStore, _en
   return { status: 201, json: { food: { ...food, mine: true } } };
 }
 
-export async function handleDeletePublicFood(req: ApiRequest, store: BackupStore, _env: Env): Promise<ApiResponse> {
-  const auth = await authenticate(req.headers.authorization, store);
+export async function handleDeletePublicFood(req: ApiRequest, store: BackupStore, env: Env): Promise<ApiResponse> {
+  const auth = await authenticate(req.headers.authorization, store, env);
   if ('denied' in auth) return auth.denied;
   if (req.method !== 'DELETE') return { status: 405, json: { error: 'Método no permitido.' } };
   if (!UUID.test(req.id ?? '')) return { status: 400, json: { error: 'id inválido.' } };
   const deleted = await store.deletePublicFood(auth.profile.id, req.id!);
   return deleted ? { status: 200, json: { deleted: true } } : { status: 404, json: { error: 'No encontramos esa comida entre las que compartiste.' } };
+}
+
+// ---------- Accounts, rewarded videos and the Pro weekly summary ----------
+
+/**
+ * POST profiles/link { token }: with a Supabase session, adopts the profile of an older install
+ * (its mom_ token) so its backups follow the account. An empty profile the account made on
+ * first use is dropped; one that already has backups is never overwritten.
+ */
+export async function handleLink(req: ApiRequest, store: BackupStore, env: Env): Promise<ApiResponse> {
+  if (req.method !== 'POST') return { status: 405, json: { error: 'Método no permitido.' } };
+  const jwt = bearer(req.headers.authorization);
+  const user = isJwt(jwt) && env.verifyAuthToken ? await env.verifyAuthToken(jwt) : null;
+  if (!user) return { status: 401, json: { error: 'Tu sesión venció. Volvé a entrar.' } };
+  const token = (req.body as { token?: unknown } | null)?.token;
+  const legacy = typeof token === 'string' && token.length >= 32 ? await store.findProfileByTokenHash(sha256Hex(token)) : null;
+  if (!legacy) return { status: 404, json: { error: 'No encontramos el perfil anterior de este teléfono.' } };
+  const current = await store.findProfileByAuthUser(user.id);
+  if (current && current.id === legacy.id) return { status: 200, json: { profile: legacy, linked: true } };
+  if (current) {
+    if ((await store.count(current.id)) > 0) {
+      return { status: 409, json: { error: 'Esta cuenta ya tiene respaldos. Entrá con otra cuenta para conservar los de este teléfono.' } };
+    }
+    await store.deleteProfile(current.id);
+  }
+  await store.setAuthUser(legacy.id, user.id);
+  return { status: 200, json: { profile: legacy, linked: true } };
+}
+
+/**
+ * GET ads/reward: AdMob's server-side verification callback for a rewarded video. The signed
+ * query carries the account id (user_id) and a transaction id; each transaction counts once.
+ * AdMob's own test request (no signature) gets a 200 so the console accepts the URL.
+ */
+export async function handleAdReward(req: ApiRequest, store: BackupStore, env: Env): Promise<ApiResponse> {
+  if (req.method !== 'GET') return { status: 405, json: { error: 'Método no permitido.' } };
+  const q = req.query ?? {};
+  if (!q.signature) return { status: 200, json: { ok: true } };
+  if (!env.verifyAdReward || !req.rawQuery || !(await env.verifyAdReward(req.rawQuery))) {
+    return { status: 403, json: { error: 'Firma inválida.' } };
+  }
+  if (!q.user_id || !UUID.test(q.user_id) || !q.transaction_id || q.transaction_id.length > 200) return { status: 400, json: { error: 'Faltan datos.' } };
+  const profile = await store.findProfileByAuthUser(q.user_id);
+  if (!profile) return { status: 404, json: { error: 'Cuenta desconocida.' } };
+  // custom_data says which feature the video was for (set by the app when it loads the ad).
+  const kind: QuotaKind = q.custom_data === 'barcode' ? 'barcode' : 'photo';
+  const credited = await store.addVideo(profile.id, today(env), kind, q.transaction_id);
+  return { status: 200, json: { ok: true, credited, kind } };
+}
+
+/**
+ * GET food/barcode/<code>: looks a packaged food up (Open Food Facts) within the daily allowance.
+ * An unknown product does not use a scan.
+ */
+export async function handleBarcode(req: ApiRequest, store: BackupStore, env: Env): Promise<ApiResponse> {
+  const auth = await authenticate(req.headers.authorization, store, env);
+  if ('denied' in auth) return auth.denied;
+  if (req.method !== 'GET') return { status: 405, json: { error: 'Método no permitido.' } };
+  const code = req.id ?? '';
+  if (!/^\d{8,14}$/.test(code)) return { status: 400, json: { error: 'Ese código de barras no es válido.' } };
+  if (!env.lookupBarcode) return { status: 503, json: { error: 'El escáner todavía no está activado en el servidor.' } };
+  const q = await quota(auth, store, env, 'barcode');
+  if (q.used >= q.limit) return { status: 429, json: { error: limitMessage(q, 'barcode', env), barcode: q } };
+  let product: BarcodeProduct | null;
+  try {
+    product = await env.lookupBarcode(code);
+  } catch {
+    return { status: 502, json: { error: 'No pudimos consultar la base de productos. Probá en un rato.' } };
+  }
+  if (!product) return { status: 404, json: { error: 'No encontramos ese producto. Cargalo a mano.', barcode: q } };
+  await store.addUsage(auth.profile.id, today(env), 'barcode');
+  return { status: 200, json: { product, barcode: { ...q, used: q.used + 1 } } };
+}
+
+/** POST ai/weekly-summary { week }: Pro only. The phone sends the week's numbers, never raw data. */
+export async function handleWeeklySummary(req: ApiRequest, store: BackupStore, env: Env): Promise<ApiResponse> {
+  const auth = await authenticate(req.headers.authorization, store, env);
+  if ('denied' in auth) return auth.denied;
+  if (req.method !== 'POST') return { status: 405, json: { error: 'Método no permitido.' } };
+  const q = await quota(auth, store, env, 'summary');
+  if (!q.pro) return { status: 402, json: { error: 'El resumen semanal es parte de Pro.' } };
+  if (q.used >= q.limit) return { status: 429, json: { error: 'Ya armaste los resúmenes de hoy. Probá mañana.' } };
+  if (!env.summarizeWeek) return { status: 503, json: { error: 'El análisis con IA todavía no está activado en el servidor.' } };
+  const week = (req.body as { week?: unknown } | null)?.week;
+  if (!week || typeof week !== 'object' || Array.isArray(week) || JSON.stringify(week).length > 4000) return { status: 400, json: { error: 'Datos de la semana inválidos.' } };
+  try {
+    const text = await env.summarizeWeek(week as WeekInput);
+    await store.addUsage(auth.profile.id, today(env), 'summary');
+    return { status: 200, json: { text } };
+  } catch (e) {
+    const message = e instanceof Error && e.message.startsWith('IA:') ? e.message.slice(3).trim() : 'No pudimos armar el resumen. Probá más tarde.';
+    return { status: 502, json: { error: message } };
+  }
 }

@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import type { BackupMeta, BackupStore, NewBackup, Profile, PublicFood } from './handlers.ts';
+import type { AuthUser, BackupMeta, BackupStore, NewBackup, Profile, PublicFood } from './handlers.ts';
 
 /**
  * Profiles and backup metadata live in Postgres; each snapshot is a gzip file in the private
@@ -38,6 +38,27 @@ export async function readConfig(url: string, secretKey: string): Promise<Record
   return Object.fromEntries((data as { key: string; value: string }[]).map((r) => [r.key, r.value]));
 }
 
+/**
+ * Supabase account helpers for the API: checks a person's access token (Supabase Auth verifies
+ * it) and deletes an account when the person deletes their profile.
+ */
+export function createAuthHelpers(url: string, secretKey: string) {
+  const db = createClient(url, secretKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  return {
+    async verifyAuthToken(jwt: string): Promise<AuthUser | null> {
+      const { data, error } = await db.auth.getUser(jwt);
+      if (error || !data.user) return null;
+      const meta = (data.user.user_metadata ?? {}) as Record<string, unknown>;
+      const name = [meta.full_name, meta.name].find((v) => typeof v === 'string' && v.trim()) as string | undefined;
+      return { id: data.user.id, email: data.user.email ?? null, name: name?.trim() ?? null };
+    },
+    async deleteAuthUser(authUserId: string): Promise<void> {
+      const { error } = await db.auth.admin.deleteUser(authUserId);
+      if (error) fail('deleteAuthUser', error);
+    },
+  };
+}
+
 export function createSupabaseStore(url: string, secretKey: string): BackupStore {
   const db = createClient(url, secretKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
@@ -54,7 +75,7 @@ export function createSupabaseStore(url: string, secretKey: string): BackupStore
       return count ?? 0;
     },
     async createProfile(p) {
-      const { data, error } = await db.from('momentum_profiles').insert({ id: p.id, name: p.name, token_hash: p.tokenHash }).select(PROFILE).single();
+      const { data, error } = await db.from('momentum_profiles').insert({ id: p.id, name: p.name, token_hash: p.tokenHash, auth_user_id: p.authUserId ?? null }).select(PROFILE).single();
       if (error) fail('createProfile', error);
       return toProfile(data as Profile);
     },
@@ -62,6 +83,15 @@ export function createSupabaseStore(url: string, secretKey: string): BackupStore
       const { data, error } = await db.from('momentum_profiles').select(PROFILE).eq('token_hash', tokenHash).maybeSingle();
       if (error) fail('findProfile', error);
       return data ? toProfile(data as Profile) : null;
+    },
+    async findProfileByAuthUser(authUserId) {
+      const { data, error } = await db.from('momentum_profiles').select(PROFILE).eq('auth_user_id', authUserId).maybeSingle();
+      if (error) fail('findProfileByAuthUser', error);
+      return data ? toProfile(data as Profile) : null;
+    },
+    async setAuthUser(profileId, authUserId) {
+      const { error } = await db.from('momentum_profiles').update({ auth_user_id: authUserId }).eq('id', profileId);
+      if (error) fail('setAuthUser', error);
     },
     async setTokenHash(profileId, tokenHash) {
       const { error } = await db.from('momentum_profiles').update({ token_hash: tokenHash }).eq('id', profileId);
@@ -130,14 +160,20 @@ export function createSupabaseStore(url: string, secretKey: string): BackupStore
       const { error } = await db.from('momentum_backups').delete().eq('profile_id', profileId).in('id', ids);
       if (error) fail('remove', error);
     },
-    async aiUsage(profileId, day) {
-      const { data, error } = await db.from('momentum_ai_usage').select('count').eq('profile_id', profileId).eq('day', day).maybeSingle();
-      if (error) fail('aiUsage', error);
-      return (data as { count: number } | null)?.count ?? 0;
+    async usage(profileId, day, kind) {
+      const { data, error } = await db.from('momentum_daily_usage').select('count, videos').eq('profile_id', profileId).eq('day', day).eq('kind', kind).maybeSingle();
+      if (error) fail('usage', error);
+      const row = data as { count: number; videos: number } | null;
+      return { count: row?.count ?? 0, videos: row?.videos ?? 0 };
     },
-    async addAiUsage(profileId, day) {
-      const { error } = await db.rpc('momentum_add_ai_usage', { p_profile: profileId, p_day: day });
-      if (error) fail('addAiUsage', error);
+    async addUsage(profileId, day, kind) {
+      const { error } = await db.rpc('momentum_add_usage', { p_profile: profileId, p_day: day, p_kind: kind });
+      if (error) fail('addUsage', error);
+    },
+    async addVideo(profileId, day, kind, transactionId) {
+      const { data, error } = await db.rpc('momentum_add_video', { p_profile: profileId, p_day: day, p_kind: kind, p_tx: transactionId });
+      if (error) fail('addVideo', error);
+      return data === true;
     },
     async searchPublicFoods(query, limit) {
       let q = db.from('momentum_public_foods').select(PUBLIC_FOOD).order('created_at', { ascending: false }).limit(limit);
