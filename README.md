@@ -20,7 +20,8 @@ Android app (Expo SDK 58, React Native, TypeScript, Expo Router)
 - **Backups are full, versioned snapshots.** SQLite triggers bump a `local_revision` counter on every write. When it is ahead of the last backed-up revision and the phone is online, the app uploads a checksummed JSON snapshot of all tables. The server stores each one as a new version (keeps the last 60 by default).
 - **No duplicates.** A retry reuses the same backup id and the server ignores ids it already has. Restores replace tables inside one transaction, so sync retries can never duplicate meal logs.
 - **No silent overwrites.** Restoring is always a manual, confirmed action. It shows what the backup contains and warns if local changes would be lost. A local safety copy is written first. After a reinstall, automatic backups stay paused until you decide whether to restore the cloud backup or keep the phone's data.
-- **Profiles and security.** No passwords. A person creates a profile with the owner's invite code (its SHA-256 lives in the `momentum_config` table); the server returns a secret token that the app keeps in SecureStore and shows once as the *código de recuperación*. The server stores only its SHA-256 hash, and every backup belongs to one profile, so nobody can read anyone else's backups. Database credentials never ship in the APK.
+- **Accounts and security.** Accounts are optional (Google or email and password, Supabase Auth); the app works fully without one. With an account the app sends the Supabase session to the API, which verifies it and finds (or creates) that account's profile. Older installs that used an invite code keep working with their own token until they sign in, when their profile moves into the account. Sessions live in SecureStore. Database credentials never ship in the APK: only public values, in `src/config.ts`. See `docs/seguridad.md`.
+- **Plans.** Free and Pro (RevenueCat over Google Play Billing). The server is the authority for what is limited (AI photo, barcode, weekly summary): daily allowances are reserved atomically in Postgres. Free accounts can earn extras with rewarded videos (AdMob, server-side verified). Limits live in `momentum_config` (`photo_free`, `photo_bonus_max`, `photo_videos_per_extra`, `photo_pro`, `barcode_*`, `summary_pro`).
 
 Decisions you may want to know about:
 - **Backend: Supabase** (Edge Function + Postgres + Storage, one free project). Tables have RLS on with no policies and the bucket is private, so only the function's secret key reaches the data. Snapshots are stored gzip-compressed; each profile keeps its 3 newest backups plus one per day for a week. The app uploads when you leave it (at most hourly) and every 6 hours while open, so the server stays mostly idle.
@@ -69,19 +70,19 @@ Already set up in the Supabase project `momentum` (`eqvyjnhkhyqzwurdtumh`, São 
    Changing the code later only affects new profiles.
 4. Put `https://<project>.supabase.co/functions/v1/momentum` in `app.json` → `expo.extra.backupApiUrl` and build again.
 
-AI food photo (free): create a key at https://aistudio.google.com/apikey (free tier, no card) and set it as the secret `GEMINI_API_KEY` in Supabase → Edge Functions → Secrets. It uses `gemini-3.8-flash` (`supabase/functions/momentum/gemini.ts`). On the free tier Google may use the photos to improve its products, so the privacy page says so. If Google's free quota runs out, the app says so and the person logs the meal by hand.
+AI (free tier): `GEMINI_API_KEY` in Supabase → Edge Functions → Secrets powers the food photo and the Pro weekly summary (`gemini.ts`, with model fallback). On the free tier Google may use the photos to improve its products; the privacy page says so.
 
-Optional paid alternative: `ANTHROPIC_API_KEY` (Claude, `ai.ts`) is used only when there is no Gemini key. Without either key the app answers "El análisis con IA todavía no está activado". Each profile gets `ai_daily_limit` analyses per day (default 30); photos are not stored. Every value the AI returns can be edited before saving.
+Optional: `ANTHROPIC_API_KEY` (Claude, `ai.ts`) is used only when there is no Gemini key. `REVENUECAT_SECRET_KEY` lets the server check Pro. Barcodes go through the server to Open Food Facts. Everything Play Store related (keys to create, forms, checklist) is in `docs/play-store.md`.
 
 The public food library (`momentum_public_foods`) never exposes who shared a food; deleting a profile removes what it shared.
 
 Limits live in `momentum_config`: `max_profiles` (default 50) and `min_upload_interval_seconds` (default 60, a guard against a client stuck in a loop).
 
-Endpoints under `/api/`: `POST profiles` (create, needs the invite code), `DELETE profiles/me` (delete profile and all backups), `POST profiles/me/token` (new recovery code), `GET status`, `GET backups`, `POST backups`, `GET backups/latest` or `backups/<id>`. Everything except creating a profile needs `Authorization: Bearer <profile token>`.
+Endpoints under `/api/`: `GET status` (profile, plan and today's allowances), `GET|POST backups`, `GET backups/latest|<id>`, `POST food/analyze`, `GET food/barcode/<code>`, `GET|POST food/library`, `DELETE food/library/<id>`, `POST ai/weekly-summary` (Pro), `POST profiles/link` (move an older install into the account), `DELETE profiles/me` (delete account, profile and backups), `GET ads/reward` (AdMob server-side verification). Legacy: `POST profiles` (invite code) and `POST profiles/me/token`. Everything except the legacy sign-up and the AdMob callback needs `Authorization: Bearer <Supabase session or legacy token>`.
 
 ## 3. Connect the app
 
-Either type the invite code on the last-but-one step of the welcome screen, or later in **⚙ (Inicio) → Datos y respaldo → Crear mi perfil o conectar → Soy nuevo**. The app creates the profile, shows the *código de recuperación* once (save it in a password manager) and from then on backs up by itself:
+Sign in on the welcome step "Guardá tu progreso" or later in **⚙ (Inicio) → Entrar o crear cuenta**. From then on the app backs up by itself:
 - a few seconds after connectivity returns,
 - when the app comes to the foreground,
 - about 20 s after a change,
