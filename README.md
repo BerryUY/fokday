@@ -67,6 +67,10 @@ Already set up in the Supabase project `momentum` (`eqvyjnhkhyqzwurdtumh`, São 
    Changing the code later only affects new profiles.
 4. Put `https://<project>.supabase.co/functions/v1/momentum` in `app.json` → `expo.extra.backupApiUrl` and build again.
 
+AI food photo: set the secret `ANTHROPIC_API_KEY` in Supabase → Edge Functions → Secrets (no redeploy needed). Without it the app answers "El análisis con IA todavía no está activado". Each profile gets `ai_daily_limit` analyses per day (default 30); photos are not stored.
+
+The public food library (`momentum_public_foods`) never exposes who shared a food; deleting a profile removes what it shared.
+
 Limits live in `momentum_config`: `max_profiles` (default 50) and `min_upload_interval_seconds` (default 60, a guard against a client stuck in a loop).
 
 Endpoints under `/api/`: `POST profiles` (create, needs the invite code), `DELETE profiles/me` (delete profile and all backups), `POST profiles/me/token` (new recovery code), `GET status`, `GET backups`, `POST backups`, `GET backups/latest` or `backups/<id>`. Everything except creating a profile needs `Authorization: Bearer <profile token>`.
