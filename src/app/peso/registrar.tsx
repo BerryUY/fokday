@@ -22,7 +22,7 @@ export default function LogWeightScreen() {
   const toast = useToast();
   const [date, setDate] = useState(params.date());
   const [weight, setWeight] = useState('');
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState<string | null>(null);
   const [previous, setPrevious] = useState<{ date: string; weight: number } | null>(null);
 
   useEffect(() => {
@@ -33,7 +33,7 @@ export default function LogWeightScreen() {
         if (e) {
           setDate(e.date);
           setWeight(toInput(e.weight, 2));
-          setNotes(e.notes ?? '');
+          setNotes(e.notes);
         }
         setPrevious(latestEntry(all.filter((w) => w.id !== id && (!e || w.date < e.date))));
       } else {
@@ -80,7 +80,6 @@ export default function LogWeightScreen() {
           <T variant="label" tone="muted">Fecha de la medición</T>
           <Row><DateChip value={date} onChange={setDate} /></Row>
         </View>
-        <Field label="Notas (opcional)" value={notes} onChangeText={setNotes} placeholder="Ej.: en ayunas, después del gym" />
         <Card tone="alt">
           <T variant="caption" tone="muted">Hay un registro por día: si ya pesaste ese día, se actualiza. Tu peso de inicio y tu meta se cambian en Ajustes.</T>
         </Card>

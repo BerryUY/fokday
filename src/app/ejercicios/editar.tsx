@@ -18,7 +18,7 @@ export default function EditExerciseScreen() {
   const run = useMutation();
   const [name, setName] = useState(params.string('name') ?? '');
   const [group, setGroup] = useState<string>('Pecho');
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -26,7 +26,7 @@ export default function EditExerciseScreen() {
       if (!e) return;
       setName(e.name);
       setGroup(e.muscleGroup);
-      setNotes(e.notes ?? '');
+      setNotes(e.notes);
     });
   }, [db, id]);
 
@@ -77,7 +77,6 @@ export default function EditExerciseScreen() {
             ))}
           </Row>
         </View>
-        <Field label="Notas" value={notes} onChangeText={setNotes} multiline placeholder="Máquina, agarre, ajustes del asiento…" />
         {id ? <Button label="Eliminar ejercicio" icon="trash-2" variant="danger" onPress={remove} /> : null}
       </View>
     </Screen>

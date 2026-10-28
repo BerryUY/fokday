@@ -79,7 +79,6 @@ export default function RoutineScreen() {
           <View style={{ flex: 1 }}>
             <T variant="overline" tone="dim">Rutina</T>
             <T variant="h2" style={{ marginTop: 2 }}>{routine.name}</T>
-            <T variant="caption" tone={routine.notes ? 'muted' : 'dim'} numberOfLines={3}>{routine.notes || 'Sin notas'}</T>
           </View>
           <Button label="Editar" icon="edit-2" size="sm" variant="secondary" onPress={() => setRenaming(true)} />
         </Row>
@@ -132,7 +131,6 @@ export default function RoutineScreen() {
                         {ex.restSeconds ? <T variant="label" tone="muted">Descanso {ex.restSeconds} s</T> : null}
                       </Row>
                       <T variant="caption" tone="dim" style={{ marginTop: 2 }}>{ex.days.length ? ex.days.map((d) => DAY_SHORT[d]).join(' · ') : 'Todos los días'}</T>
-                      {ex.notes ? <T variant="caption" tone="muted" style={{ marginTop: 4 }}>{ex.notes}</T> : null}
                     </View>
                     <IconButton icon="edit-2" label={`Editar ${ex.name}`} size={32} onPress={() => setEditing(ex)} />
                     <View style={{ gap: 6 }}>
@@ -175,10 +173,9 @@ export default function RoutineScreen() {
         key={`${routine.name}-${renaming}`}
         visible={renaming}
         name={routine.name}
-        notes={routine.notes ?? ''}
         onClose={() => setRenaming(false)}
-        onSave={async (name, notes) => {
-          const ok = await run((db) => saveRoutine(db, { name, notes }, routine.id), { success: 'Rutina actualizada' });
+        onSave={async (name) => {
+          const ok = await run((db) => saveRoutine(db, { name, notes: routine.notes }, routine.id), { success: 'Rutina actualizada' });
           if (ok) setRenaming(false);
         }}
       />
@@ -197,7 +194,6 @@ function TargetsSheet({ exercise, onClose, onSave, onRemove }: {
   const [max, setMax] = useState(exercise.repsMax ? String(exercise.repsMax) : '');
   const [rest, setRest] = useState(exercise.restSeconds ?? 90);
   const [hasRest, setHasRest] = useState(exercise.restSeconds !== null);
-  const [notes, setNotes] = useState(exercise.notes ?? '');
   const [days, setDays] = useState<number[]>(exercise.days);
   const repsMin = min.trim() ? parsePositive(min) : null;
   const repsMax = max.trim() ? parsePositive(max) : null;
@@ -216,7 +212,6 @@ function TargetsSheet({ exercise, onClose, onSave, onRemove }: {
           <Chip label={hasRest ? 'Descanso' : 'Sin descanso definido'} selected={hasRest} onPress={() => setHasRest(!hasRest)} />
           {hasRest ? <Stepper value={rest} onChange={setRest} min={15} max={600} step={15} format={(v) => `${v} s`} /> : null}
         </Row>
-        <Field label="Notas" value={notes} onChangeText={setNotes} placeholder="Técnica, máquina, agarre…" />
         <View style={{ gap: 6 }}>
           <T variant="bodyMedium">¿Qué días lo hacés?</T>
           <T variant="caption" tone="dim">Si no marcás ninguno, aparece todos los días de la rutina.</T>
@@ -234,7 +229,7 @@ function TargetsSheet({ exercise, onClose, onSave, onRemove }: {
               repsMin: repsMin === null ? null : Math.round(repsMin),
               repsMax: repsMax === null ? null : Math.round(repsMax),
               restSeconds: hasRest ? rest : null,
-              notes: notes || null,
+              notes: exercise.notes,
               days,
             })
           }
@@ -255,15 +250,13 @@ function TargetsSheet({ exercise, onClose, onSave, onRemove }: {
   );
 }
 
-function RenameSheet({ visible, name, notes, onClose, onSave }: { visible: boolean; name: string; notes: string; onClose: () => void; onSave: (name: string, notes: string) => void }) {
+function RenameSheet({ visible, name, onClose, onSave }: { visible: boolean; name: string; onClose: () => void; onSave: (name: string) => void }) {
   const [value, setValue] = useState(name);
-  const [text, setText] = useState(notes);
   return (
-    <Sheet visible={visible} onClose={onClose} title="Editar rutina">
+    <Sheet visible={visible} onClose={onClose} title="Nombre de la rutina">
       <View style={{ gap: space.lg }}>
         <Field label="Nombre" value={value} onChangeText={setValue} />
-        <Field label="Notas" value={text} onChangeText={setText} multiline placeholder="Opcional" />
-        <Button label="Guardar" onPress={() => onSave(value, text)} disabled={!value.trim()} />
+        <Button label="Guardar" onPress={() => onSave(value)} disabled={!value.trim()} />
       </View>
     </Sheet>
   );

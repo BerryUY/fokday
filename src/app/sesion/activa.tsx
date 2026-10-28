@@ -4,12 +4,12 @@ import { useEffect, useState } from 'react';
 import { Platform, StyleSheet, Vibration, View } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { SessionExerciseCard } from '@/components/SessionExercise';
-import { Field, confirm } from '@/components/ui/form';
+import { confirm } from '@/components/ui/form';
 import { EmptyState, Loading, Screen } from '@/components/ui/layout';
 import { ProgressBar } from '@/components/ui/progress';
 import { Button, Row, T } from '@/components/ui/primitives';
 import { getProfile } from '@/data/settings';
-import { cancelSession, finishSession, getActiveSession, getPreviousPerformance, getSession, updateSessionNotes, type PreviousPerformance } from '@/data/workouts';
+import { cancelSession, finishSession, getActiveSession, getPreviousPerformance, getSession, type PreviousPerformance } from '@/data/workouts';
 import { formatDuration } from '@/lib/dates';
 import { useDb, useMutation, useQuery } from '@/state/db';
 import { haptic } from '@/state/toast';
@@ -26,7 +26,6 @@ export default function ActiveSessionScreen() {
   const run = useMutation();
   const [now, setNow] = useState(Date.now());
   const [rest, setRest] = useState<{ endsAt: number; total: number } | null>(null);
-  const [notes, setNotes] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
 
   const { data } = useQuery(async (d) => {
@@ -76,7 +75,6 @@ export default function ActiveSessionScreen() {
     );
     if (!ok) return;
     setFinishing(true);
-    if (notes !== null) await updateSessionNotes(db, session.id, notes);
     const done = await run((d) => finishSession(d, session.id), { success: '¡Entrenamiento guardado! Un día más en tu racha.' });
     setFinishing(false);
     if (done !== undefined) router.replace({ pathname: '/sesion/[id]', params: { id: session.id } });
@@ -117,7 +115,7 @@ export default function ActiveSessionScreen() {
               style={{ flex: 1 }}
               onPress={() => router.push({ pathname: '/ejercicios', params: { pick: 'session', target: session.id } })}
             />
-            <Button label="Cancelar" variant="ghost" onPress={cancel} />
+            <Button label="Cancelar" variant="danger" onPress={cancel} />
           </Row>
         </View>
       }
@@ -150,16 +148,6 @@ export default function ActiveSessionScreen() {
           ))}
         </View>
       )}
-      <View style={{ marginTop: space.xl }}>
-        <Field
-          label="Notas de la sesión"
-          value={notes ?? session.notes ?? ''}
-          onChangeText={setNotes}
-          onBlur={() => notes !== null && run((d) => updateSessionNotes(d, session.id, notes), { silent: true })}
-          multiline
-          placeholder="Energía, molestias, lo que quieras recordar"
-        />
-      </View>
     </Screen>
   );
 }

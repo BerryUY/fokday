@@ -26,7 +26,7 @@ export default function ActivityScreen() {
   const [type, setType] = useState<string>('caminata');
   const [minutes, setMinutes] = useState('');
   const [distance, setDistance] = useState('');
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -36,7 +36,7 @@ export default function ActivityScreen() {
       setType(a.type);
       setMinutes(String(a.minutes));
       setDistance(toInput(a.distanceKm, 2));
-      setNotes(a.notes ?? '');
+      setNotes(a.notes);
     });
   }, [db, id]);
 
@@ -86,7 +86,6 @@ export default function ActivityScreen() {
           <T variant="label" tone="muted">Día</T>
           <Row><DateChip value={date} onChange={setDate} /></Row>
         </View>
-        <Field label="Notas (opcional)" value={notes} onChangeText={setNotes} placeholder="Ej.: por la rambla" />
         <Card tone="alt">
           <Row gap={space.md} align="flex-start">
             <MaterialCommunityIcons name="information-outline" size={18} color={c.textDim} />

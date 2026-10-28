@@ -1,24 +1,22 @@
 import { router } from 'expo-router';
 import { goBack } from '@/lib/nav';
-import { useState } from 'react';
 import { View } from 'react-native';
 import { DateChip } from '@/components/DatePicker';
 import { SessionExerciseCard } from '@/components/SessionExercise';
-import { Field, confirm } from '@/components/ui/form';
+import { confirm } from '@/components/ui/form';
 import { EmptyState, Loading, Screen } from '@/components/ui/layout';
 import { Badge, Button, Card, Row, T } from '@/components/ui/primitives';
-import { deleteSession, getSession, updateSessionMeta, updateSessionNotes } from '@/data/workouts';
+import { deleteSession, getSession, updateSessionMeta } from '@/data/workouts';
 import { capitalize, formatDuration, formatLong, formatTime } from '@/lib/dates';
 import { formatNumber } from '@/lib/format';
 import { useParams } from '@/lib/params';
 import { useMutation, useQuery } from '@/state/db';
 import { space } from '@/theme/tokens';
 
-/** A finished session: summary plus fully editable sets (history stays correctable). */
+/** A finished session, fully editable: date, sets, weights, reps and exercises (history stays correctable). */
 export default function SessionDetailScreen() {
   const id = useParams().string('id') ?? '';
   const run = useMutation();
-  const [notes, setNotes] = useState<string | null>(null);
   const { data: session, loading } = useQuery((db) => getSession(db, id), [id]);
 
   if (loading && !session) return <Screen title="Entrenamiento"><Loading /></Screen>;
@@ -45,7 +43,7 @@ export default function SessionDetailScreen() {
     <Screen title={session.routineName ?? 'Entrenamiento libre'} subtitle={capitalize(formatLong(session.date))}>
       <Card style={{ padding: space.xl }}>
         <Row style={{ justifyContent: 'space-between' }}>
-          <Badge label="Completado" />
+          <Badge label="Completado · editable" />
           <T variant="caption" tone="dim">{formatTime(session.startedAt)}{session.finishedAt ? ` – ${formatTime(session.finishedAt)}` : ''}</T>
         </Row>
         <Row style={{ justifyContent: 'space-between', marginTop: space.lg }}>
@@ -65,20 +63,17 @@ export default function SessionDetailScreen() {
         ))}
       </View>
 
-      <View style={{ marginTop: space.lg }}>
-        <Field
-          label="Notas"
-          value={notes ?? session.notes ?? ''}
-          onChangeText={setNotes}
-          onBlur={() => notes !== null && run((db) => updateSessionNotes(db, session.id, notes), { silent: true })}
-          multiline
-          placeholder="Sin notas"
-        />
-      </View>
+      <Button
+        label="Agregar ejercicio"
+        icon="plus"
+        variant="secondary"
+        style={{ marginTop: space.lg }}
+        onPress={() => router.push({ pathname: '/ejercicios', params: { pick: 'session', target: session.id } })}
+      />
       <T variant="caption" tone="dim" style={{ marginTop: space.md }}>
-        Podés corregir pesos y repeticiones; mantené presionado el número de una serie para borrarla.
+        Todo se puede corregir: la fecha, los pesos, las repeticiones y los ejercicios. Mantené presionado el número de una serie para borrarla.
       </T>
-      <Button label="Eliminar entrenamiento" icon="trash-2" variant="ghost" style={{ marginTop: space.lg }} onPress={remove} />
+      <Button label="Eliminar entrenamiento" icon="trash-2" variant="danger" style={{ marginTop: space.lg }} onPress={remove} />
     </Screen>
   );
 }

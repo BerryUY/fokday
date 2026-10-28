@@ -78,7 +78,6 @@ export default function ExercisesScreen() {
                     {i > 0 ? <Divider style={{ marginHorizontal: space.lg }} /> : null}
                     <ListRow
                       title={e.name}
-                      subtitle={e.notes ?? undefined}
                       onPress={() => choose(e.id, e.name)}
                       right={pick ? <IconBubble icon="plus" tone="accent" size={30} /> : undefined}
                       chevron={!pick}

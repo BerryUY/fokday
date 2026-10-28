@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
-import { Field, Sheet, confirm } from '@/components/ui/form';
+import { Sheet, confirm } from '@/components/ui/form';
 import { Badge, Button, Card, IconButton, Row, T } from '@/components/ui/primitives';
 import { SetHeader, SetRow } from '@/components/workout';
 import { formatReps } from '@/data/routines';
@@ -10,7 +10,6 @@ import {
   deleteSet,
   removeSessionExercise,
   setExerciseSkipped,
-  updateExerciseNotes,
   updateSet,
   type PreviousPerformance,
   type WorkoutExercise,
@@ -20,7 +19,7 @@ import { formatDecimal } from '@/lib/format';
 import { useMutation } from '@/state/db';
 import { space } from '@/theme/tokens';
 
-/** An exercise inside a session (live or past): sets table, extra sets, skip, notes. */
+/** An exercise inside a session (live or past): sets table, extra sets, skip, remove. */
 export function SessionExerciseCard({ exercise, previous, onSetCompleted }: {
   exercise: WorkoutExercise;
   previous?: PreviousPerformance | null;
@@ -28,7 +27,6 @@ export function SessionExerciseCard({ exercise, previous, onSetCompleted }: {
 }) {
   const run = useMutation();
   const [menu, setMenu] = useState(false);
-  const [notes, setNotes] = useState(exercise.notes ?? '');
   const skipped = exercise.status === 'skipped';
   const doneSets = exercise.sets.filter((s) => s.isCompleted).length;
 
@@ -53,7 +51,6 @@ export function SessionExerciseCard({ exercise, previous, onSetCompleted }: {
           Anterior ({formatShort(previous.date)}): {previous.sets.map((s) => `${s.weight !== null ? formatDecimal(s.weight, 2) : '—'}×${s.reps ?? '—'}`).join(' · ')}
         </T>
       ) : null}
-      {exercise.notes ? <T variant="caption" tone="muted" style={{ paddingHorizontal: 4, marginTop: 4 }}>Nota: {exercise.notes}</T> : null}
 
       {!skipped ? (
         <View style={{ marginTop: space.md }}>
@@ -81,15 +78,6 @@ export function SessionExerciseCard({ exercise, previous, onSetCompleted }: {
 
       <Sheet visible={menu} onClose={() => setMenu(false)} title={exercise.name}>
         <View style={{ gap: space.md }}>
-          <Field label="Notas del ejercicio" value={notes} onChangeText={setNotes} placeholder="Cómo te sentiste, ajustes…" />
-          <Button
-            label="Guardar notas"
-            variant="secondary"
-            onPress={async () => {
-              await run((db) => updateExerciseNotes(db, exercise.id, notes), { success: 'Notas guardadas' });
-              setMenu(false);
-            }}
-          />
           <Button
             label={skipped ? 'Retomar ejercicio' : 'Saltear ejercicio'}
             icon={skipped ? 'rotate-ccw' : 'skip-forward'}

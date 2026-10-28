@@ -134,7 +134,6 @@ export default function WeightScreen() {
                     <Row style={{ paddingHorizontal: space.lg, paddingVertical: 12 }}>
                       <View style={{ flex: 1 }}>
                         <T variant="bodyMedium">{capitalize(formatLong(w.date))}</T>
-                        {w.notes ? <T variant="caption" tone="dim" numberOfLines={1}>{w.notes}</T> : null}
                       </View>
                       {diff !== null ? <T variant="caption" tone="dim" style={{ marginRight: space.md }}>{formatSigned(diff)}</T> : null}
                       <T variant="h3">{formatKg(w.weight)} kg</T>
