@@ -166,9 +166,14 @@ export function createSupabaseStore(url: string, secretKey: string): BackupStore
       const row = data as { count: number; videos: number } | null;
       return { count: row?.count ?? 0, videos: row?.videos ?? 0 };
     },
-    async addUsage(profileId, day, kind) {
-      const { error } = await db.rpc('momentum_add_usage', { p_profile: profileId, p_day: day, p_kind: kind });
-      if (error) fail('addUsage', error);
+    async tryUse(profileId, day, kind, limit) {
+      const { data, error } = await db.rpc('momentum_try_use', { p_profile: profileId, p_day: day, p_kind: kind, p_limit: limit });
+      if (error) fail('tryUse', error);
+      return data === true;
+    },
+    async refundUse(profileId, day, kind) {
+      const { error } = await db.rpc('momentum_refund_use', { p_profile: profileId, p_day: day, p_kind: kind });
+      if (error) fail('refundUse', error);
     },
     async addVideo(profileId, day, kind, transactionId) {
       const { data, error } = await db.rpc('momentum_add_video', { p_profile: profileId, p_day: day, p_kind: kind, p_tx: transactionId });

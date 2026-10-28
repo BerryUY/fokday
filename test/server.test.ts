@@ -35,6 +35,8 @@ function memoryStore() {
   const store: BackupStore = {
     async countProfiles() { return profiles.length; },
     async createProfile(p) {
+      // Like the unique index on auth_user_id.
+      if (p.authUserId && profiles.some((x) => x.authUserId === p.authUserId)) throw new Error('duplicate key');
       const profile = { id: p.id, name: p.name, plan: 'free', createdAt: new Date(clock).toISOString(), tokenHash: p.tokenHash, authUserId: p.authUserId };
       profiles.push(profile);
       return pub(profile);
@@ -79,7 +81,14 @@ function memoryStore() {
       for (let i = rows.length - 1; i >= 0; i--) if (rows[i].profileId === profileId && ids.includes(rows[i].id)) rows.splice(i, 1);
     },
     async usage(profileId, day, kind) { return { count: usage.get(profileId + day + kind) ?? 0, videos: videos.get(profileId + day + kind) ?? 0 }; },
-    async addUsage(profileId, day, kind) { usage.set(profileId + day + kind, (usage.get(profileId + day + kind) ?? 0) + 1); },
+    async tryUse(profileId, day, kind, limit) {
+      // Same contract as the SQL function: check and increment in one step.
+      const n = usage.get(profileId + day + kind) ?? 0;
+      if (n >= limit) return false;
+      usage.set(profileId + day + kind, n + 1);
+      return true;
+    },
+    async refundUse(profileId, day, kind) { usage.set(profileId + day + kind, Math.max(0, (usage.get(profileId + day + kind) ?? 0) - 1)); },
     async addVideo(profileId, day, kind, transactionId) {
       if (transactions.has(transactionId)) return false;
       transactions.add(transactionId);
@@ -373,6 +382,13 @@ describe('accounts, plans and rewarded videos', () => {
     await expect(cloudApi.status({ url: URL, token: jwt('nadie') }, fetchImpl)).rejects.toMatchObject({ status: 401 });
   });
 
+  it('creates a single profile when the first requests of an account arrive together', async () => {
+    const { fetchImpl, profiles } = accounts();
+    const all = await Promise.all(Array.from({ length: 6 }, () => cloudApi.status({ url: URL, token: jwt('ana') }, fetchImpl)));
+    expect(profiles).toHaveLength(1);
+    expect(new Set(all.map((s) => s.profile.id)).size).toBe(1);
+  });
+
   it('links an older install to the account, keeping its backups', async () => {
     const { fetchImpl, profiles } = accounts();
     const old = await signUp(fetchImpl, 'Santi');
@@ -423,6 +439,20 @@ describe('accounts, plans and rewarded videos', () => {
     expect((await cloudApi.status(ana, pro)).barcode).toMatchObject({ pro: true, limit: 200 });
   });
 
+  it('never goes past the limit with many photos at once, and gives back failed ones', async () => {
+    let calls = 0;
+    const { fetchImpl, store } = accounts({ analyzeFood: async () => { calls++; await new Promise((r) => setTimeout(r, 5)); return analysis; } });
+    const ana = { url: URL, token: jwt('ana') };
+    await cloudApi.status(ana, fetchImpl);
+    const results = await Promise.allSettled(Array.from({ length: 10 }, () => cloudApi.analyzeFood(ana, photo, fetchImpl)));
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(2);
+    expect(calls).toBe(2);
+    const failing = wire(store, { ...accounts().env, analyzeFood: async () => { throw new Error('IA: ocupado'); } });
+    const beto = { url: URL, token: jwt('beto') };
+    await expect(cloudApi.analyzeFood(beto, photo, failing)).rejects.toMatchObject({ status: 502 });
+    expect((await cloudApi.status(beto, failing)).ai).toMatchObject({ used: 0 });
+  });
+
   it('older installs without an account keep 2 photos and cannot earn videos; a manual grant gives Pro', async () => {
     const { fetchImpl, profiles } = accounts();
     const old = await signUp(fetchImpl, 'Santi');
@@ -447,7 +477,7 @@ describe('accounts, plans and rewarded videos', () => {
     await cloudApi.weeklySummary(ana, { gymDays: 3 }, pro);
     await cloudApi.weeklySummary(ana, { gymDays: 3 }, pro);
     await expect(cloudApi.weeklySummary(ana, { gymDays: 3 }, pro)).rejects.toMatchObject({ status: 429 }); // 3 a day
-    await expect(cloudApi.weeklySummary(ana, [] as unknown as Record<string, unknown>, pro)).rejects.toMatchObject({ status: 429 });
+    await expect(cloudApi.weeklySummary(ana, [] as unknown as Record<string, unknown>, pro)).rejects.toMatchObject({ status: 400 });
   });
 
   it('deleting the profile also deletes the account sign-in', async () => {

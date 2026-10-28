@@ -44,7 +44,10 @@ export interface BackupStore {
   remove(profileId: string, ids: string[]): Promise<void>;
   /** Uses of a limited feature on a UTC day (YYYY-MM-DD), and rewarded videos watched for it. */
   usage(profileId: string, day: string, kind: QuotaKind): Promise<{ count: number; videos: number }>;
-  addUsage(profileId: string, day: string, kind: QuotaKind): Promise<void>;
+  /** Reserves one use only while count < limit (atomic, so parallel requests cannot pass the limit). */
+  tryUse(profileId: string, day: string, kind: QuotaKind, limit: number): Promise<boolean>;
+  /** Gives a reserved use back when the work behind it failed. */
+  refundUse(profileId: string, day: string, kind: QuotaKind): Promise<void>;
   /** Counts one rewarded video; false when that transaction was already counted. */
   addVideo(profileId: string, day: string, kind: QuotaKind, transactionId: string): Promise<boolean>;
   /** Newest first; empty query lists the latest. */
@@ -175,8 +178,15 @@ export async function authenticate(header: string | string[] | undefined, store:
       return { denied: { status: 403, json: { error: 'Se alcanzó el máximo de perfiles de este servidor.' } } };
     }
     const name = (user.name ?? user.email?.split('@')[0] ?? 'Sin nombre').slice(0, 60);
-    const profile = await store.createProfile({ id: randomUUID(), name, tokenHash: sha256Hex(newToken()), authUserId: user.id });
-    return { profile, authUser: user };
+    try {
+      const profile = await store.createProfile({ id: randomUUID(), name, tokenHash: sha256Hex(newToken()), authUserId: user.id });
+      return { profile, authUser: user };
+    } catch (e) {
+      // Two first requests at once: the other one created it (auth_user_id is unique).
+      const created = await store.findProfileByAuthUser(user.id);
+      if (created) return { profile: created, authUser: user };
+      throw e;
+    }
   }
   const profile = await store.findProfileByTokenHash(sha256Hex(given));
   return profile ? { profile, authUser: null } : { denied: denied401 };
@@ -398,15 +408,17 @@ export async function handleAnalyzeFood(req: ApiRequest, store: BackupStore, env
   }
   const day = today(env);
   const q = await quota(auth, store, env, 'photo');
-  if (q.used >= q.limit) return { status: 429, json: { error: limitMessage(q, 'photo', env), ai: q } };
+  if (q.used >= q.limit || !(await store.tryUse(auth.profile.id, day, 'photo', q.limit))) {
+    return { status: 429, json: { error: limitMessage(q, 'photo', env), ai: { ...q, used: Math.max(q.used, q.limit) } } };
+  }
   let food: FoodAnalysis;
   try {
     food = await env.analyzeFood(image);
   } catch (e) {
+    await store.refundUse(auth.profile.id, day, 'photo');
     const message = e instanceof Error && e.message.startsWith('IA:') ? e.message.slice(3).trim() : 'No pudimos analizar la foto. Probá de nuevo.';
     return { status: 502, json: { error: message } };
   }
-  await store.addUsage(auth.profile.id, day, 'photo');
   const ai = { ...q, used: q.used + 1 };
   return { status: 200, json: { food, remaining: Math.max(0, ai.limit - ai.used), ai } };
 }
@@ -520,16 +532,22 @@ export async function handleBarcode(req: ApiRequest, store: BackupStore, env: En
   const code = req.id ?? '';
   if (!/^\d{8,14}$/.test(code)) return { status: 400, json: { error: 'Ese código de barras no es válido.' } };
   if (!env.lookupBarcode) return { status: 503, json: { error: 'El escáner todavía no está activado en el servidor.' } };
+  const day = today(env);
   const q = await quota(auth, store, env, 'barcode');
-  if (q.used >= q.limit) return { status: 429, json: { error: limitMessage(q, 'barcode', env), barcode: q } };
+  if (q.used >= q.limit || !(await store.tryUse(auth.profile.id, day, 'barcode', q.limit))) {
+    return { status: 429, json: { error: limitMessage(q, 'barcode', env), barcode: { ...q, used: Math.max(q.used, q.limit) } } };
+  }
   let product: BarcodeProduct | null;
   try {
     product = await env.lookupBarcode(code);
   } catch {
+    await store.refundUse(auth.profile.id, day, 'barcode');
     return { status: 502, json: { error: 'No pudimos consultar la base de productos. Probá en un rato.' } };
   }
-  if (!product) return { status: 404, json: { error: 'No encontramos ese producto. Cargalo a mano.', barcode: q } };
-  await store.addUsage(auth.profile.id, today(env), 'barcode');
+  if (!product) {
+    await store.refundUse(auth.profile.id, day, 'barcode');
+    return { status: 404, json: { error: 'No encontramos ese producto. Cargalo a mano.', barcode: q } };
+  }
   return { status: 200, json: { product, barcode: { ...q, used: q.used + 1 } } };
 }
 
@@ -540,15 +558,17 @@ export async function handleWeeklySummary(req: ApiRequest, store: BackupStore, e
   if (req.method !== 'POST') return { status: 405, json: { error: 'Método no permitido.' } };
   const q = await quota(auth, store, env, 'summary');
   if (!q.pro) return { status: 402, json: { error: 'El resumen semanal es parte de Pro.' } };
-  if (q.used >= q.limit) return { status: 429, json: { error: 'Ya armaste los resúmenes de hoy. Probá mañana.' } };
   if (!env.summarizeWeek) return { status: 503, json: { error: 'El análisis con IA todavía no está activado en el servidor.' } };
   const week = (req.body as { week?: unknown } | null)?.week;
   if (!week || typeof week !== 'object' || Array.isArray(week) || JSON.stringify(week).length > 4000) return { status: 400, json: { error: 'Datos de la semana inválidos.' } };
+  const day = today(env);
+  if (q.used >= q.limit || !(await store.tryUse(auth.profile.id, day, 'summary', q.limit))) {
+    return { status: 429, json: { error: 'Ya armaste los resúmenes de hoy. Probá mañana.' } };
+  }
   try {
-    const text = await env.summarizeWeek(week as WeekInput);
-    await store.addUsage(auth.profile.id, today(env), 'summary');
-    return { status: 200, json: { text } };
+    return { status: 200, json: { text: await env.summarizeWeek(week as WeekInput) } };
   } catch (e) {
+    await store.refundUse(auth.profile.id, day, 'summary');
     const message = e instanceof Error && e.message.startsWith('IA:') ? e.message.slice(3).trim() : 'No pudimos armar el resumen. Probá más tarde.';
     return { status: 502, json: { error: message } };
   }
