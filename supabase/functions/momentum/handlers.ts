@@ -297,13 +297,13 @@ function validatePublicFood(body: unknown): PublicFoodInput | string {
   if (!name) return 'La comida necesita un nombre.';
   const category = FOOD_CATEGORIES.find((c) => c === b.category);
   if (!category) return 'Categoría inválida.';
-  const calories = num(b.calories, 5000);
-  const protein = num(b.protein, 500);
+  const calories = num(b.calories, 20000);
+  const protein = num(b.protein, 1500);
   if (calories === null || protein === null) return 'Calorías o proteína inválidas.';
   const extras: PublicFoodInput['extras'] = {};
   const rawExtras = (b.extras ?? {}) as Record<string, unknown>;
   for (const k of EXTRA_KEYS) {
-    const v = num(rawExtras[k], 1000);
+    const v = num(rawExtras[k], 3000);
     if (v) extras[k] = Math.round(v * 10) / 10;
   }
   const ingredients = Array.isArray(b.ingredients)

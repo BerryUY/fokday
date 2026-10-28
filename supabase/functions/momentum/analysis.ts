@@ -44,17 +44,17 @@ export function parseAnalysis(text: string | undefined): FoodAnalysis {
     ? (raw.items as { name?: unknown; grams?: unknown }[])
         .filter((i) => typeof i.name === 'string' && i.name)
         .slice(0, 12)
-        .map((i) => ({ name: String(i.name).slice(0, 60), grams: Math.round(clamp(i.grams, 3000)) }))
+        .map((i) => ({ name: String(i.name).slice(0, 60), grams: Math.round(clamp(i.grams, 10000)) }))
     : [];
   const confidence = raw.confidence === 'alta' || raw.confidence === 'baja' ? raw.confidence : 'media';
   return {
     name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim().slice(0, 80) : 'Comida',
     items,
-    calories: Math.round(clamp(raw.calories, 5000)),
-    protein: Math.round(clamp(raw.protein, 500) * 10) / 10,
-    carbs: Math.round(clamp(raw.carbs, 1000) * 10) / 10,
-    fat: Math.round(clamp(raw.fat, 1000) * 10) / 10,
-    fiber: Math.round(clamp(raw.fiber, 200) * 10) / 10,
+    calories: Math.round(clamp(raw.calories, 20000)),
+    protein: Math.round(clamp(raw.protein, 1500) * 10) / 10,
+    carbs: Math.round(clamp(raw.carbs, 3000) * 10) / 10,
+    fat: Math.round(clamp(raw.fat, 2000) * 10) / 10,
+    fiber: Math.round(clamp(raw.fiber, 300) * 10) / 10,
     confidence,
   };
 }

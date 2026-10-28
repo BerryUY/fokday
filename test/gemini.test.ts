@@ -59,7 +59,7 @@ describe('Gemini food analyzer', () => {
   it('clamps silly numbers', async () => {
     const analyze = createGeminiAnalyzer('k', fakeFetch(200, answer({ ...milanesa, calories: 99999, protein: -5 })));
     const food = await analyze('x');
-    expect(food.calories).toBe(5000);
+    expect(food.calories).toBe(20000);
     expect(food.protein).toBe(0);
   });
 
