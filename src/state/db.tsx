@@ -64,7 +64,8 @@ export function useQuery<T>(fn: (db: Db) => Promise<T>, deps: unknown[] = []): Q
 
 /**
  * Wraps a write: runs it, refreshes every screen, and shows errors as a toast.
- * Returns the result, or undefined if it failed.
+ * Returns the result, or undefined if it failed. A write that returns nothing resolves to null,
+ * so `ok !== undefined` tells success from failure (and the sheet or screen can close).
  */
 export function useMutation() {
   const db = useDb();
@@ -75,7 +76,7 @@ export function useMutation() {
         const result = await fn(db);
         notifyDataChanged();
         if (opts.success) toast.show(opts.success);
-        return result;
+        return (result ?? null) as T;
       } catch (e) {
         if (!opts.silent) toast.show(e instanceof Error ? e.message : 'No se pudo guardar.', 'error');
         return undefined;
