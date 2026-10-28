@@ -5,7 +5,9 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Image, StyleSheet, Switch, View } from 'react-native';
 import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
-import { cloudApi, type FoodAnalysis } from '@/backup/api';
+import { ApiError, cloudApi, type FoodAnalysis } from '@/backup/api';
+import { refreshPlan, setQuota, usePlan } from '@/billing/pro';
+import { left, QuotaCard } from '@/components/QuotaCard';
 import { MomentPicker } from '@/components/MomentPicker';
 import { Field } from '@/components/ui/form';
 import { Screen } from '@/components/ui/layout';
@@ -38,6 +40,11 @@ export default function FoodPhotoScreen() {
   const run = useMutation();
   const date = useParams().date();
   const { config, loading } = useCloudConfig();
+  const plan = usePlan();
+  const outOfPhotos = left(plan.ai) === 0;
+  useEffect(() => {
+    if (config) void refreshPlan();
+  }, [config]);
   const [phase, setPhase] = useState<Phase>({ kind: 'pick' });
   const [name, setName] = useState('');
   const [kcal, setKcal] = useState('');
@@ -62,7 +69,8 @@ export default function FoodPhotoScreen() {
     const uri = result.assets[0].uri;
     setPhase({ kind: 'analyzing', uri });
     try {
-      const { food, remaining } = await cloudApi.analyzeFood(config, await toSmallJpeg(uri));
+      const { food, remaining, ai } = await cloudApi.analyzeFood(config, await toSmallJpeg(uri));
+      setQuota('ai', ai);
       setName(food.name);
       setKcal(toInput(food.calories, 0));
       setProt(toInput(food.protein, 1));
@@ -71,6 +79,7 @@ export default function FoodPhotoScreen() {
       setFiber(toInput(food.fiber, 1));
       setPhase({ kind: 'result', uri, food, remaining });
     } catch (e) {
+      if (e instanceof ApiError && e.status === 429) void refreshPlan();
       toast.show(e instanceof Error ? e.message : 'No pudimos analizar la foto.', 'error');
       setPhase({ kind: 'pick' });
     }
@@ -124,8 +133,10 @@ export default function FoodPhotoScreen() {
             <T variant="h2" style={{ textAlign: 'center', marginTop: space.sm }}>Sacale una foto a tu plato</T>
             <T variant="body" tone="muted" style={{ textAlign: 'center' }}>La IA estima calorías, proteína y más. Después podés corregir todo antes de guardar.</T>
           </Card>
-          <Button label="Sacar foto" icon="camera" size="lg" onPress={() => void pick('camera')} />
-          <Button label="Elegir de la galería" icon="image" variant="secondary" onPress={() => void pick('library')} />
+          {outOfPhotos ? <QuotaCard kind="photo" /> : null}
+          <Button label="Sacar foto" icon="camera" size="lg" disabled={outOfPhotos} onPress={() => void pick('camera')} />
+          <Button label="Elegir de la galería" icon="image" variant="secondary" disabled={outOfPhotos} onPress={() => void pick('library')} />
+          {!outOfPhotos ? <QuotaCard kind="photo" /> : null}
           <T variant="caption" tone="dim" style={{ textAlign: 'center' }}>Consejo: que se vea todo el plato y, si podés, un cubierto al lado para la escala.</T>
         </Animated.View>
       ) : null}

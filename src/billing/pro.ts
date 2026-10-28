@@ -45,6 +45,9 @@ export function usePlan(): PlanState {
 
 export const usePro = () => usePlan().pro;
 
+/** The current plan outside React (e.g. while waiting for a reward to be credited). */
+export const getPlan = (): PlanState => state;
+
 const activeIn = (info: CustomerInfo) => !!info.entitlements.active[ENTITLEMENT];
 const applyStore = (info: CustomerInfo) => {
   storePro = activeIn(info);

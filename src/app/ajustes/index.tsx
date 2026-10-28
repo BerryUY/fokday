@@ -2,6 +2,7 @@ import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, Switch, View } from 'react-native';
+import { showAdsPrivacyOptions, videosAvailable } from '@/ads/rewarded';
 import { useAccount } from '@/auth/account';
 import { useSyncState } from '@/backup/service';
 import { usePro } from '@/billing/pro';
@@ -256,6 +257,12 @@ function SettingsForm({ profile, calories, protein, latest }: {
         />
         <Divider style={{ marginHorizontal: space.lg }} />
         <ListRow icon="book" title="Biblioteca de ejercicios" onPress={() => router.push('/ejercicios')} />
+        {videosAvailable() ? (
+          <>
+            <Divider style={{ marginHorizontal: space.lg }} />
+            <ListRow icon="shield" title="Privacidad de anuncios" subtitle="Tu elección sobre los videos con premio" onPress={() => void showAdsPrivacyOptions()} />
+          </>
+        ) : null}
       </Card>
 
       <T variant="caption" tone="dim" style={{ textAlign: 'center', marginTop: space.xl }}>
