@@ -55,7 +55,7 @@ export default function PublicLibraryScreen() {
         <Card style={{ padding: space.xl, gap: space.md }}>
           <Feather name="globe" size={28} color={c.accent} />
           <T variant="h2">Activá tu perfil en la nube</T>
-          <T variant="body" tone="muted">La biblioteca vive en el servidor de Momentum. Con tu perfil podés buscar las comidas que compartió la comunidad y compartir las tuyas.</T>
+          <T variant="body" tone="muted">La biblioteca vive en el servidor de FokDay. Con tu perfil podés buscar las comidas que compartió la comunidad y compartir las tuyas.</T>
           <Button label="Crear mi perfil" icon="user-plus" onPress={() => router.push('/ajustes/respaldo')} />
         </Card>
       </Screen>

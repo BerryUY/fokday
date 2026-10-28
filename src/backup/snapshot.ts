@@ -105,10 +105,10 @@ export async function wrapSnapshot(snapshot: Snapshot): Promise<BackupEnvelope> 
 
 /** Throws a BackupValidationError (with a message in Spanish) unless the envelope is intact and compatible. */
 export async function validateEnvelope(input: unknown): Promise<BackupEnvelope> {
-  if (!input || typeof input !== 'object') throw new BackupValidationError('El archivo no es un respaldo de Momentum.');
+  if (!input || typeof input !== 'object') throw new BackupValidationError('El archivo no es un respaldo de FokDay.');
   const env = input as Partial<BackupEnvelope>;
   if (env.format !== BACKUP_FORMAT || !env.snapshot || typeof env.checksum !== 'string') {
-    throw new BackupValidationError('El archivo no es un respaldo de Momentum.');
+    throw new BackupValidationError('El archivo no es un respaldo de FokDay.');
   }
   const actual = await sha256(JSON.stringify(env.snapshot));
   if (actual !== env.checksum) {
@@ -116,7 +116,7 @@ export async function validateEnvelope(input: unknown): Promise<BackupEnvelope> 
   }
   const s = env.snapshot;
   if (s.formatVersion > BACKUP_FORMAT_VERSION || s.schemaVersion > SCHEMA_VERSION) {
-    throw new BackupValidationError('Este respaldo es de una versión más nueva de la app. Actualizá Momentum antes de restaurarlo.');
+    throw new BackupValidationError('Este respaldo es de una versión más nueva de la app. Actualizá FokDay antes de restaurarlo.');
   }
   if (!s.tables || typeof s.tables !== 'object') throw new BackupValidationError('El respaldo no tiene datos.');
   for (const table of DATA_TABLES) {

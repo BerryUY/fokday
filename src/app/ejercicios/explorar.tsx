@@ -72,7 +72,7 @@ export default function ExploreExercisesScreen() {
       ) : !all ? (
         <Loading />
       ) : results.length === 0 ? (
-        <EmptyState icon="search" title="Sin resultados" message="Probá con otra palabra. Los nombres están en inglés (por ejemplo: squat, curl, row)." />
+        <EmptyState icon="search" title="Sin resultados" message="Probá con otra palabra, en español o en inglés (por ejemplo: sentadilla, curl, remo)." />
       ) : (
         <View style={{ gap: space.sm }}>
           {results.slice(0, limit).map((e, i) => (
@@ -136,8 +136,9 @@ function ExerciseSheet({ exercise, pick, target, onClose }: { exercise: CatalogE
     setSaving(true);
     const done = await run(
       async (db) => {
-        // Reuse the exercise if it's already in your library (same name).
-        const existing = (await listExercises(db)).find((x) => x.name.toLowerCase() === e.name.toLowerCase());
+        // Reuse the exercise if it's already in your library (same name, also the English one added before the translation).
+        const names = [e.name.toLowerCase(), e.nameEn.toLowerCase()];
+        const existing = (await listExercises(db)).find((x) => names.includes(x.name.toLowerCase()));
         const id = existing?.id ?? (await saveExercise(db, { name: e.name, muscleGroup: groupFor(e) }));
         if (pick === 'routine' && target) {
           const profile = await getProfile(db);
@@ -173,7 +174,7 @@ function ExerciseSheet({ exercise, pick, target, onClose }: { exercise: CatalogE
           ) : null}
           {e.instructions.length ? (
             <Card tone="alt" style={{ gap: space.sm }}>
-              <T variant="label" tone="muted">Cómo se hace (en inglés)</T>
+              <T variant="label" tone="muted">Cómo se hace</T>
               {e.instructions.map((step, i) => (
                 <Row key={i} gap={space.sm} align="flex-start">
                   <T variant="label" tone="accent" style={{ width: 18 }}>{i + 1}</T>

@@ -1,4 +1,4 @@
-// Generates the Momentum app icons (no dependencies): node scripts/generate-icons.mjs
+// Generates the FokDay app icons (no dependencies): node scripts/generate-icons.mjs
 // Mark: three ascending rounded bars in lime on near-black — steady progress.
 import { writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';

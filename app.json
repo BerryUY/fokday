@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Momentum",
+    "name": "FokDay",
     "slug": "momentum",
     "version": "1.2.0",
     "scheme": "momentum",
@@ -36,8 +36,8 @@
       [
         "expo-image-picker",
         {
-          "cameraPermission": "Momentum usa la cámara para que saques una foto de tu comida y estime sus calorías.",
-          "photosPermission": "Momentum usa tus fotos para estimar las calorías de una comida que elijas.",
+          "cameraPermission": "FokDay usa la cámara para que saques una foto de tu comida y estime sus calorías.",
+          "photosPermission": "FokDay usa tus fotos para estimar las calorías de una comida que elijas.",
           "microphonePermission": false
         }
       ],

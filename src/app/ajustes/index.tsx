@@ -212,7 +212,7 @@ function SettingsForm({ profile, calories, protein, latest }: {
       </Card>
 
       <T variant="caption" tone="dim" style={{ textAlign: 'center', marginTop: space.xl }}>
-        Momentum {Constants.expoConfig?.version ?? ''} · Tus datos viven en este teléfono y funcionan sin internet.
+        FokDay {Constants.expoConfig?.version ?? ''} · Tus datos viven en este teléfono y funcionan sin internet.
       </T>
     </Screen>
   );

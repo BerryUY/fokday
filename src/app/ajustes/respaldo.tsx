@@ -146,13 +146,13 @@ export default function BackupScreen() {
         <T variant="caption" tone="dim" style={{ marginTop: 2, marginBottom: space.md }}>Todo vive en este teléfono. Estas copias te cuidan si lo perdés o desinstalás la app.</T>
         <ProtectionRow on title="Copia de Android en Google Drive" detail="Automática cada noche, si tu teléfono tiene activada la copia de seguridad (Ajustes → Sistema → Copia de seguridad). Al reinstalar desde Play Store se restaura sola." />
         <ProtectionRow on={!!folder.folderUri} title="Copia semanal en una carpeta" detail={folder.folderUri ? 'Activada' : 'Desactivada: activala más abajo'} />
-        <ProtectionRow on={sync.configured} title="Nube de Momentum" detail={sync.configured ? 'Activada' : 'Sin configurar'} last />
+        <ProtectionRow on={sync.configured} title="Nube de FokDay" detail={sync.configured ? 'Activada' : 'Sin configurar'} last />
       </Card>
 
       <SectionHeader title="Respaldo en la nube" />
       <Card>
         <Row style={{ justifyContent: 'space-between' }}>
-          <T variant="h3">Nube de Momentum</T>
+          <T variant="h3">Nube de FokDay</T>
           <Badge label={status.label} tone={status.tone} />
         </Row>
         {sync.configured ? (
@@ -384,7 +384,7 @@ export default function BackupScreen() {
                 toast.show('No hay registros en ese período', 'info');
                 return;
               }
-              await exportCsv(`momentum-${csvKind}-${today}.csv`, csv);
+              await exportCsv(`fokday-${csvKind}-${today}.csv`, csv);
             })
           }
         />

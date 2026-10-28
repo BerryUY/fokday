@@ -102,7 +102,7 @@ export default function FoodPhotoScreen() {
           <Feather name="camera" size={28} color={c.accent} />
           <T variant="h2">Activá tu perfil en la nube</T>
           <T variant="body" tone="muted">
-            La foto se analiza en el servidor de Momentum, así que necesitás tu perfil (con el código de invitación). Tus fotos no se guardan: solo se usan para estimar.
+            La foto se analiza en el servidor de FokDay, así que necesitás tu perfil (con el código de invitación). Tus fotos no se guardan: solo se usan para estimar.
           </T>
           <Button label="Crear mi perfil" icon="user-plus" onPress={() => router.push('/ajustes/respaldo')} />
         </Card>

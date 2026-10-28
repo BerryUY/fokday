@@ -149,7 +149,7 @@ export default function WelcomeScreen() {
           {key === 'hola' ? (
             <View style={{ alignItems: 'center', gap: space.lg, paddingTop: space.xxxl }}>
               <BrandMark />
-              <T variant="hero" style={{ textAlign: 'center' }}>¡Hola! Soy Momentum</T>
+              <T variant="hero" style={{ textAlign: 'center' }}>¡Hola! Soy FokDay</T>
               <T variant="body" tone="muted" style={{ textAlign: 'center', maxWidth: 320 }}>
                 Te ayudo a seguir tus comidas, tus entrenamientos y tu peso. Son unas preguntas cortitas y arrancamos.
               </T>

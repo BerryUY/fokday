@@ -36,7 +36,7 @@ async function shareText(fileName: string, text: string, mimeType: string) {
 
 export async function exportJsonBackup(db: Db): Promise<void> {
   const envelope = await buildEnvelope(db);
-  await shareText(`momentum-respaldo-${todayKey()}.json`, JSON.stringify(envelope), 'application/json');
+  await shareText(`fokday-respaldo-${todayKey()}.json`, JSON.stringify(envelope), 'application/json');
 }
 
 export async function exportCsv(fileName: string, csv: string): Promise<void> {

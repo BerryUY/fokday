@@ -1,11 +1,11 @@
-# Publicar Momentum en Google Play (prueba interna)
+# Publicar FokDay en Google Play (prueba interna)
 
 La idea es que la usen solo conocidos: se publica en el **canal de prueba interna** de Play Console, que admite hasta 100 testers por invitación y no aparece en búsquedas.
 
 ## 1. Lo que tenés que hacer vos (una sola vez)
 
 1. Crear la cuenta de desarrollador en <https://play.google.com/console> (pago único de US$25 y verificación de identidad).
-2. Crear la app: nombre **Momentum**, idioma **Español (Latinoamérica)**, tipo **App**, **Gratis**.
+2. Crear la app: nombre **FokDay**, idioma **Español (Latinoamérica)**, tipo **App**, **Gratis**.
 3. El servidor ya está en Supabase y la app ya tiene su dirección. Completá tu email de contacto en `docs/privacidad.html` y publicala en una dirección pública (por ejemplo GitHub Pages desde la carpeta `docs/`, o Netlify arrastrando el archivo). Esa URL es la política de privacidad para Play.
 
 ## 2. Generar el paquete para la tienda
@@ -26,14 +26,14 @@ La primera vez Play Console exige subir el .aab a mano (Prueba → Prueba intern
 
 ## 3. Ficha de la tienda
 
-**Nombre:** Momentum
+**Nombre:** FokDay
 
 **Descripción breve (máx. 80):**
 Comidas, entrenamientos y peso en un solo lugar. Simple, sin publicidad.
 
 **Descripción completa:**
 
-Momentum te ayuda a sostener tus hábitos de comida y entrenamiento sin complicarte.
+FokDay te ayuda a sostener tus hábitos de comida y entrenamiento sin complicarte.
 
 • Comidas: registrá lo que comés con un toque, en porciones, y mirá calorías y proteína del día. Si querés, sumá carbohidratos, grasas, fibra o lácteos.
 • Entrenamientos: armá tus rutinas con ejercicios por día (lunes piernas, martes pecho…), registrá series y pesos, y mirá tu progreso.

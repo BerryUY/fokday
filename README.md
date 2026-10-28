@@ -1,4 +1,6 @@
-# Momentum
+# FokDay
+
+Formerly called Momentum. The internal identifiers keep that name on purpose (Android package `uy.santiago.momentum`, EAS slug, database file, backup format, the Supabase function and tables) so updates install over the old app and old backups still restore.
 
 Android fitness tracker for a small group of people (the owner and friends): nutrition (with the plan from plancomidas.netlify.app built in), gym attendance, routines with per-day exercises, live workouts, free activities (walks, cycling), body weight toward a goal (up, down or maintain), optional trackers (water, creatine, carbs, fat, fiber, dairy), local reminders, statistics and history. A short step-by-step welcome sets each person up. Works fully offline; each person can back up to Supabase through their own profile. All UI text is in Spanish (Uruguay).
 

@@ -1,7 +1,7 @@
 /**
  * The open exercise guide (free-exercise-db, public domain): 800+ exercises with two photos
- * each (start and end position). Names and steps come in English; everything around them is
- * translated so filters and labels read naturally in Spanish.
+ * each (start and end position). The source is in English; names and steps are shown from a
+ * Spanish translation made once (src/data/exercises-es.json), and the English name stays searchable.
  */
 
 export const CATALOG_URL = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json';
@@ -10,6 +10,8 @@ export const IMAGE_BASE = 'https://raw.githubusercontent.com/yuhonas/free-exerci
 export type CatalogExercise = {
   id: string;
   name: string;
+  /** The original English name, kept for search ("bench" finds "Press de banca"). */
+  nameEn: string;
   level: string;
   equipment: string | null;
   primaryMuscles: string[];
@@ -68,6 +70,7 @@ export function parseCatalog(raw: unknown): CatalogExercise[] {
     out.push({
       id: r.id,
       name: r.name,
+      nameEn: r.name,
       level: typeof r.level === 'string' ? r.level : '',
       equipment: typeof r.equipment === 'string' && r.equipment ? r.equipment : null,
       primaryMuscles: list(r.primaryMuscles),
@@ -80,13 +83,25 @@ export function parseCatalog(raw: unknown): CatalogExercise[] {
   return out;
 }
 
-/** Search by name (English), muscle or equipment in Spanish, optionally within one filter. */
+/** Spanish name and steps per exercise id: { n: name, i: steps }. */
+export type CatalogTranslations = Record<string, { n: string; i: string[] }>;
+
+/** Swaps in the Spanish name and steps where a translation exists; the rest stay in English. */
+export function applySpanish(all: CatalogExercise[], es: CatalogTranslations): CatalogExercise[] {
+  return all.map((e) => {
+    const t = es[e.id];
+    if (!t) return e;
+    return { ...e, name: t.n, instructions: t.i.length === e.instructions.length ? t.i : e.instructions };
+  });
+}
+
+/** Search by name (Spanish or English), muscle or equipment, optionally within one filter. */
 export function searchCatalog(all: CatalogExercise[], query: string, filter: CatalogFilter | null): CatalogExercise[] {
   const q = fold(query.trim());
   return all.filter((e) => {
     if (filter === 'Estiramientos' ? e.category !== 'stretching' : filter && (e.category === 'stretching' || groupFor(e) !== filter)) return false;
     if (!q) return true;
-    const haystack = [e.name, ...e.primaryMuscles.map(muscleLabel), equipmentLabel(e.equipment)].map(fold).join(' ');
+    const haystack = [e.name, e.nameEn, ...e.primaryMuscles.map(muscleLabel), equipmentLabel(e.equipment)].map(fold).join(' ');
     return q.split(/\s+/).every((word) => haystack.includes(word));
   });
 }
