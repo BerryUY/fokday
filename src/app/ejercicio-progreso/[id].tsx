@@ -1,6 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
+import { usePro } from '@/billing/pro';
+import { ProLock } from '@/components/ProGate';
 import { BarChart } from '@/components/charts/BarChart';
 import { LineChart } from '@/components/charts/LineChart';
 import { EmptyState, ListRow, Loading, Screen } from '@/components/ui/layout';
@@ -20,8 +22,16 @@ export default function ExerciseProgressScreen() {
   const c = useColors();
   const id = useParams().string('id') ?? '';
   const [metric, setMetric] = useState<Metric>('weight');
+  const pro = usePro();
   const { data } = useQuery(async (db) => ({ exercise: await getExercise(db, id), points: await getExerciseProgress(db, id) }), [id]);
 
+  if (!pro) {
+    return (
+      <Screen title="Progresión">
+        <ProLock title="Progresión por ejercicio" message="Mirá cómo suben tus pesos y repeticiones en cada ejercicio, sesión a sesión." />
+      </Screen>
+    );
+  }
   if (!data) return <Screen title="Progresión"><Loading /></Screen>;
   const { points } = data;
   const name = data.exercise?.name ?? 'Ejercicio';

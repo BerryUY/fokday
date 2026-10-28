@@ -34,13 +34,14 @@ const summarizeWeek = geminiKey ? createWeekSummarizer(geminiKey) : undefined;
 const lookupBarcode = createBarcodeLookup('FokDay/1.3 (Android; app de hábitos)');
 const verifyAdReward = createAdRewardVerifier(fetchAdMobKeys);
 
-// Pro comes from RevenueCat (secret REVENUECAT_SECRET_KEY); answers are cached for 10 minutes per instance.
+// Pro comes from RevenueCat (secret REVENUECAT_SECRET_KEY). A "yes" is cached for 10 minutes per
+// instance; a "no" only for 30 seconds, so a fresh purchase unlocks the limits right away.
 const revenueCatKey = Deno.env.get('REVENUECAT_SECRET_KEY');
 const proCache = new Map<string, { at: number; pro: boolean }>();
 async function checkPro(authUserId: string): Promise<boolean> {
   if (!revenueCatKey) return false;
   const hit = proCache.get(authUserId);
-  if (hit && Date.now() - hit.at < 600_000) return hit.pro;
+  if (hit && Date.now() - hit.at < (hit.pro ? 600_000 : 30_000)) return hit.pro;
   const res = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(authUserId)}`, {
     headers: { Authorization: `Bearer ${revenueCatKey}` },
     signal: AbortSignal.timeout(8_000),

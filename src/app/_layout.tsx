@@ -13,7 +13,9 @@ import * as SystemUI from 'expo-system-ui';
 import { useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useAccount } from '@/auth/account';
 import { startBackupService } from '@/backup/service';
+import { refreshPlan, syncPurchasesAccount, usePro } from '@/billing/pro';
 import { DialogHost } from '@/components/ui/dialog';
 import { PortalProvider } from '@/components/ui/portal';
 import { getProfile, type ThemePreference } from '@/data/settings';
@@ -23,6 +25,7 @@ import type { Db } from '@/db/types';
 import { DbProvider, useDataVersion, useDb } from '@/state/db';
 import { ToastProvider } from '@/state/toast';
 import { ThemeProvider, useColors } from '@/theme/ThemeProvider';
+import type { AccentKey } from '@/theme/tokens';
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -71,10 +74,24 @@ function ThemedApp() {
   const db = useDb();
   const version = useDataVersion();
   const [preference, setPreference] = useState<ThemePreference>('dark');
+  const [accent, setAccent] = useState<AccentKey>('lima');
+  const { account, loading } = useAccount();
+  const pro = usePro();
 
   useEffect(() => {
-    getProfile(db).then((p) => setPreference(p.theme)).catch(() => {});
+    getProfile(db)
+      .then((p) => {
+        setPreference(p.theme);
+        setAccent(p.accent);
+      })
+      .catch(() => {});
   }, [db, version]);
+
+  // Purchases and plan follow the signed-in account.
+  useEffect(() => {
+    if (loading) return;
+    void syncPurchasesAccount(account?.id ?? null).then(refreshPlan);
+  }, [account?.id, loading]);
 
   // Keeps scheduled reminders in line with the settings (skipped when nothing changed).
   useEffect(() => {
@@ -83,7 +100,7 @@ function ThemedApp() {
   }, [db, version]);
 
   return (
-    <ThemeProvider preference={preference}>
+    <ThemeProvider preference={preference} accent={pro ? accent : 'lima'}>
       {/* Layers, bottom to top: screens → sheets → dialogs → toasts (ToastProvider draws last). */}
       <ToastProvider>
         <PortalProvider>

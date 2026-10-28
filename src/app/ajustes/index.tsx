@@ -1,9 +1,11 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Switch, View } from 'react-native';
+import { Pressable, Switch, View } from 'react-native';
 import { useAccount } from '@/auth/account';
 import { useSyncState } from '@/backup/service';
+import { usePro } from '@/billing/pro';
+import { ProBadge } from '@/components/ProGate';
 import { Field, Stepper } from '@/components/ui/form';
 import { ListRow, Loading, Screen } from '@/components/ui/layout';
 import { Button, Card, Chip, Divider, Row, SectionHeader, Segmented, T } from '@/components/ui/primitives';
@@ -15,7 +17,7 @@ import { latestEntry } from '@/domain/weight';
 import { DAY_SHORT, formatDateTime, formatShort, todayKey, WEEK_ORDER } from '@/lib/dates';
 import { formatKg, formatLiters, parsePositive, toInput } from '@/lib/format';
 import { useMutation, useQuery } from '@/state/db';
-import { space } from '@/theme/tokens';
+import { ACCENTS, space, withAccent } from '@/theme/tokens';
 
 const OPTIONAL_FEATURES: { key: FeatureKey; label: string; description: string }[] = [
   ...HABIT_FEATURES,
@@ -41,6 +43,7 @@ function SettingsForm({ profile, calories, protein, latest }: {
   const run = useMutation();
   const sync = useSyncState();
   const { account } = useAccount();
+  const pro = usePro();
   const [name, setName] = useState(profile.name);
   const [start, setStart] = useState(toInput(profile.startWeight, 1));
   const [target, setTarget] = useState(toInput(profile.targetWeight, 1));
@@ -83,6 +86,16 @@ function SettingsForm({ profile, calories, protein, latest }: {
           title={account ? account.name ?? account.email ?? 'Tu cuenta' : 'Entrar o crear cuenta'}
           subtitle={account ? account.email ?? 'Tu cuenta' : 'Guardá tu progreso y activá la foto con IA y el escáner'}
           onPress={() => router.push(account ? '/cuenta' : '/cuenta/entrar')}
+        />
+      </Card>
+
+      <Card padded={false} style={{ paddingVertical: space.xs, marginBottom: space.xl }}>
+        <ListRow
+          icon="zap"
+          iconTone="accent"
+          title={pro ? 'FokDay Pro activo' : 'Probá FokDay Pro'}
+          subtitle={pro ? 'Gracias por bancar la app' : 'Más fotos con IA, escáner ilimitado, resumen semanal y más'}
+          onPress={() => router.push('/pro')}
         />
       </Card>
 
@@ -201,6 +214,28 @@ function SettingsForm({ profile, calories, protein, latest }: {
         value={profile.theme}
         onChange={(theme) => run((db) => updateProfile(db, { theme }))}
       />
+      <Card style={{ marginTop: space.md }}>
+        <Row style={{ justifyContent: 'space-between', marginBottom: space.md }}>
+          <T variant="bodyMedium">Color de la app</T>
+          {pro ? null : <ProBadge />}
+        </Row>
+        <Row style={{ flexWrap: 'wrap' }} gap={space.md}>
+          {ACCENTS.map((a) => {
+            const swatch = withAccent(c, a.key).accent;
+            const on = pro ? profile.accent === a.key : a.key === 'lima';
+            return (
+              <Pressable
+                key={a.key}
+                accessibilityRole="radio"
+                accessibilityLabel={a.label}
+                accessibilityState={{ selected: on }}
+                onPress={() => (pro ? run((db) => updateProfile(db, { accent: a.key }), { silent: true }) : router.push('/pro'))}
+                style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: swatch, borderWidth: on ? 3 : 0, borderColor: c.text, opacity: pro || a.key === 'lima' ? 1 : 0.45 }}
+              />
+            );
+          })}
+        </Row>
+      </Card>
 
       <SectionHeader title="Más" style={{ marginTop: space.xl }} />
       <Card padded={false} style={{ paddingVertical: space.xs }}>

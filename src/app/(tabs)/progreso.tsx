@@ -3,6 +3,8 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import { usePro } from '@/billing/pro';
+import { ProLock } from '@/components/ProGate';
 import { BarChart, type Bar } from '@/components/charts/BarChart';
 import { LineChart } from '@/components/charts/LineChart';
 import { ListRow, Loading, Screen, TabHeader } from '@/components/ui/layout';
@@ -23,6 +25,9 @@ export default function ProgressScreen() {
   const c = useColors();
   const [range, setRange] = useState<RangeKey>('30d');
   const today = todayKey();
+  const pro = usePro();
+  // 90 días and the whole history are Pro; 7 and 30 days stay free.
+  const locked = !pro && (range === '90d' || range === 'all');
 
   const { data } = useQuery(async (db) => {
     const [profile, weights, nutrition, gym] = await Promise.all([
@@ -37,9 +42,13 @@ export default function ProgressScreen() {
   return (
     <Screen tab>
       <TabHeader title="Progreso" subtitle="Tus datos reales" />
-      <Segmented<RangeKey> options={RANGES.map((r) => ({ key: r.key, label: r.label }))} value={range} onChange={setRange} />
+      <Segmented<RangeKey> options={RANGES.map((r) => ({ key: r.key, label: !pro && (r.key === '90d' || r.key === 'all') ? `${r.label} 🔒` : r.label }))} value={range} onChange={setRange} />
 
-      {!data ? (
+      {locked ? (
+        <View style={{ marginTop: space.lg }}>
+          <ProLock title="Estadísticas avanzadas" message="Mirá 90 días o todo tu historial: peso, nutrición y gimnasio, para ver el camino completo." />
+        </View>
+      ) : !data ? (
         <Loading />
       ) : (
         <Animated.View key={range} entering={FadeIn.duration(250)}>

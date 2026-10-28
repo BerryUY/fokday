@@ -2,6 +2,7 @@ import type { Db } from '@/db/types';
 import { INITIAL_GOAL_DATE, SETTING_DEFAULTS } from '@/db/seed';
 import { nowIso, type DateKey } from '@/lib/dates';
 import { newId } from '@/lib/ids';
+import { ACCENTS, type AccentKey } from '@/theme/tokens';
 
 export type ThemePreference = 'dark' | 'light' | 'system';
 
@@ -12,6 +13,8 @@ export type Profile = {
   /** Weekdays (0 = domingo) the user plans to train. */
   trainingDays: number[];
   theme: ThemePreference;
+  /** Pro color theme; free accounts always see the default (lima). */
+  accent: AccentKey;
   defaultRestSeconds: number;
   /** Optional trackers the person turned on (see FEATURE_KEYS). Everything is off by default. */
   features: FeatureKey[];
@@ -69,6 +72,7 @@ export async function getProfile(db: Db): Promise<Profile> {
     targetWeight: Number(map['weight.target']) || 0,
     trainingDays: parseDays(map['training.days']),
     theme: theme === 'light' || theme === 'system' ? theme : 'dark',
+    accent: ACCENTS.find((a) => a.key === map['appearance.accent'])?.key ?? 'lima',
     defaultRestSeconds: Number(map['workout.default_rest']) || 90,
     features: parseFeatures(map['features.enabled']),
     waterGoalMl: Number(map['water.goal_ml']) || 2500,
@@ -82,6 +86,7 @@ export async function updateProfile(db: Db, patch: Partial<Profile>): Promise<vo
     if (patch.targetWeight !== undefined) await setSetting(db, 'weight.target', String(patch.targetWeight));
     if (patch.trainingDays !== undefined) await setSetting(db, 'training.days', JSON.stringify([...new Set(patch.trainingDays)].sort()));
     if (patch.theme !== undefined) await setSetting(db, 'appearance.theme', patch.theme);
+    if (patch.accent !== undefined) await setSetting(db, 'appearance.accent', patch.accent);
     if (patch.defaultRestSeconds !== undefined) await setSetting(db, 'workout.default_rest', String(Math.round(patch.defaultRestSeconds)));
     if (patch.features !== undefined) await setSetting(db, 'features.enabled', JSON.stringify(FEATURE_KEYS.filter((k) => patch.features!.includes(k))));
     if (patch.waterGoalMl !== undefined) await setSetting(db, 'water.goal_ml', String(Math.round(patch.waterGoalMl)));

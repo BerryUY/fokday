@@ -73,6 +73,36 @@ export const light: Palette = {
   heat: ['#E8E8E3', '#CFE3A6', '#93BF3F', '#5E8C0A'],
 };
 
+/** Pro color themes: the accent (buttons, rings, highlights) in a dark and a light variant. */
+export type AccentKey = 'lima' | 'verde' | 'turquesa' | 'violeta' | 'naranja' | 'rosa';
+type AccentPair = { dark: string; darkText: string; light: string; lightText: string };
+export const ACCENTS: { key: AccentKey; label: string; colors: AccentPair }[] = [
+  { key: 'lima', label: 'Lima', colors: { dark: '#C8F560', darkText: '#0B0F02', light: '#5E8C0A', lightText: '#FFFFFF' } },
+  { key: 'verde', label: 'Verde FokDay', colors: { dark: '#3DF58A', darkText: '#04210F', light: '#138A45', lightText: '#FFFFFF' } },
+  { key: 'turquesa', label: 'Turquesa', colors: { dark: '#3DE0D0', darkText: '#031C1A', light: '#0E8379', lightText: '#FFFFFF' } },
+  { key: 'violeta', label: 'Violeta', colors: { dark: '#B48CFF', darkText: '#140A26', light: '#6B42C9', lightText: '#FFFFFF' } },
+  { key: 'naranja', label: 'Naranja', colors: { dark: '#FF9F5A', darkText: '#1F0E02', light: '#C2560E', lightText: '#FFFFFF' } },
+  { key: 'rosa', label: 'Rosa', colors: { dark: '#FF7AB6', darkText: '#26061A', light: '#C2266F', lightText: '#FFFFFF' } },
+];
+
+const hex = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const mix = (a: string, b: string, t: number) =>
+  '#' + hex(a).map((v, i) => Math.round(v + (hex(b)[i] - v) * t).toString(16).padStart(2, '0')).join('');
+
+/** The palette with another accent; the heatmap fades from the empty cell to the accent. */
+export function withAccent(base: Palette, key: AccentKey): Palette {
+  const a = (ACCENTS.find((x) => x.key === key) ?? ACCENTS[0]).colors;
+  const accent = base.scheme === 'dark' ? a.dark : a.light;
+  const [r, g, b] = hex(accent);
+  return {
+    ...base,
+    accent,
+    accentText: base.scheme === 'dark' ? a.darkText : a.lightText,
+    accentSoft: `rgba(${r}, ${g}, ${b}, 0.12)`,
+    heat: [base.heat[0], mix(base.heat[0], accent, 0.3), mix(base.heat[0], accent, 0.65), accent],
+  };
+}
+
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 28, xxxl: 40 } as const;
 export const radius = { sm: 10, md: 14, lg: 20, xl: 26, pill: 999 } as const;
 
