@@ -47,10 +47,13 @@ type GeminiResponse = {
 
 type Attempt = { status: number; body: GeminiResponse };
 
+const TOTAL_BUDGET_MS = 40_000;
+const PER_MODEL_TIMEOUT_MS = 18_000;
+
 const retryable = (status: number) => status === 404 || status === 429 || status >= 500;
 
 export function createGeminiAnalyzer(apiKey: string, fetchFn: FetchFn = fetch as unknown as FetchFn, models = GEMINI_MODELS) {
-  async function call(model: string, jpegBase64: string): Promise<Attempt> {
+  async function call(model: string, jpegBase64: string, timeoutMs: number): Promise<Attempt> {
     try {
       const res = await fetchFn(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: 'POST',
@@ -60,7 +63,7 @@ export function createGeminiAnalyzer(apiKey: string, fetchFn: FetchFn = fetch as
           contents: [{ role: 'user', parts: [{ text: USER_PROMPT }, { inlineData: { mimeType: 'image/jpeg', data: jpegBase64 } }] }],
           generationConfig: { responseMimeType: 'application/json', responseSchema: SCHEMA, maxOutputTokens: 8192 },
         }),
-        signal: AbortSignal.timeout(25_000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
       return { status: res.status, body: (await res.json().catch(() => ({}))) as GeminiResponse };
     } catch (e) {
@@ -70,9 +73,13 @@ export function createGeminiAnalyzer(apiKey: string, fetchFn: FetchFn = fetch as
   }
 
   return async function analyzeFood(jpegBase64: string): Promise<FoodAnalysis> {
+    // The app gives up after 45 s, so every model together must answer within ~40 s.
+    const deadline = Date.now() + TOTAL_BUDGET_MS;
     let attempt: Attempt = { status: 503, body: {} };
     for (const model of models) {
-      attempt = await call(model, jpegBase64);
+      const left = deadline - Date.now();
+      if (left < 4_000) break;
+      attempt = await call(model, jpegBase64, Math.min(PER_MODEL_TIMEOUT_MS, left));
       if (attempt.status < 300) break;
       // Logged without the key so the reason shows up in the function logs.
       console.warn(`Gemini ${model} → ${attempt.status} ${attempt.body.error?.status ?? ''}: ${attempt.body.error?.message ?? ''}`.slice(0, 500));
