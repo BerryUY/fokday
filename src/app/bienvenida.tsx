@@ -4,7 +4,9 @@ import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from
 import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeInRight, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { createCloudProfile, defaultApiUrl } from '@/backup/service';
+import { finishSignIn, signInWithGoogle, useAccount, type LinkChoice } from '@/auth/account';
+import { authConfigured } from '@/auth/supabase';
+import { LinkChoiceSheet } from '@/components/CloudLink';
 import { Button, Chip, IconButton, Row, T } from '@/components/ui/primitives';
 import { completeOnboarding, isOnboarded, updateProfile, type FeatureKey } from '@/data/settings';
 import { EXTRA_NUTRIENTS } from '@/domain/nutrition';
@@ -49,7 +51,9 @@ export default function WelcomeScreen() {
   const run = useMutation();
   const toast = useToast();
   const insets = useSafeAreaInsets();
-  const apiUrl = defaultApiUrl();
+  const { account } = useAccount();
+  const [signingIn, setSigningIn] = useState(false);
+  const [choice, setChoice] = useState<LinkChoice | null>(null);
   const finishing = useRef(false);
   const { data: onboarded } = useQuery((d) => isOnboarded(d), []);
 
@@ -64,7 +68,6 @@ export default function WelcomeScreen() {
   const [targetsTouched, setTargetsTouched] = useState(false);
   const [days, setDays] = useState<number[]>([1, 3, 5]);
   const [features, setFeatures] = useState<FeatureKey[]>([]);
-  const [invite, setInvite] = useState('');
   const [saving, setSaving] = useState(false);
 
   // Restoring a backup from here marks setup as done: leave once that happens.
@@ -72,7 +75,7 @@ export default function WelcomeScreen() {
     if (onboarded && !finishing.current) router.replace('/');
   }, [onboarded]);
 
-  const steps: StepKey[] = ['hola', 'nombre', 'objetivo', 'peso', ...(goal === 'maintain' ? [] : ['meta' as const]), 'nutricion', 'gym', 'extras', ...(apiUrl ? ['nube' as const] : []), 'listo'];
+  const steps: StepKey[] = ['hola', 'nombre', 'objetivo', 'peso', ...(goal === 'maintain' ? [] : ['meta' as const]), 'nutricion', 'gym', 'extras', ...(authConfigured ? ['nube' as const] : []), 'listo'];
   const key = steps[Math.min(step, steps.length - 1)];
   const progress = step / (steps.length - 1);
 
@@ -106,23 +109,30 @@ export default function WelcomeScreen() {
       return;
     }
     haptic('success');
-    if (invite.trim() && apiUrl) {
-      try {
-        await createCloudProfile(db, { url: apiUrl, inviteCode: invite, name });
-        router.replace({ pathname: '/ajustes/respaldo', params: { nuevo: '1' } });
-        return;
-      } catch (e) {
-        toast.show(`${e instanceof Error ? e.message : 'No se pudo crear el perfil.'} Podés crearlo después en Ajustes → Datos y respaldo.`, 'error');
-      }
-    }
     router.replace('/');
+  };
+
+  /** Google right from the welcome; email opens the account screen and comes back here. */
+  const google = async () => {
+    setSigningIn(true);
+    try {
+      await signInWithGoogle();
+      const pending = await finishSignIn(db);
+      if (pending) setChoice(pending);
+      else next();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'No pudimos entrar.';
+      if (msg !== 'cancelled') toast.show(msg, 'error');
+    } finally {
+      setSigningIn(false);
+    }
   };
 
   const footer: Record<StepKey, ReactNode> = {
     hola: (
       <View style={{ gap: space.sm }}>
         <Button label="Empecemos" icon="arrow-right" size="lg" onPress={next} />
-        <Button label="Ya tengo un respaldo" icon="cloud" variant="ghost" size="sm" onPress={() => router.push('/ajustes/respaldo')} />
+        <Button label="Ya tengo una cuenta" icon="log-in" variant="ghost" size="sm" onPress={() => router.push(authConfigured ? '/cuenta/entrar' : '/ajustes/respaldo')} />
       </View>
     ),
     nombre: <Button label="Continuar" size="lg" onPress={next} disabled={!name.trim()} />,
@@ -132,7 +142,15 @@ export default function WelcomeScreen() {
     nutricion: <Button label="Continuar" size="lg" onPress={next} />,
     gym: <Button label="Continuar" size="lg" onPress={next} />,
     extras: <Button label={features.length ? 'Continuar' : 'Por ahora nada más'} size="lg" variant={features.length ? 'primary' : 'secondary'} onPress={next} />,
-    nube: <Button label={invite.trim() ? 'Continuar' : 'Ahora no'} size="lg" variant={invite.trim() ? 'primary' : 'secondary'} onPress={next} />,
+    nube: account ? (
+      <Button label="Continuar" size="lg" onPress={next} />
+    ) : (
+      <View style={{ gap: space.sm }}>
+        <Button label="Continuar con Google" icon="log-in" size="lg" loading={signingIn} onPress={google} />
+        <Button label="Con email" icon="mail" variant="secondary" onPress={() => router.push('/cuenta/entrar')} />
+        <Button label="Ahora no" variant="ghost" size="sm" onPress={next} />
+      </View>
+    ),
     listo: <Button label="Empezar" icon="check" size="lg" onPress={finish} loading={saving} />,
   };
 
@@ -323,17 +341,22 @@ export default function WelcomeScreen() {
 
           {key === 'nube' ? (
             <>
-              <Question title="¿Tenés un código de invitación?" subtitle="Con él tus datos se guardan en la nube y los recuperás si cambiás de teléfono. Si no tenés, seguí sin él." />
-              <TextInput
-                value={invite}
-                onChangeText={setInvite}
-                placeholder="Código de invitación"
-                placeholderTextColor={c.textDim}
-                autoCapitalize="none"
-                autoCorrect={false}
-                maxFontSizeMultiplier={1.3}
-                style={[styles.bigInput, { color: c.text, borderColor: invite ? c.accent : c.border, backgroundColor: c.surface, fontSize: 22 }]}
+              <Question
+                title="Guardá tu progreso"
+                subtitle={account ? `Entraste como ${account.email ?? account.name ?? 'vos'}. Tus datos se respaldan solos.` : 'Con una cuenta tus datos se respaldan solos y los recuperás si cambiás de teléfono. Es opcional.'}
               />
+              <View style={{ gap: space.md }}>
+                {[
+                  { icon: 'cloud-check-outline' as const, text: 'Respaldo automático en la nube' },
+                  { icon: 'camera-outline' as const, text: 'Foto con IA y escáner de códigos' },
+                  { icon: 'cellphone-arrow-down' as const, text: 'Tus datos en cualquier teléfono' },
+                ].map((b) => (
+                  <Row key={b.text} gap={space.md}>
+                    <MaterialCommunityIcons name={b.icon} size={24} color={account ? c.accent : c.textMuted} />
+                    <T variant="bodyMedium">{b.text}</T>
+                  </Row>
+                ))}
+              </View>
             </>
           ) : null}
 
@@ -356,6 +379,13 @@ export default function WelcomeScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + space.md }]}>{footer[key]}</View>
+      <LinkChoiceSheet
+        choice={choice}
+        onClose={() => {
+          setChoice(null);
+          next();
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }

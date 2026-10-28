@@ -1,14 +1,15 @@
 import NetInfo from '@react-native-community/netinfo';
-import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { useSyncExternalStore } from 'react';
 import { AppState, Platform } from 'react-native';
+import { authConfigured, supabase } from '@/auth/supabase';
+import { PUBLIC_CONFIG } from '@/config';
 import type { Db } from '@/db/types';
 import { newId } from '@/lib/ids';
 import { subscribeData } from '@/state/dataBus';
-import { cloudApi, normalizeBaseUrl, type CloudConfig } from './api';
+import { type CloudConfig } from './api';
 import { writeFolderCopy } from './folderBackup';
-import { getSyncInfo, runBackup, setLinked, type BackupOutcome, type SyncDeps, type SyncInfo } from './sync';
+import { getSyncInfo, runBackup, type BackupOutcome, type SyncDeps, type SyncInfo } from './sync';
 
 /**
  * Runs backups in the background of the UI (all async, never blocks a screen). The phone's
@@ -28,46 +29,36 @@ const secure = {
   del: (k: string) => (Platform.OS === 'web' ? Promise.resolve(void memoryStore.delete(k)) : SecureStore.deleteItemAsync(k)),
 };
 
+/**
+ * How this phone reaches the FokDay API: the signed-in account's session (refreshed by
+ * Supabase as needed), or, on an older install not yet moved to an account, its own token.
+ */
 export async function getCloudConfig(): Promise<CloudConfig | null> {
+  const url = defaultApiUrl();
+  if (url && authConfigured) {
+    const { data } = await supabase.auth.getSession();
+    if (data.session) return { url, token: data.session.access_token };
+  }
+  return getLegacyConfig();
+}
+
+/** The token an older install created with an invite code (before accounts existed). */
+export async function getLegacyConfig(): Promise<CloudConfig | null> {
   const [url, token] = await Promise.all([secure.get(URL_KEY), secure.get(TOKEN_KEY)]);
   return url && token ? { url, token } : null;
 }
 
-export async function saveCloudConfig(config: CloudConfig): Promise<void> {
-  await secure.set(URL_KEY, normalizeBaseUrl(config.url));
-  await secure.set(TOKEN_KEY, config.token.trim());
-  refreshState();
-}
-
-/** Address of the backup server baked into the app (app.json → extra.backupApiUrl); empty until the server is deployed. */
-export function defaultApiUrl(): string {
-  const value = Constants.expoConfig?.extra?.backupApiUrl;
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-/** The personal token doubles as the recovery code: with it, a new phone can reach the same backups. */
-export async function getRecoveryCode(): Promise<string | null> {
-  return secure.get(TOKEN_KEY);
-}
-
-/**
- * Creates this person's profile on the server with an invite code and links the phone to it.
- * The phone's data is the source of truth for a brand-new profile, so automatic backups start right away.
- */
-export async function createCloudProfile(database: Db, input: { url: string; inviteCode: string; name: string }): Promise<void> {
-  const url = normalizeBaseUrl(input.url);
-  if (!/^https:\/\//.test(url)) throw new Error('La dirección del servidor tiene que empezar con https://');
-  const { token } = await cloudApi.createProfile(url, input.inviteCode.trim(), input.name);
-  await saveCloudConfig({ url, token });
-  await setLinked(database, true);
-  void backupNow(true);
-}
-
-export async function clearCloudConfig(): Promise<void> {
+export async function clearLegacyConfig(): Promise<void> {
   await secure.del(URL_KEY);
   await secure.del(TOKEN_KEY);
   refreshState();
 }
+
+/** Address of the FokDay API baked into the app (src/config.ts). */
+export function defaultApiUrl(): string {
+  return PUBLIC_CONFIG.apiUrl;
+}
+
 
 export async function isOnline(): Promise<boolean> {
   const s = await NetInfo.fetch();
@@ -174,6 +165,8 @@ export function startBackupService(database: Db): () => void {
     else if (s === 'active') setTimeout(() => void autoBackup(OPEN_GAP_MS), 5_000);
   });
   const unsubData = subscribeData(() => void refreshState());
+  // Signing in or out changes whether there is a cloud to back up to.
+  const { data: authSub } = supabase.auth.onAuthStateChange(() => void refreshState());
   const interval = setInterval(() => void autoBackup(OPEN_GAP_MS), 30 * 60_000);
   setTimeout(() => void autoBackup(OPEN_GAP_MS), 5_000);
   // The weekly folder copy (if the person set one up) is checked once per launch too.
@@ -182,6 +175,7 @@ export function startBackupService(database: Db): () => void {
     unsubNet();
     appState.remove();
     unsubData();
+    authSub.subscription.unsubscribe();
     clearInterval(interval);
     if (timer) clearTimeout(timer);
     db = null;

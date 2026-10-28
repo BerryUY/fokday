@@ -71,7 +71,8 @@
         }
       ],
       "expo-sharing",
-      "expo-status-bar"
+      "expo-status-bar",
+      "@react-native-google-signin/google-signin"
     ],
     "extra": {
       "router": {
@@ -85,8 +86,7 @@
       },
       "eas": {
         "projectId": "16417576-ddbb-4a19-b5cd-a4453a715d85"
-      },
-      "backupApiUrl": "https://eqvyjnhkhyqzwurdtumh.supabase.co/functions/v1/momentum"
+      }
     }
   }
 }

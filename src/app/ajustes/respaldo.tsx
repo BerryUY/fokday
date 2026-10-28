@@ -1,62 +1,41 @@
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Share, View } from 'react-native';
-import { cloudApi, normalizeBaseUrl, type CloudBackupMeta } from '@/backup/api';
+import { View } from 'react-native';
+import { useAccount, type LinkChoice } from '@/auth/account';
+import { cloudApi, type CloudBackupMeta } from '@/backup/api';
 import { buildCsv, CSV_KINDS, type CsvKind } from '@/backup/csv';
 import { exportCsv, exportJsonBackup, listSafetyCopies, pickJsonBackup, readSafetyCopy, saveSafetyCopy, shareSafetyCopy } from '@/backup/files';
-import { backupNow, clearCloudConfig, createCloudProfile, defaultApiUrl, getCloudConfig, getRecoveryCode, refreshSyncState, saveCloudConfig, syncDeps, useSyncState } from '@/backup/service';
+import { backupNow, getCloudConfig, refreshSyncState, syncDeps, useSyncState } from '@/backup/service';
 import { chooseBackupFolder, disableFolderBackup, getFolderBackupInfo, writeFolderCopy, type FolderBackupInfo } from '@/backup/folderBackup';
-import { countUserRecords, hasUserChanges, type BackupEnvelope } from '@/backup/snapshot';
-import { applyRestore, prepareCloudRestore, setLinked } from '@/backup/sync';
-import { Field, Sheet, confirm } from '@/components/ui/form';
+import { hasUserChanges } from '@/backup/snapshot';
+import { prepareCloudRestore, setLinked } from '@/backup/sync';
+import { LinkChoiceSheet, recordsIn, useRestore } from '@/components/CloudLink';
+import { Sheet, confirm } from '@/components/ui/form';
 import { ListRow, Screen } from '@/components/ui/layout';
 import { Badge, Button, Card, Chip, Divider, Row, SectionHeader, T } from '@/components/ui/primitives';
 import { resetAllData } from '@/data/reset';
-import { getProfile } from '@/data/settings';
-import { useParams } from '@/lib/params';
 import { addDays, formatDateTime, todayKey } from '@/lib/dates';
 import { useDb, useMutation } from '@/state/db';
-import { notifyDataChanged } from '@/state/dataBus';
 import { useToast } from '@/state/toast';
 import { space } from '@/theme/tokens';
-
-function describe(env: BackupEnvelope): string {
-  const t = env.snapshot.counts;
-  return `${t.meal_logs} comidas registradas, ${t.weight_entries} pesos, ${t.workout_sessions} entrenamientos, ${t.gym_attendance} días de gym y ${t.workout_routines} rutinas.`;
-}
 
 export default function BackupScreen() {
   const db = useDb();
   const run = useMutation();
   const toast = useToast();
   const sync = useSyncState();
-  const [host, setHost] = useState<string | null>(null);
-  const [setupOpen, setSetupOpen] = useState(false);
-  const [url, setUrl] = useState('');
-  const [token, setToken] = useState('');
-  const [mode, setMode] = useState<'new' | 'existing'>('new');
-  const [invite, setInvite] = useState('');
-  const [recovery, setRecovery] = useState<string | null>(null);
-  const apiUrl = defaultApiUrl();
-  const justOnboarded = useParams().string('nuevo') === '1';
+  const { account } = useAccount();
+  const restore = useRestore();
   const [busy, setBusy] = useState<string | null>(null);
   const [cloudList, setCloudList] = useState<CloudBackupMeta[] | null>(null);
-  const [linkChoice, setLinkChoice] = useState<{ count: number; latest: CloudBackupMeta } | null>(null);
+  const [linkChoice, setLinkChoice] = useState<LinkChoice | null>(null);
   const [csvKind, setCsvKind] = useState<CsvKind>('comidas');
   const [csvRange, setCsvRange] = useState<'30' | '90' | 'all'>('all');
   const [copies, setCopies] = useState(listSafetyCopies());
   const [folder, setFolder] = useState<FolderBackupInfo>({ folderUri: null, lastAt: null, lastError: null });
   const refreshFolder = () => void getFolderBackupInfo(db).then(setFolder).catch(() => {});
   useEffect(refreshFolder, [db]);
-
-  useEffect(() => {
-    getCloudConfig().then((cfg) => setHost(cfg ? cfg.url.replace(/^https?:\/\//, '').split('/')[0] : null)).catch(() => setHost(null));
-    void refreshSyncState();
-  }, [sync.configured]);
-
-  // Coming from the welcome screen with a fresh profile: show the recovery code once.
-  useEffect(() => {
-    if (justOnboarded && sync.configured) getRecoveryCode().then(setRecovery).catch(() => {});
-  }, [justOnboarded, sync.configured]);
+  useEffect(() => void refreshSyncState(), [account?.id]);
 
   const withBusy = async (key: string, fn: () => Promise<void>) => {
     setBusy(key);
@@ -72,65 +51,20 @@ export default function BackupScreen() {
     }
   };
 
-  /** Validated restore with a safety copy first; local data is untouched unless every step succeeds. */
-  const restore = async (envelope: BackupEnvelope, sourceId: string | null, warnLocal: boolean) => {
-    const ok = await confirm(
-      'Restaurar respaldo',
-      `Respaldo del ${formatDateTime(envelope.snapshot.createdAt)}: ${describe(envelope)}\n\nSe reemplazan los datos de este teléfono. Antes se guarda una copia automática.${warnLocal ? '\n\nAtención: tenés cambios en este teléfono que no están en ese respaldo y se perderían.' : ''}`,
-      'Restaurar',
-      true,
-    );
-    if (!ok) return false;
-    await saveSafetyCopy(db, 'antes-de-restaurar');
-    await applyRestore(db, envelope, sourceId);
-    await setLinked(db, true);
-    notifyDataChanged();
-    toast.show('Datos restaurados');
-    return true;
-  };
-
-  const createProfile = () =>
-    withBusy('profile', async () => {
-      const profile = await getProfile(db);
-      await createCloudProfile(db, { url: apiUrl || url, inviteCode: invite, name: profile.name });
-      setSetupOpen(false);
-      setInvite('');
-      setRecovery(await getRecoveryCode());
-      toast.show('Perfil creado');
-    });
-
-  const connect = () =>
-    withBusy('connect', async () => {
-      const config = { url: normalizeBaseUrl(apiUrl || url), token: token.trim() };
-      if (!/^https:\/\//.test(config.url)) throw new Error('La dirección tiene que empezar con https://');
-      const status = await cloudApi.status(config);
-      await saveCloudConfig(config);
-      setSetupOpen(false);
-      setToken('');
-      toast.show('Conectado al servidor de respaldo');
-      await startLink(status.count, status.latest);
-    });
-
   /** Decides what happens with backups already in the cloud before automatic backups start. */
-  const startLink = async (count: number, latest: CloudBackupMeta | null) => {
-    if (count === 0 || !latest) {
-      await setLinked(db, true);
-      await backupNow(true);
-      return;
-    }
-    setLinkChoice({ count, latest });
-  };
-
   const resumeLink = () =>
     withBusy('link', async () => {
       const cfg = await getCloudConfig();
       if (!cfg) return;
       const status = await cloudApi.status(cfg);
-      await startLink(status.count, status.latest);
+      if (status.count === 0 || !status.latest) {
+        await setLinked(db, true);
+        await backupNow(true);
+      } else setLinkChoice({ count: status.count, latest: status.latest });
     });
 
   const status = (() => {
-    if (!sync.configured) return { label: 'Sin configurar', tone: 'muted' as const };
+    if (!sync.configured) return { label: 'Sin cuenta', tone: 'muted' as const };
     if (!sync.info?.linked) return { label: 'En pausa', tone: 'weight' as const };
     if (sync.running) return { label: 'Respaldando…', tone: 'protein' as const };
     if (sync.info?.lastError && sync.info.pendingChanges) return { label: 'Error', tone: 'danger' as const };
@@ -146,7 +80,7 @@ export default function BackupScreen() {
         <T variant="caption" tone="dim" style={{ marginTop: 2, marginBottom: space.md }}>Todo vive en este teléfono. Estas copias te cuidan si lo perdés o desinstalás la app.</T>
         <ProtectionRow on title="Copia de Android en Google Drive" detail="Automática cada noche, si tu teléfono tiene activada la copia de seguridad (Ajustes → Sistema → Copia de seguridad). Al reinstalar desde Play Store se restaura sola." />
         <ProtectionRow on={!!folder.folderUri} title="Copia semanal en una carpeta" detail={folder.folderUri ? 'Activada' : 'Desactivada: activala más abajo'} />
-        <ProtectionRow on={sync.configured} title="Nube de FokDay" detail={sync.configured ? 'Activada' : 'Sin configurar'} last />
+        <ProtectionRow on={sync.configured} title="Nube de FokDay" detail={sync.configured ? 'Activada' : 'Entrá con tu cuenta para activarla'} last />
       </Card>
 
       <SectionHeader title="Respaldo en la nube" />
@@ -157,7 +91,7 @@ export default function BackupScreen() {
         </Row>
         {sync.configured ? (
           <View style={{ gap: 4, marginTop: space.md }}>
-            <T variant="label" tone="muted">Servidor: {host ?? '—'}</T>
+            {account?.email ? <T variant="label" tone="muted">Cuenta: {account.email}</T> : null}
             <T variant="label" tone="muted">
               Último respaldo: {sync.info?.lastBackupAt ? formatDateTime(sync.info.lastBackupAt) : 'todavía ninguno'}
             </T>
@@ -169,21 +103,27 @@ export default function BackupScreen() {
             ) : (
               <T variant="caption" tone="dim">Se respalda solo cuando hay internet y hubo cambios. Tus datos nunca se borran del teléfono por un error de subida.</T>
             )}
+            {!account ? (
+              <T variant="label" tone="weight">Este teléfono usa el perfil anterior (con código de invitación). Entrá con una cuenta para conservarlo: tus respaldos pasan a la cuenta.</T>
+            ) : null}
           </View>
         ) : (
           <T variant="label" tone="muted" style={{ marginTop: space.md }}>
-            Creá tu perfil con el código de invitación que te pasaron y tus datos se copian solos a la nube, para recuperarlos si cambiás de teléfono. Si ya tenías un perfil, conectalo con tu código de recuperación.
+            Entrá con Google o con tu email y tus datos se copian solos a la nube, para recuperarlos si cambiás de teléfono.
           </T>
         )}
         <View style={{ gap: space.sm, marginTop: space.lg }}>
-          {!sync.configured ? (
-            <Button label="Crear mi perfil o conectar" icon="link" onPress={() => setSetupOpen(true)} />
-          ) : !sync.info?.linked ? (
+          {!account ? (
+            <Button label={sync.configured ? 'Pasar mi perfil a una cuenta' : 'Entrar o crear cuenta'} icon="log-in" onPress={() => router.push('/cuenta/entrar')} />
+          ) : null}
+          {sync.configured && !sync.info?.linked ? (
             <Button label="Revisar respaldos de la nube" icon="cloud" loading={busy === 'link'} onPress={resumeLink} />
-          ) : (
+          ) : null}
+          {sync.configured && sync.info?.linked ? (
             <Button
               label="Respaldar ahora"
               icon="upload-cloud"
+              variant={account ? 'primary' : 'secondary'}
               loading={sync.running || busy === 'backup'}
               onPress={() =>
                 withBusy('backup', async () => {
@@ -196,77 +136,23 @@ export default function BackupScreen() {
                 })
               }
             />
-          )}
-          {sync.configured ? (
-            <>
-              <Button
-                label="Restaurar desde la nube"
-                icon="download-cloud"
-                variant="secondary"
-                loading={busy === 'list'}
-                onPress={() =>
-                  withBusy('list', async () => {
-                    const cfg = await getCloudConfig();
-                    if (!cfg) return;
-                    setCloudList((await cloudApi.list(cfg)).backups);
-                  })
-                }
-              />
-              <Button
-                label="Ver mi código de recuperación"
-                icon="key"
-                variant="secondary"
-                onPress={async () => setRecovery(await getRecoveryCode())}
-              />
-              <Button
-                label="Cambiar código de recuperación"
-                icon="refresh-cw"
-                variant="ghost"
-                size="sm"
-                loading={busy === 'rotate'}
-                onPress={async () => {
-                  if (!(await confirm('Cambiar código', 'Se genera un código nuevo y el anterior deja de funcionar. Vas a tener que guardar el nuevo.', 'Cambiar'))) return;
-                  await withBusy('rotate', async () => {
-                    const cfg = await getCloudConfig();
-                    if (!cfg) return;
-                    const { token: fresh } = await cloudApi.rotateToken(cfg);
-                    await saveCloudConfig({ url: cfg.url, token: fresh });
-                    setRecovery(fresh);
-                  });
-                }}
-              />
-              <Button
-                label="Eliminar mi perfil de la nube"
-                icon="trash-2"
-                variant="ghost"
-                size="sm"
-                loading={busy === 'delete-profile'}
-                onPress={async () => {
-                  if (!(await confirm('Eliminar perfil de la nube', 'Se borran tu perfil y todos tus respaldos del servidor. Los datos de este teléfono no se tocan.', 'Continuar', true))) return;
-                  if (!(await confirm('¿Seguro?', 'No se puede deshacer.', 'Eliminar', true))) return;
-                  await withBusy('delete-profile', async () => {
-                    const cfg = await getCloudConfig();
-                    if (!cfg) return;
-                    await cloudApi.deleteProfile(cfg);
-                    await clearCloudConfig();
-                    await setLinked(db, false);
-                    toast.show('Perfil eliminado de la nube');
-                  });
-                }}
-              />
-              <Button
-                label="Desconectar"
-                variant="ghost"
-                size="sm"
-                onPress={async () => {
-                  if (!(await confirm('Desconectar', 'Se borra la conexión de este teléfono. Tus respaldos en la nube no se tocan, pero vas a necesitar tu código de recuperación para volver a conectarte.', 'Desconectar', true))) return;
-                  await clearCloudConfig();
-                  await setLinked(db, false);
-                  void refreshSyncState();
-                }}
-              />
-            </>
           ) : null}
+          {sync.configured ? (
+            <Button
+              label="Restaurar desde la nube"
+              icon="download-cloud"
+              variant="secondary"
+              loading={busy === 'list'}
+              onPress={() =>
+                withBusy('list', async () => {
+                  const cfg = await getCloudConfig();
+                  if (!cfg) return;
+                  setCloudList((await cloudApi.list(cfg)).backups);
+                })
+              }
+            />
+          ) : null}
+          {account ? <Button label="Mi cuenta" icon="user" variant="ghost" size="sm" onPress={() => router.push('/cuenta')} /> : null}
         </View>
       </Card>
 
@@ -409,80 +295,7 @@ export default function BackupScreen() {
         />
       </Card>
 
-      <Sheet visible={setupOpen} onClose={() => setSetupOpen(false)} title="Respaldo en la nube">
-        <View style={{ gap: space.lg }}>
-          <Row>
-            <Chip label="Soy nuevo" selected={mode === 'new'} onPress={() => setMode('new')} />
-            <Chip label="Ya tengo un perfil" selected={mode === 'existing'} onPress={() => setMode('existing')} />
-          </Row>
-          {!apiUrl ? (
-            <Field label="Dirección del servidor" value={url} onChangeText={setUrl} placeholder="https://momentum-api.vercel.app" autoCapitalize="none" autoCorrect={false} keyboardType="url" />
-          ) : null}
-          {mode === 'new' ? (
-            <>
-              <Field label="Código de invitación" value={invite} onChangeText={setInvite} placeholder="El que te pasó quien administra la app" autoCapitalize="none" autoCorrect={false} />
-              <T variant="caption" tone="dim">Se crea un perfil solo tuyo: nadie más puede ver tus respaldos. Te damos un código de recuperación para volver a entrar desde otro teléfono.</T>
-              <Button label="Crear mi perfil" icon="user-plus" loading={busy === 'profile'} disabled={!(apiUrl || url.trim()) || !invite.trim()} onPress={createProfile} />
-            </>
-          ) : (
-            <>
-              <Field label="Código de recuperación" value={token} onChangeText={setToken} placeholder="El que te mostramos al crear tu perfil" autoCapitalize="none" autoCorrect={false} secureTextEntry />
-              <T variant="caption" tone="dim">Se guarda cifrado en este teléfono (SecureStore) y nunca se incluye en los respaldos.</T>
-              <Button label="Probar y conectar" icon="link" loading={busy === 'connect'} disabled={!(apiUrl || url.trim()) || !token.trim()} onPress={connect} />
-            </>
-          )}
-        </View>
-      </Sheet>
-
-      <Sheet visible={!!recovery} onClose={() => setRecovery(null)} title="Tu código de recuperación">
-        <View style={{ gap: space.lg }}>
-          <T variant="label" tone="muted">Guardalo en un lugar seguro, por ejemplo tu gestor de contraseñas. Si cambiás de teléfono o reinstalás la app, lo necesitás para recuperar tus datos. Quien tenga este código puede ver tus respaldos.</T>
-          <Card tone="alt">
-            <T variant="bodyMedium" selectable style={{ fontVariant: ['tabular-nums'] }}>{recovery}</T>
-          </Card>
-          <Button label="Compartir o copiar" icon="share" onPress={() => void Share.share({ message: recovery ?? '' })} />
-          <Button label="Ya lo guardé" variant="secondary" onPress={() => setRecovery(null)} />
-        </View>
-      </Sheet>
-
-      <Sheet visible={!!linkChoice} onClose={() => setLinkChoice(null)} title="Ya tenés respaldos en la nube">
-        {linkChoice ? (
-          <View style={{ gap: space.md }}>
-            <T variant="label" tone="muted">
-              Hay {linkChoice.count} {linkChoice.count === 1 ? 'respaldo' : 'respaldos'}. El último es del {formatDateTime(linkChoice.latest.createdAt)} con{' '}
-              {countUserRecordsFromCounts(linkChoice.latest.counts)} registros.
-            </T>
-            <Button
-              label="Restaurar el último respaldo"
-              icon="download-cloud"
-              loading={busy === 'restore-link'}
-              onPress={() =>
-                withBusy('restore-link', async () => {
-                  const check = await prepareCloudRestore(syncDeps(db), linkChoice.latest.id);
-                  const done = await restore(check.envelope, check.meta.id, check.localHasUnsavedChanges);
-                  if (done) setLinkChoice(null);
-                })
-              }
-            />
-            <Button
-              label="Mantener los datos de este teléfono"
-              variant="secondary"
-              onPress={async () => {
-                const yes = await confirm(
-                  'Mantener datos locales',
-                  'Los datos de este teléfono se suben como una versión nueva. Los respaldos anteriores siguen guardados en la nube.',
-                  'Mantener',
-                );
-                if (!yes) return;
-                await setLinked(db, true);
-                setLinkChoice(null);
-                await backupNow(true);
-              }}
-            />
-            <Button label="Decidir después" variant="ghost" onPress={() => setLinkChoice(null)} />
-          </View>
-        ) : null}
-      </Sheet>
+      <LinkChoiceSheet choice={linkChoice} onClose={() => setLinkChoice(null)} />
 
       <Sheet visible={!!cloudList} onClose={() => setCloudList(null)} title="Respaldos en la nube">
         {cloudList?.length === 0 ? (
@@ -496,7 +309,7 @@ export default function BackupScreen() {
                   icon="cloud"
                   iconTone={i === 0 ? 'accent' : 'muted'}
                   title={`${formatDateTime(b.createdAt)}${i === 0 ? ' · el más reciente' : ''}`}
-                  subtitle={`${countUserRecordsFromCounts(b.counts)} registros · ${Math.max(1, Math.round(b.sizeBytes / 1024))} KB`}
+                  subtitle={`${recordsIn(b.counts)} registros · ${Math.max(1, Math.round(b.sizeBytes / 1024))} KB`}
                   style={{ paddingHorizontal: 0 }}
                   onPress={() =>
                     withBusy('restore', async () => {
@@ -513,10 +326,6 @@ export default function BackupScreen() {
       </Sheet>
     </Screen>
   );
-}
-
-function countUserRecordsFromCounts(counts: CloudBackupMeta['counts']): number {
-  return countUserRecords({ counts } as Parameters<typeof countUserRecords>[0]);
 }
 
 function ProtectionRow({ on, title, detail, last }: { on: boolean; title: string; detail: string; last?: boolean }) {

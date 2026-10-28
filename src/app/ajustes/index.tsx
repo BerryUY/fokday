@@ -2,6 +2,7 @@ import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Switch, View } from 'react-native';
+import { useAccount } from '@/auth/account';
 import { useSyncState } from '@/backup/service';
 import { Field, Stepper } from '@/components/ui/form';
 import { ListRow, Loading, Screen } from '@/components/ui/layout';
@@ -39,6 +40,7 @@ function SettingsForm({ profile, calories, protein, latest }: {
   const c = useColors();
   const run = useMutation();
   const sync = useSyncState();
+  const { account } = useAccount();
   const [name, setName] = useState(profile.name);
   const [start, setStart] = useState(toInput(profile.startWeight, 1));
   const [target, setTarget] = useState(toInput(profile.targetWeight, 1));
@@ -74,6 +76,16 @@ function SettingsForm({ profile, calories, protein, latest }: {
 
   return (
     <Screen title="Ajustes">
+      <Card padded={false} style={{ paddingVertical: space.xs, marginBottom: space.xl }}>
+        <ListRow
+          icon={account ? 'user-check' : 'log-in'}
+          iconTone="accent"
+          title={account ? account.name ?? account.email ?? 'Tu cuenta' : 'Entrar o crear cuenta'}
+          subtitle={account ? account.email ?? 'Tu cuenta' : 'Guardá tu progreso y activá la foto con IA y el escáner'}
+          onPress={() => router.push(account ? '/cuenta' : '/cuenta/entrar')}
+        />
+      </Card>
+
       <SectionHeader title="Perfil y objetivos" />
       <Card>
         <View style={{ gap: space.lg }}>
@@ -200,7 +212,7 @@ function SettingsForm({ profile, calories, protein, latest }: {
           title="Datos y respaldo"
           subtitle={
             !sync.configured
-              ? 'Respaldo en la nube sin configurar'
+              ? 'Respaldo en la nube: entrá con tu cuenta'
               : lastBackup
                 ? `Último respaldo: ${formatDateTime(lastBackup)}`
                 : 'Todavía no hay respaldos'
