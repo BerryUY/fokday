@@ -6,6 +6,28 @@ export type CloudConfig = { url: string; token: string };
 
 export type CloudProfile = { id: string; name: string; plan: string; createdAt: string };
 
+/** The AI's reading of a food photo (whole visible portion). */
+export type FoodAnalysis = {
+  name: string;
+  items: { name: string; grams: number }[];
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
+  confidence: 'alta' | 'media' | 'baja';
+};
+
+export type PublicFoodInput = {
+  name: string;
+  category: 'desayuno' | 'almuerzo' | 'merienda' | 'cena' | 'extra';
+  calories: number;
+  protein: number;
+  extras: Record<string, number>;
+  ingredients: string[];
+};
+export type PublicFood = PublicFoodInput & { id: string; createdAt: string; mine?: boolean };
+
 export type CloudBackupMeta = {
   id: string;
   deviceId: string;
@@ -82,6 +104,23 @@ export const cloudApi = {
 
   list(config: CloudConfig, fetchImpl?: FetchLike) {
     return request<{ backups: CloudBackupMeta[] }>(config, 'backups', {}, fetchImpl);
+  },
+
+  /** Sends a food photo (JPEG, base64) for the AI to estimate; needs a cloud profile. */
+  analyzeFood(config: CloudConfig, jpegBase64: string, fetchImpl?: FetchLike) {
+    return request<{ food: FoodAnalysis; remaining: number }>(config, 'food/analyze', { method: 'POST', body: JSON.stringify({ image: jpegBase64 }) }, fetchImpl);
+  },
+
+  searchPublicFoods(config: CloudConfig, query: string, fetchImpl?: FetchLike) {
+    return request<{ foods: PublicFood[] }>(config, `food/library?q=${encodeURIComponent(query)}`, {}, fetchImpl);
+  },
+
+  sharePublicFood(config: CloudConfig, food: PublicFoodInput, fetchImpl?: FetchLike) {
+    return request<{ food: PublicFood }>(config, 'food/library', { method: 'POST', body: JSON.stringify(food) }, fetchImpl);
+  },
+
+  deletePublicFood(config: CloudConfig, id: string, fetchImpl?: FetchLike) {
+    return request<{ deleted: true }>(config, `food/library/${encodeURIComponent(id)}`, { method: 'DELETE' }, fetchImpl);
   },
 
   /** Removes this person's profile and every backup from the server. */

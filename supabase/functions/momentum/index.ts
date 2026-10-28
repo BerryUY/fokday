@@ -1,4 +1,5 @@
 import { handleRequest, MAX_PAYLOAD_BYTES, type Env } from './handlers.ts';
+import { createFoodAnalyzer } from './ai.ts';
 import { createSupabaseStore, readConfig } from './store.ts';
 
 /**
@@ -17,6 +18,9 @@ const secretKey = (() => {
 })() ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const store = createSupabaseStore(url, secretKey);
+// The AI photo feature turns on once ANTHROPIC_API_KEY is set in the function's secrets.
+const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
+const analyzeFood = anthropicKey ? createFoodAnalyzer(anthropicKey) : undefined;
 
 // Settings live in the momentum_config table; cached for a minute per instance.
 let cached: { at: number; env: Env } | null = null;
@@ -27,6 +31,8 @@ async function loadEnv(): Promise<Env> {
     inviteCodeHash: values.invite_code_sha256,
     maxProfiles: Number(values.max_profiles) || 50,
     minUploadIntervalSeconds: Number(values.min_upload_interval_seconds) || 60,
+    aiDailyLimit: Number(values.ai_daily_limit) || 30,
+    analyzeFood,
   };
   cached = { at: Date.now(), env };
   return env;
@@ -37,7 +43,8 @@ const json = (status: number, body: unknown) => new Response(JSON.stringify(body
 
 Deno.serve(async (req) => {
   try {
-    const route = new URL(req.url).pathname.match(/\/api\/(.*)$/)?.[1] ?? '';
+    const requestUrl = new URL(req.url);
+    const route = requestUrl.pathname.match(/\/api\/(.*)$/)?.[1] ?? '';
     let body: unknown = undefined;
     if (req.method === 'POST') {
       const text = await req.text();
@@ -48,7 +55,7 @@ Deno.serve(async (req) => {
         return json(400, { error: 'Cuerpo inválido.' });
       }
     }
-    const out = await handleRequest(route, { method: req.method, headers: { authorization: req.headers.get('authorization') ?? undefined }, body }, store, await loadEnv());
+    const out = await handleRequest(route, { method: req.method, headers: { authorization: req.headers.get('authorization') ?? undefined }, body, query: Object.fromEntries(requestUrl.searchParams) }, store, await loadEnv());
     if (out.raw !== undefined) return new Response(out.raw, { status: out.status, headers });
     return json(out.status, out.json ?? {});
   } catch (e) {

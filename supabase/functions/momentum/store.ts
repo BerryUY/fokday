@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import type { BackupMeta, BackupStore, NewBackup, Profile } from './handlers.ts';
+import type { BackupMeta, BackupStore, NewBackup, Profile, PublicFood } from './handlers.ts';
 
 /**
  * Profiles and backup metadata live in Postgres; each snapshot is a gzip file in the private
@@ -10,6 +10,7 @@ import type { BackupMeta, BackupStore, NewBackup, Profile } from './handlers.ts'
 const BUCKET = 'backups';
 const META = 'id, deviceId:device_id, schemaVersion:schema_version, localRevision:local_revision, checksum, sizeBytes:size_bytes, counts, createdAt:created_at, receivedAt:received_at';
 const PROFILE = 'id, name, plan, createdAt:created_at';
+const PUBLIC_FOOD = 'id, name, category, calories, protein, extras, ingredients, createdAt:created_at, profileId:profile_id';
 
 const path = (profileId: string, id: string) => `${profileId}/${id}.json.gz`;
 const iso = (v: string) => new Date(v).toISOString();
@@ -128,6 +129,43 @@ export function createSupabaseStore(url: string, secretKey: string): BackupStore
       await removeFiles(profileId, ids);
       const { error } = await db.from('momentum_backups').delete().eq('profile_id', profileId).in('id', ids);
       if (error) fail('remove', error);
+    },
+    async aiUsage(profileId, day) {
+      const { data, error } = await db.from('momentum_ai_usage').select('count').eq('profile_id', profileId).eq('day', day).maybeSingle();
+      if (error) fail('aiUsage', error);
+      return (data as { count: number } | null)?.count ?? 0;
+    },
+    async addAiUsage(profileId, day) {
+      const { error } = await db.rpc('momentum_add_ai_usage', { p_profile: profileId, p_day: day });
+      if (error) fail('addAiUsage', error);
+    },
+    async searchPublicFoods(query, limit) {
+      let q = db.from('momentum_public_foods').select(PUBLIC_FOOD).order('created_at', { ascending: false }).limit(limit);
+      // ilike wildcards in the person's text are matched literally.
+      if (query) q = q.ilike('name', `%${query.replace(/[\\%_]/g, (m) => `\\${m}`)}%`);
+      const { data, error } = await q;
+      if (error) fail('searchPublicFoods', error);
+      return (data as (PublicFood & { profileId: string })[]).map((f) => ({ ...f, createdAt: iso(f.createdAt) }));
+    },
+    async countPublicFoods(profileId) {
+      const { count, error } = await db.from('momentum_public_foods').select('id', { count: 'exact', head: true }).eq('profile_id', profileId);
+      if (error) fail('countPublicFoods', error);
+      return count ?? 0;
+    },
+    async createPublicFood(profileId, f) {
+      const { data, error } = await db
+        .from('momentum_public_foods')
+        .insert({ profile_id: profileId, name: f.name, category: f.category, calories: f.calories, protein: f.protein, extras: f.extras, ingredients: f.ingredients })
+        .select(PUBLIC_FOOD)
+        .single();
+      if (error) fail('createPublicFood', error);
+      const { profileId: _p, ...food } = data as PublicFood & { profileId: string };
+      return { ...food, createdAt: iso(food.createdAt) };
+    },
+    async deletePublicFood(profileId, id) {
+      const { data, error } = await db.from('momentum_public_foods').delete().eq('id', id).eq('profile_id', profileId).select('id');
+      if (error) fail('deletePublicFood', error);
+      return (data ?? []).length > 0;
     },
   };
 }

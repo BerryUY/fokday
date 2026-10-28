@@ -20,6 +20,7 @@
   "exclude": [
     "node_modules",
     "supabase/functions/momentum/index.ts",
-    "supabase/functions/momentum/store.ts"
+    "supabase/functions/momentum/store.ts",
+    "supabase/functions/momentum/ai.ts"
   ]
 }

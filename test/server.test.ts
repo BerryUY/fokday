@@ -13,6 +13,7 @@ import {
   type Env,
   type NewBackup,
   type Profile,
+  type PublicFood,
 } from '../supabase/functions/momentum/handlers';
 import { createTestDb } from './helpers/db';
 
@@ -24,6 +25,8 @@ type StoredBackup = BackupMeta & { payload: string; profileId: string };
 function memoryStore() {
   const rows: StoredBackup[] = [];
   const profiles: (Profile & { tokenHash: string })[] = [];
+  const usage = new Map<string, number>();
+  const foods: (PublicFood & { profileId: string })[] = [];
   let clock = Date.parse('2026-03-10T12:00:00Z');
   const pub = ({ tokenHash: _h, ...p }: Profile & { tokenHash: string }): Profile => p;
   const store: BackupStore = {
@@ -64,8 +67,27 @@ function memoryStore() {
     async remove(profileId, ids) {
       for (let i = rows.length - 1; i >= 0; i--) if (rows[i].profileId === profileId && ids.includes(rows[i].id)) rows.splice(i, 1);
     },
+    async aiUsage(profileId, day) { return usage.get(profileId + day) ?? 0; },
+    async addAiUsage(profileId, day) { usage.set(profileId + day, (usage.get(profileId + day) ?? 0) + 1); },
+    async searchPublicFoods(query, limit) {
+      const q = query.toLowerCase();
+      return foods.filter((f) => f.name.toLowerCase().includes(q)).reverse().slice(0, limit);
+    },
+    async countPublicFoods(profileId) { return foods.filter((f) => f.profileId === profileId).length; },
+    async createPublicFood(profileId, input) {
+      const food = { ...input, id: randomUUID(), createdAt: new Date(clock).toISOString(), profileId };
+      foods.push(food);
+      const { profileId: _p, ...pub } = food;
+      return pub;
+    },
+    async deletePublicFood(profileId, id) {
+      const i = foods.findIndex((f) => f.id === id && f.profileId === profileId);
+      if (i < 0) return false;
+      foods.splice(i, 1);
+      return true;
+    },
   };
-  return { store, rows, profiles, now: () => new Date(clock + 60 * 60_000) };
+  return { store, rows, profiles, foods, now: () => new Date(clock + 60 * 60_000) };
 }
 
 /** Routes the app's fetch calls straight into the server handlers, JSON round-trip included. */
@@ -76,7 +98,9 @@ function wire(store: BackupStore, env: Env): FetchLike {
       headers: { authorization: (init?.headers as Record<string, string>)?.Authorization },
       body: init?.body ? JSON.parse(String(init.body)) : undefined,
     };
-    const out = await handleRequest(url.split('/api/')[1], req, store, env);
+    const [path, search = ''] = url.split('/api/')[1].split('?');
+    req.query = Object.fromEntries(new URLSearchParams(search));
+    const out = await handleRequest(path, req, store, env);
     return new Response(out.raw ?? JSON.stringify(out.json), { status: out.status });
   };
 }
@@ -242,5 +266,55 @@ describe('backup API', () => {
     const res = await runBackup(deps(db, fetchImpl, 'c'.repeat(64)));
     expect(res).toEqual({ status: 'error', message: expect.stringMatching(/token/i) });
     expect((await getSyncInfo(db)).pendingChanges).toBe(true);
+  });
+});
+
+describe('food: AI photo and public library', () => {
+  const photo = 'A'.repeat(400);
+  const analysis = { name: 'Milanesa con puré', items: [{ name: 'milanesa', grams: 180 }], calories: 650, protein: 38, carbs: 55, fat: 28, fiber: 4, confidence: 'media' as const };
+
+  it('analyzes a photo, counts the daily limit and says when the server has no AI', async () => {
+    const mem = memoryStore();
+    const env: Env = { inviteCodeHash: sha256Hex(INVITE), maxProfiles: 3, minUploadIntervalSeconds: 60, aiDailyLimit: 2, analyzeFood: async () => analysis };
+    const fetchImpl = wire(mem.store, env);
+    const { token } = await signUp(fetchImpl, 'Ana');
+    const cfg = { url: URL, token };
+    expect(await cloudApi.analyzeFood(cfg, photo, fetchImpl)).toEqual({ food: analysis, remaining: 1 });
+    expect((await cloudApi.analyzeFood(cfg, photo, fetchImpl)).remaining).toBe(0);
+    await expect(cloudApi.analyzeFood(cfg, photo, fetchImpl)).rejects.toMatchObject({ status: 429 });
+    await expect(cloudApi.analyzeFood(cfg, 'not base64 !!', fetchImpl)).rejects.toMatchObject({ status: 400 });
+    const noAi = wire(mem.store, { ...env, analyzeFood: undefined });
+    await expect(cloudApi.analyzeFood(cfg, photo, noAi)).rejects.toMatchObject({ status: 503 });
+    await expect(cloudApi.analyzeFood({ url: URL, token: 'x'.repeat(40) }, photo, fetchImpl)).rejects.toMatchObject({ status: 401 });
+  });
+
+  it('does not count a failed analysis against the limit', async () => {
+    const mem = memoryStore();
+    const env: Env = { inviteCodeHash: sha256Hex(INVITE), maxProfiles: 3, minUploadIntervalSeconds: 60, aiDailyLimit: 1, analyzeFood: async () => { throw new Error('IA: No se ve comida en la foto.'); } };
+    const fetchImpl = wire(mem.store, env);
+    const { token } = await signUp(fetchImpl, 'Ana');
+    await expect(cloudApi.analyzeFood({ url: URL, token }, photo, fetchImpl)).rejects.toThrow('No se ve comida en la foto.');
+    await expect(cloudApi.analyzeFood({ url: URL, token }, photo, fetchImpl)).rejects.toMatchObject({ status: 502 });
+  });
+
+  it('shares foods anonymously, searches them and lets only the author delete', async () => {
+    const { fetchImpl, foods } = setup();
+    const ana = await signUp(fetchImpl, 'Ana');
+    const beto = await signUp(fetchImpl, 'Beto');
+    const food = { name: 'Cucharada de chocolate', category: 'extra' as const, calories: 60, protein: 1, extras: { carbs: 7, bogus: 3 }, ingredients: ['chocolate'] };
+    const { food: shared } = await cloudApi.sharePublicFood({ url: URL, token: ana.token }, food, fetchImpl);
+    expect(shared).toMatchObject({ name: 'Cucharada de chocolate', extras: { carbs: 7 }, mine: true });
+    expect(foods).toHaveLength(1);
+    await expect(cloudApi.sharePublicFood({ url: URL, token: ana.token }, { ...food, name: '  ' }, fetchImpl)).rejects.toMatchObject({ status: 400 });
+
+    const seen = await cloudApi.searchPublicFoods({ url: URL, token: beto.token }, 'choco', fetchImpl);
+    expect(seen.foods).toHaveLength(1);
+    expect(seen.foods[0]).toMatchObject({ mine: false });
+    expect(JSON.stringify(seen)).not.toContain(ana.profile.id);
+    expect((await cloudApi.searchPublicFoods({ url: URL, token: beto.token }, 'pizza', fetchImpl)).foods).toHaveLength(0);
+
+    await expect(cloudApi.deletePublicFood({ url: URL, token: beto.token }, shared.id, fetchImpl)).rejects.toMatchObject({ status: 404 });
+    await cloudApi.deletePublicFood({ url: URL, token: ana.token }, shared.id, fetchImpl);
+    expect(foods).toHaveLength(0);
   });
 });

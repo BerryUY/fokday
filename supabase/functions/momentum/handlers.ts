@@ -38,9 +38,43 @@ export interface BackupStore {
   /** Inserts unless the id exists. Returns the stored receivedAt either way. */
   insert(profileId: string, backup: NewBackup): Promise<{ inserted: boolean; receivedAt: string }>;
   remove(profileId: string, ids: string[]): Promise<void>;
+  /** AI photo analyses used by a profile on a UTC day (YYYY-MM-DD). */
+  aiUsage(profileId: string, day: string): Promise<number>;
+  addAiUsage(profileId: string, day: string): Promise<void>;
+  /** Newest first; empty query lists the latest. */
+  searchPublicFoods(query: string, limit: number): Promise<(PublicFood & { profileId: string })[]>;
+  countPublicFoods(profileId: string): Promise<number>;
+  createPublicFood(profileId: string, food: PublicFoodInput): Promise<PublicFood>;
+  /** Only the author can delete; false when nothing was deleted. */
+  deletePublicFood(profileId: string, id: string): Promise<boolean>;
 }
 
-export type ApiRequest = { method: string; headers: Record<string, string | string[] | undefined>; body: unknown; id?: string };
+/** What the AI reads from a food photo (all values for the whole visible portion). */
+export type FoodAnalysis = {
+  name: string;
+  items: { name: string; grams: number }[];
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
+  confidence: 'alta' | 'media' | 'baja';
+};
+
+export const FOOD_CATEGORIES = ['desayuno', 'almuerzo', 'merienda', 'cena', 'extra'] as const;
+export const EXTRA_KEYS = ['carbs', 'fat', 'fiber', 'dairy'] as const;
+
+export type PublicFoodInput = {
+  name: string;
+  category: (typeof FOOD_CATEGORIES)[number];
+  calories: number;
+  protein: number;
+  extras: Partial<Record<(typeof EXTRA_KEYS)[number], number>>;
+  ingredients: string[];
+};
+export type PublicFood = PublicFoodInput & { id: string; createdAt: string; mine?: boolean };
+
+export type ApiRequest = { method: string; headers: Record<string, string | string[] | undefined>; body: unknown; id?: string; query?: Record<string, string> };
 export type ApiResponse = { status: number; json?: unknown; raw?: string };
 
 export type Env = {
@@ -49,8 +83,16 @@ export type Env = {
   maxProfiles: number;
   /** Automatic uploads closer together than this are refused (the app retries later). */
   minUploadIntervalSeconds: number;
+  /** AI photo analyses allowed per profile per day (keeps the AI bill bounded). */
+  aiDailyLimit?: number;
+  /** Reads a JPEG (base64) and estimates its nutrition. Missing when the server has no AI key. */
+  analyzeFood?: (jpegBase64: string) => Promise<FoodAnalysis>;
   now?: () => Date;
 };
+
+/** A ~1 MB JPEG is plenty for a food photo; the app sends ~100 KB. */
+export const MAX_IMAGE_BASE64 = 1_500_000;
+export const MAX_PUBLIC_FOODS_PER_PROFILE = 200;
 
 /** Request bodies are kept under a few MB; the app's snapshots are far smaller. */
 export const MAX_PAYLOAD_BYTES = 4_400_000;
@@ -212,5 +254,89 @@ export async function handleRequest(path: string, req: ApiRequest, store: Backup
   if (clean === 'status') return handleStatus(req, store, env);
   if (clean === 'backups') return handleBackups(req, store, env);
   if (clean.startsWith('backups/')) return handleBackupById({ ...req, id: decodeURIComponent(clean.slice('backups/'.length)) }, store, env);
+  if (clean === 'food/analyze') return handleAnalyzeFood(req, store, env);
+  if (clean === 'food/library') return handlePublicFoods(req, store, env);
+  if (clean.startsWith('food/library/')) return handleDeletePublicFood({ ...req, id: decodeURIComponent(clean.slice('food/library/'.length)) }, store, env);
   return { status: 404, json: { error: 'Ruta desconocida.' } };
+}
+
+// ---------- Food: AI photo analysis and the public library ----------
+
+const num = (v: unknown, max: number): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= max ? v : null);
+
+/** POST food/analyze { image: base64 JPEG } → { food: FoodAnalysis, remaining } */
+export async function handleAnalyzeFood(req: ApiRequest, store: BackupStore, env: Env): Promise<ApiResponse> {
+  const auth = await authenticate(req.headers.authorization, store);
+  if ('denied' in auth) return auth.denied;
+  if (req.method !== 'POST') return { status: 405, json: { error: 'Método no permitido.' } };
+  if (!env.analyzeFood) return { status: 503, json: { error: 'El análisis con IA todavía no está activado en el servidor.' } };
+  const image = (req.body as { image?: unknown } | null)?.image;
+  if (typeof image !== 'string' || image.length < 100 || image.length > MAX_IMAGE_BASE64 || !/^[A-Za-z0-9+/=]+$/.test(image)) {
+    return { status: 400, json: { error: 'La foto no es válida o es demasiado grande.' } };
+  }
+  const day = (env.now ?? (() => new Date()))().toISOString().slice(0, 10);
+  const limit = env.aiDailyLimit ?? 30;
+  const used = await store.aiUsage(auth.profile.id, day);
+  if (used >= limit) {
+    return { status: 429, json: { error: 'Llegaste a las ' + limit + ' fotos con IA de hoy. Mañana se renueva; mientras tanto podés cargarla a mano.' } };
+  }
+  let food: FoodAnalysis;
+  try {
+    food = await env.analyzeFood(image);
+  } catch (e) {
+    const message = e instanceof Error && e.message.startsWith('IA:') ? e.message.slice(3).trim() : 'No pudimos analizar la foto. Probá de nuevo.';
+    return { status: 502, json: { error: message } };
+  }
+  await store.addAiUsage(auth.profile.id, day);
+  return { status: 200, json: { food, remaining: Math.max(0, limit - used - 1) } };
+}
+
+function validatePublicFood(body: unknown): PublicFoodInput | string {
+  const b = (body ?? {}) as Record<string, unknown>;
+  const name = typeof b.name === 'string' ? b.name.trim().slice(0, 80) : '';
+  if (!name) return 'La comida necesita un nombre.';
+  const category = FOOD_CATEGORIES.find((c) => c === b.category);
+  if (!category) return 'Categoría inválida.';
+  const calories = num(b.calories, 5000);
+  const protein = num(b.protein, 500);
+  if (calories === null || protein === null) return 'Calorías o proteína inválidas.';
+  const extras: PublicFoodInput['extras'] = {};
+  const rawExtras = (b.extras ?? {}) as Record<string, unknown>;
+  for (const k of EXTRA_KEYS) {
+    const v = num(rawExtras[k], 1000);
+    if (v) extras[k] = Math.round(v * 10) / 10;
+  }
+  const ingredients = Array.isArray(b.ingredients)
+    ? b.ingredients.filter((i): i is string => typeof i === 'string').map((i) => i.trim().slice(0, 120)).filter(Boolean).slice(0, 30)
+    : [];
+  return { name, category, calories: Math.round(calories), protein: Math.round(protein * 10) / 10, extras, ingredients };
+}
+
+/** GET food/library?q= searches; POST shares one of your foods. */
+export async function handlePublicFoods(req: ApiRequest, store: BackupStore, _env: Env): Promise<ApiResponse> {
+  const auth = await authenticate(req.headers.authorization, store);
+  if ('denied' in auth) return auth.denied;
+  if (req.method === 'GET') {
+    const q = (req.query?.q ?? '').trim().slice(0, 60);
+    const found = await store.searchPublicFoods(q, 40);
+    // Who shared a food is never exposed, only whether it was you (so you can remove it).
+    return { status: 200, json: { foods: found.map(({ profileId, ...f }) => ({ ...f, mine: profileId === auth.profile.id })) } };
+  }
+  if (req.method !== 'POST') return { status: 405, json: { error: 'Método no permitido.' } };
+  const input = validatePublicFood(req.body);
+  if (typeof input === 'string') return { status: 400, json: { error: input } };
+  if ((await store.countPublicFoods(auth.profile.id)) >= MAX_PUBLIC_FOODS_PER_PROFILE) {
+    return { status: 403, json: { error: 'Ya compartiste el máximo de comidas permitido.' } };
+  }
+  const food = await store.createPublicFood(auth.profile.id, input);
+  return { status: 201, json: { food: { ...food, mine: true } } };
+}
+
+export async function handleDeletePublicFood(req: ApiRequest, store: BackupStore, _env: Env): Promise<ApiResponse> {
+  const auth = await authenticate(req.headers.authorization, store);
+  if ('denied' in auth) return auth.denied;
+  if (req.method !== 'DELETE') return { status: 405, json: { error: 'Método no permitido.' } };
+  if (!UUID.test(req.id ?? '')) return { status: 400, json: { error: 'id inválido.' } };
+  const deleted = await store.deletePublicFood(auth.profile.id, req.id!);
+  return deleted ? { status: 200, json: { deleted: true } } : { status: 404, json: { error: 'No encontramos esa comida entre las que compartiste.' } };
 }
