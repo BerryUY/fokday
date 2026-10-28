@@ -1,8 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Redirect } from 'expo-router';
-import { Tabs, type BottomTabBarProps } from 'expo-router/js-tabs';
-import type { ComponentProps } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { TopTabs, type MaterialTopTabBarProps } from 'expo-router/js-top-tabs';
+import { useState, type ComponentProps } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isOnboarded } from '@/data/settings';
 import { useQuery } from '@/state/db';
@@ -20,15 +20,37 @@ const TABS: Record<string, { label: string; icon: IconName; iconActive: IconName
   historial: { label: 'Historial', icon: 'calendar-blank-outline', iconActive: 'calendar-blank' },
 };
 
-function TabBar({ state, navigateToTab }: BottomTabBarProps) {
+const PILL_W = 52;
+const PILL_H = 34;
+
+/**
+ * Floating bar with one pill that slides between tabs. It follows the finger while swiping
+ * between sections (the pill is a single view that only moves, so its rounded shape never changes).
+ */
+function TabBar({ state, navigateToTab, position }: MaterialTopTabBarProps) {
   const c = useColors();
   const insets = useSafeAreaInsets();
+  const [itemWidth, setItemWidth] = useState(0);
+  const routes = state.routes.filter((r) => TABS[r.name]);
+  const translateX = itemWidth
+    ? position.interpolate({
+        inputRange: routes.map((_, i) => i),
+        outputRange: routes.map((_, i) => i * itemWidth + (itemWidth - PILL_W) / 2),
+        extrapolate: 'clamp',
+      })
+    : 0;
+
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-      <View style={[styles.bar, { backgroundColor: c.scheme === 'dark' ? 'rgba(24,24,27,0.97)' : 'rgba(255,255,255,0.97)', borderColor: c.border }]}>
-        {state.routes.map((route, index) => {
+      <View
+        style={[styles.bar, { backgroundColor: c.scheme === 'dark' ? 'rgba(24,24,27,0.97)' : 'rgba(255,255,255,0.97)', borderColor: c.border }]}
+        onLayout={(e) => setItemWidth((e.nativeEvent.layout.width - 8) / Math.max(1, routes.length))}
+      >
+        {itemWidth ? (
+          <Animated.View pointerEvents="none" style={[styles.pill, { backgroundColor: c.accentSoft, transform: [{ translateX }] }]} />
+        ) : null}
+        {routes.map((route, index) => {
           const meta = TABS[route.name];
-          if (!meta) return null;
           const focused = state.index === index;
           return (
             <Pressable
@@ -43,10 +65,10 @@ function TabBar({ state, navigateToTab }: BottomTabBarProps) {
               }}
               style={styles.item}
             >
-              <View style={[styles.iconPill, focused && { backgroundColor: c.accentSoft }]}>
+              <View style={styles.iconSlot}>
                 <MaterialCommunityIcons name={focused ? meta.iconActive : meta.icon} size={22} color={focused ? c.accent : c.textDim} />
               </View>
-              <Text style={[styles.label, { color: focused ? c.text : c.textDim }]}>{meta.label}</Text>
+              <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={[styles.label, { color: focused ? c.text : c.textDim }]}>{meta.label}</Text>
             </Pressable>
           );
         })}
@@ -61,16 +83,18 @@ export default function TabsLayout() {
   if (onboarded === undefined) return null;
   if (!onboarded) return <Redirect href="/bienvenida" />;
   return (
-    <Tabs
+    <TopTabs
+      tabBarPosition="bottom"
       tabBar={(props) => <TabBar {...props} />}
-      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: c.bg }, animation: 'fade' }}
+      style={{ backgroundColor: c.bg }}
+      screenOptions={{ swipeEnabled: true, animationEnabled: true, lazy: true, lazyPreloadDistance: 1, sceneStyle: { backgroundColor: c.bg } }}
     >
-      <Tabs.Screen name="index" />
-      <Tabs.Screen name="comidas" />
-      <Tabs.Screen name="entrenar" />
-      <Tabs.Screen name="progreso" />
-      <Tabs.Screen name="historial" />
-    </Tabs>
+      <TopTabs.Screen name="index" />
+      <TopTabs.Screen name="comidas" />
+      <TopTabs.Screen name="entrenar" />
+      <TopTabs.Screen name="progreso" />
+      <TopTabs.Screen name="historial" />
+    </TopTabs>
   );
 }
 
@@ -88,7 +112,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     elevation: 12,
   },
+  pill: { position: 'absolute', top: 8, left: 4, width: PILL_W, height: PILL_H, borderRadius: PILL_H / 2 },
   item: { flex: 1, alignItems: 'center', gap: 3 },
-  iconPill: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  iconSlot: { width: PILL_W, height: PILL_H, alignItems: 'center', justifyContent: 'center' },
   label: { fontFamily: font.semibold, fontSize: 11 },
 });
