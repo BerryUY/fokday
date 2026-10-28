@@ -67,7 +67,9 @@ Already set up in the Supabase project `momentum` (`eqvyjnhkhyqzwurdtumh`, São 
    Changing the code later only affects new profiles.
 4. Put `https://<project>.supabase.co/functions/v1/momentum` in `app.json` → `expo.extra.backupApiUrl` and build again.
 
-AI food photo: set the secret `ANTHROPIC_API_KEY` in Supabase → Edge Functions → Secrets (no redeploy needed). Without it the app answers "El análisis con IA todavía no está activado". Each profile gets `ai_daily_limit` analyses per day (default 30); photos are not stored.
+AI food photo (free): create a key at https://aistudio.google.com/apikey (free tier, no card) and set it as the secret `GEMINI_API_KEY` in Supabase → Edge Functions → Secrets. It uses `gemini-3.8-flash` (`supabase/functions/momentum/gemini.ts`). On the free tier Google may use the photos to improve its products, so the privacy page says so. If Google's free quota runs out, the app says so and the person logs the meal by hand.
+
+Optional paid alternative: `ANTHROPIC_API_KEY` (Claude, `ai.ts`) is used only when there is no Gemini key. Without either key the app answers "El análisis con IA todavía no está activado". Each profile gets `ai_daily_limit` analyses per day (default 30); photos are not stored. Every value the AI returns can be edited before saving.
 
 The public food library (`momentum_public_foods`) never exposes who shared a food; deleting a profile removes what it shared.
 

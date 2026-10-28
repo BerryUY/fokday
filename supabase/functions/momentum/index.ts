@@ -1,5 +1,6 @@
 import { handleRequest, MAX_PAYLOAD_BYTES, type Env } from './handlers.ts';
 import { createFoodAnalyzer } from './ai.ts';
+import { createGeminiAnalyzer } from './gemini.ts';
 import { createSupabaseStore, readConfig } from './store.ts';
 
 /**
@@ -18,9 +19,11 @@ const secretKey = (() => {
 })() ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const store = createSupabaseStore(url, secretKey);
-// The AI photo feature turns on once ANTHROPIC_API_KEY is set in the function's secrets.
+// The AI photo turns on once a key is set in the function's secrets: GEMINI_API_KEY (free tier
+// in Google AI Studio) is preferred; ANTHROPIC_API_KEY (paid) is used only if there is no Gemini key.
+const geminiKey = Deno.env.get('GEMINI_API_KEY');
 const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
-const analyzeFood = anthropicKey ? createFoodAnalyzer(anthropicKey) : undefined;
+const analyzeFood = geminiKey ? createGeminiAnalyzer(geminiKey) : anthropicKey ? createFoodAnalyzer(anthropicKey) : undefined;
 
 // Settings live in the momentum_config table; cached for a minute per instance.
 let cached: { at: number; env: Env } | null = null;
