@@ -216,6 +216,20 @@ function SettingsForm({ profile, calories, protein, latest }: {
         onChange={(theme) => run((db) => updateProfile(db, { theme }))}
       />
       <Card style={{ marginTop: space.md }}>
+        <Row style={{ justifyContent: 'space-between', marginBottom: space.lg }}>
+          <View style={{ flex: 1, paddingRight: space.md }}>
+            <T variant="bodyMedium">Sonidos de recompensa</T>
+            <T variant="caption" tone="dim">Un clinc al cumplir una tarea, la creatina o el gym</T>
+          </View>
+          <Switch
+            value={profile.sounds}
+            onValueChange={(sounds) => run((db) => updateProfile(db, { sounds }), { silent: true })}
+            trackColor={{ true: c.accent, false: c.track }}
+            thumbColor="#FFFFFF"
+            accessibilityLabel="Sonidos de recompensa"
+          />
+        </Row>
+        <Divider style={{ marginBottom: space.lg }} />
         <Row style={{ justifyContent: 'space-between', marginBottom: space.md }}>
           <T variant="bodyMedium">Color de la app</T>
           {pro ? null : <ProBadge />}

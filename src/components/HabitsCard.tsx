@@ -8,6 +8,7 @@ import { addWater, creatineStreak, getHabits, setCreatine } from '@/data/habits'
 import { formatLiters } from '@/lib/format';
 import { useMutation, useQuery } from '@/state/db';
 import { useFeatures } from '@/state/features';
+import { playReward } from '@/lib/sound';
 import { haptic } from '@/state/toast';
 import { useColors } from '@/theme/ThemeProvider';
 import { radius, space } from '@/theme/tokens';
@@ -102,6 +103,7 @@ function Creatine({ date, taken, streak }: { date: string; taken: boolean; strea
     <PressableScale
       onPress={() => {
         haptic(taken ? 'light' : 'success');
+        if (!taken) void playReward();
         void run((db) => setCreatine(db, date, !taken), { silent: true });
       }}
       accessibilityRole="checkbox"

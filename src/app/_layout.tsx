@@ -27,6 +27,7 @@ import { DbProvider, useDataVersion, useDb } from '@/state/db';
 import { ToastProvider } from '@/state/toast';
 import { ThemeProvider, useColors } from '@/theme/ThemeProvider';
 import type { AccentKey } from '@/theme/tokens';
+import { setSoundsEnabled } from '@/lib/sound';
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -86,6 +87,7 @@ function ThemedApp() {
       .then((p) => {
         setPreference(p.theme);
         setAccent(p.accent);
+        setSoundsEnabled(p.sounds);
       })
       .catch(() => {});
   }, [db, version]);

@@ -14,6 +14,8 @@ import { getActiveSession, listSessions, listTrainedExercises, startSession } fr
 import { DAY_SHORT, formatDuration, formatMinutes, formatShort, todayKey, weekday, WEEK_ORDER } from '@/lib/dates';
 import { formatNumber } from '@/lib/format';
 import { useMutation, useQuery } from '@/state/db';
+import { playReward } from '@/lib/sound';
+import { haptic } from '@/state/toast';
 import { useColors } from '@/theme/ThemeProvider';
 import { radius, space } from '@/theme/tokens';
 
@@ -143,11 +145,15 @@ export default function TrainScreen() {
           icon={data.attendance ? 'check-circle' : 'check-circle-outline'}
           label={data.attendance ? 'Fuiste' : 'Ya fui'}
           active={!!data.attendance}
-          onPress={() =>
-            run((db) => (data.attendance ? removeAttendance(db, today) : markAttendance(db, today)), {
+          onPress={() => {
+            if (!data.attendance) {
+              haptic('success');
+              void playReward();
+            }
+            void run((db) => (data.attendance ? removeAttendance(db, today) : markAttendance(db, today)), {
               success: data.attendance ? 'Listo, lo desmarqué' : '¡Bien ahí! Hoy cuenta como día de gym',
-            })
-          }
+            });
+          }}
         />
         <Tile icon="lightning-bolt-outline" label="Entreno libre" onPress={() => start(null)} disabled={!!data.active} />
         <Tile icon="walk" label="Caminata o bici" onPress={() => router.push('/actividad/nueva')} />

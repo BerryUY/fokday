@@ -6,6 +6,7 @@ import { MOTION } from '@/components/ui/motion';
 import { Card, IconButton, PressableScale, Row, T } from '@/components/ui/primitives';
 import { addTodo, bringPending, deleteTodo, listTodos, pendingFromYesterday, setTodoDone, type Todo } from '@/data/todos';
 import { useMutation, useQuery } from '@/state/db';
+import { playReward } from '@/lib/sound';
 import { haptic } from '@/state/toast';
 import { useColors } from '@/theme/ThemeProvider';
 import { font, radius, space } from '@/theme/tokens';
@@ -94,6 +95,7 @@ function TodoRow({ todo, onToggle, onDelete }: { todo: Todo; onToggle: () => voi
       <PressableScale
         onPress={() => {
           haptic(todo.done ? 'light' : 'success');
+          if (!todo.done) void playReward();
           onToggle();
         }}
         scaleTo={0.85}

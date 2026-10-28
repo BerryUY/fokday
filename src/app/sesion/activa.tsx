@@ -12,6 +12,8 @@ import { getProfile } from '@/data/settings';
 import { cancelSession, finishSession, getActiveSession, getPreviousPerformance, getSession, type PreviousPerformance } from '@/data/workouts';
 import { formatDuration } from '@/lib/dates';
 import { useMutation, useQuery } from '@/state/db';
+import { SwipeToComplete } from '@/components/juice/SwipeToComplete';
+import { playReward } from '@/lib/sound';
 import { haptic } from '@/state/toast';
 import { useColors } from '@/theme/ThemeProvider';
 import { radius, space } from '@/theme/tokens';
@@ -67,16 +69,17 @@ export default function ActiveSessionScreen() {
 
   const finish = async () => {
     const pending = allSets.length - doneSets;
-    const ok = await confirm(
-      'Terminar entrenamiento',
-      pending > 0 ? `Hay ${pending} series sin marcar: no se guardan. La asistencia de hoy se registra automáticamente.` : 'Se guarda la sesión y se registra la asistencia de hoy.',
-      'Terminar',
-    );
-    if (!ok) return;
+    if (pending > 0) {
+      const ok = await confirm('Terminar entrenamiento', `Hay ${pending} series sin marcar: no se guardan. La asistencia de hoy se registra automáticamente.`, 'Terminar');
+      if (!ok) return;
+    }
     setFinishing(true);
     const done = await run((d) => finishSession(d, session.id), { success: '¡Entrenamiento guardado! Un día más en tu racha.' });
     setFinishing(false);
-    if (done !== undefined) router.replace({ pathname: '/sesion/[id]', params: { id: session.id } });
+    if (done !== undefined) {
+      void playReward();
+      router.replace({ pathname: '/sesion/[id]', params: { id: session.id } });
+    }
   };
 
   const cancel = async () => {
@@ -90,9 +93,9 @@ export default function ActiveSessionScreen() {
     <Screen
       title={session.routineName ?? 'Entrenamiento libre'}
       subtitle={`${formatDuration(elapsed)} · ${doneSets}/${allSets.length} series`}
-      right={<Button label="Terminar" size="sm" onPress={finish} loading={finishing} />}
       footer={
         <View style={{ gap: space.sm }}>
+          <SwipeToComplete label="Deslizá para terminar" onComplete={() => void finish()} loading={finishing} />
           {rest ? (
             <Animated.View entering={FadeInDown} exiting={FadeOutDown} style={[styles.rest, { backgroundColor: c.surfaceAlt }]}>
               <View style={{ flex: 1, gap: 6 }}>
@@ -141,6 +144,7 @@ export default function ActiveSessionScreen() {
               previous={ex.exerciseId ? data.previous?.[ex.exerciseId] : null}
               onSetCompleted={(seconds) => {
                 const total = seconds ?? data.defaultRest ?? 90;
+                haptic('light');
                 setRest({ endsAt: Date.now() + total * 1000, total });
               }}
             />

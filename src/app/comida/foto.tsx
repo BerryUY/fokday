@@ -4,10 +4,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Image, StyleSheet, Switch, View } from 'react-native';
-import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { ApiError, cloudApi, type FoodAnalysis } from '@/backup/api';
 import { refreshPlan, setQuota, usePlan } from '@/billing/pro';
 import { left, QuotaCard } from '@/components/QuotaCard';
+import { Burst } from '@/components/juice/Burst';
 import { MomentPicker } from '@/components/MomentPicker';
 import { Field } from '@/components/ui/form';
 import { Screen } from '@/components/ui/layout';
@@ -19,7 +20,8 @@ import { goBack } from '@/lib/nav';
 import { useParams } from '@/lib/params';
 import { useCloudConfig } from '@/state/cloud';
 import { useMutation } from '@/state/db';
-import { useToast } from '@/state/toast';
+import { playReward } from '@/lib/sound';
+import { haptic, useToast } from '@/state/toast';
 import { useColors } from '@/theme/ThemeProvider';
 import { radius, space } from '@/theme/tokens';
 
@@ -55,6 +57,12 @@ export default function FoodPhotoScreen() {
   const [moment, setMoment] = useState<MealCategory>(guessCategory());
   const [keep, setKeep] = useState(false);
   const [saving, setSaving] = useState(false);
+  // The "approved" moment: a pop, a green frame and a burst of sparks.
+  const [burst, setBurst] = useState(0);
+  const pop = useSharedValue(1);
+  const glow = useSharedValue(0);
+  const popStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }));
+  const glowStyle = useAnimatedStyle(() => ({ opacity: glow.value }));
 
   const pick = async (source: 'camera' | 'library') => {
     if (!config) return;
@@ -78,6 +86,12 @@ export default function FoodPhotoScreen() {
       setFat(toInput(food.fat, 1));
       setFiber(toInput(food.fiber, 1));
       setPhase({ kind: 'result', uri, food, remaining });
+      haptic('heavy');
+      setTimeout(() => haptic('success'), 140);
+      void playReward();
+      setBurst((n) => n + 1);
+      pop.set(withSequence(withTiming(0.94, { duration: 90 }), withTiming(1.05, { duration: 170, easing: Easing.out(Easing.back(3)) }), withTiming(1, { duration: 160 })));
+      glow.set(withSequence(withTiming(1, { duration: 180 }), withTiming(0.35, { duration: 900 })));
     } catch (e) {
       if (e instanceof ApiError && e.status === 429) void refreshPlan();
       toast.show(e instanceof Error ? e.message : 'No pudimos analizar la foto.', 'error');
@@ -150,7 +164,11 @@ export default function FoodPhotoScreen() {
 
       {phase.kind === 'result' ? (
         <Animated.View entering={FadeIn.duration(260)} style={{ gap: space.lg }}>
-          <Image source={{ uri: phase.uri }} style={[styles.photo, { backgroundColor: c.surfaceAlt, height: 180 }]} />
+          <Animated.View style={popStyle}>
+            <Image source={{ uri: phase.uri }} style={[styles.photo, { backgroundColor: c.surfaceAlt, height: 180 }]} />
+            <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.photoFrame, { borderColor: c.accent }, glowStyle]} />
+            <Burst play={burst} />
+          </Animated.View>
           <Row style={{ justifyContent: 'space-between' }}>
             <Badge
               label={phase.food.confidence === 'alta' ? 'Estimación confiable' : phase.food.confidence === 'media' ? 'Estimación aproximada' : 'Revisá los valores'}
@@ -212,5 +230,6 @@ function Analyzing() {
 const styles = StyleSheet.create({
   hero: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
   photo: { width: '100%', height: 260, borderRadius: radius.lg },
+  photoFrame: { borderRadius: radius.lg, borderWidth: 3 },
   analyzing: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, borderRadius: radius.lg },
 });
