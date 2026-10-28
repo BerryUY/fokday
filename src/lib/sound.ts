@@ -1,4 +1,4 @@
-import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
+import type { AudioPlayer } from 'expo-audio';
 
 /**
  * The reward "clink" (synthesized by scripts/generate-sounds.mjs). Short, mixes with music
@@ -16,6 +16,8 @@ export async function playReward(): Promise<void> {
   if (!enabled) return;
   try {
     if (!player) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { createAudioPlayer, setAudioModeAsync } = require('expo-audio') as typeof import('expo-audio');
       await setAudioModeAsync({ playsInSilentMode: false, interruptionMode: 'mixWithOthers' });
       player = createAudioPlayer(require('../../assets/sounds/reward.wav'));
       player.volume = 0.7;

@@ -1,6 +1,9 @@
 import { Platform } from 'react-native';
-import mobileAds, { AdEventType, AdsConsent, RewardedAd, RewardedAdEventType, TestIds } from 'react-native-google-mobile-ads';
 import { PUBLIC_CONFIG } from '@/config';
+
+// The AdMob SDK loads on first use, so a problem in it can never stop the app from opening.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const ads = (): typeof import('react-native-google-mobile-ads') => require('react-native-google-mobile-ads');
 
 /**
  * Optional rewarded videos: a free account watches a short video to earn one more AI photo
@@ -11,13 +14,14 @@ import { PUBLIC_CONFIG } from '@/config';
 
 export type RewardKind = 'photo' | 'barcode';
 
-const unitId = () => PUBLIC_CONFIG.admobRewardedUnitAndroid || TestIds.REWARDED;
+const unitId = () => PUBLIC_CONFIG.admobRewardedUnitAndroid || ads().TestIds.REWARDED;
 let ready: Promise<boolean> | null = null;
 
 /** Consent first (Google's UMP form when the law asks for it), then the SDK; once per launch. */
 function ensureAds(): Promise<boolean> {
   if (!ready) {
     ready = (async () => {
+      const { AdsConsent, default: mobileAds } = ads();
       try {
         await AdsConsent.gatherConsent();
       } catch {
@@ -40,6 +44,7 @@ export const videosAvailable = () => Platform.OS === 'android';
 export async function watchRewardedVideo(kind: RewardKind, accountId: string): Promise<boolean> {
   if (!videosAvailable()) throw new Error('Los videos funcionan desde el teléfono.');
   if (!(await ensureAds())) throw new Error('Sin permiso para mostrar videos. Podés cambiarlo en Ajustes → Privacidad de anuncios.');
+  const { AdEventType, RewardedAd, RewardedAdEventType } = ads();
   const ad = RewardedAd.createForAdRequest(unitId(), {
     serverSideVerificationOptions: { userId: accountId, customData: kind },
   });
@@ -72,5 +77,5 @@ export async function watchRewardedVideo(kind: RewardKind, accountId: string): P
 /** Lets the person review the ads consent choice (required where the law asks for it). */
 export async function showAdsPrivacyOptions(): Promise<void> {
   if (!videosAvailable()) return;
-  await AdsConsent.showPrivacyOptionsForm().catch(() => {});
+  await ads().AdsConsent.showPrivacyOptionsForm().catch(() => {});
 }

@@ -95,7 +95,16 @@
           "recordAudioAndroid": false
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "extraProguardRules": "-keep class * extends androidx.room.RoomDatabase { <init>(); }\n-keep class androidx.work.impl.WorkDatabase_Impl { *; }\n-keep class * extends androidx.work.ListenableWorker { <init>(android.content.Context, androidx.work.WorkerParameters); }\n-keep class * extends androidx.work.InputMerger { <init>(); }"
+          }
+        }
+      ],
+      "./plugins/withWorkManager"
     ],
     "extra": {
       "router": {

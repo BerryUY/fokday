@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { Linking, Platform } from 'react-native';
-import Purchases, { type CustomerInfo, type PurchasesPackage } from 'react-native-purchases';
+import type { CustomerInfo, PurchasesPackage } from 'react-native-purchases';
 import { cloudApi, type Quota } from '@/backup/api';
 import { getCloudConfig } from '@/backup/service';
 import { PUBLIC_CONFIG } from '@/config';
@@ -14,6 +14,10 @@ import { PUBLIC_CONFIG } from '@/config';
 export const ENTITLEMENT = 'pro';
 const ANDROID_PACKAGE = 'uy.santiago.momentum';
 const storeAvailable = Platform.OS === 'android' && !!PUBLIC_CONFIG.revenueCatAndroidKey;
+
+// Native SDKs load on first use, so a problem in one can never stop the app from opening.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const sdk = (): typeof import('react-native-purchases').default => require('react-native-purchases').default;
 
 export type PlanState = {
   pro: boolean;
@@ -61,15 +65,15 @@ export async function syncPurchasesAccount(accountId: string | null): Promise<vo
   if (!storeAvailable || configuredFor === accountId) return;
   try {
     if (configuredFor === undefined) {
-      Purchases.configure({ apiKey: PUBLIC_CONFIG.revenueCatAndroidKey, appUserID: accountId ?? undefined });
-      Purchases.addCustomerInfoUpdateListener(applyStore);
+      sdk().configure({ apiKey: PUBLIC_CONFIG.revenueCatAndroidKey, appUserID: accountId ?? undefined });
+      sdk().addCustomerInfoUpdateListener(applyStore);
     } else if (accountId) {
-      await Purchases.logIn(accountId);
+      await sdk().logIn(accountId);
     } else {
-      await Purchases.logOut().catch(() => {});
+      await sdk().logOut().catch(() => {});
     }
     configuredFor = accountId;
-    applyStore(await Purchases.getCustomerInfo());
+    applyStore(await sdk().getCustomerInfo());
   } catch {
     // Without the store the app keeps working; Pro falls back to the server's answer.
   }
@@ -102,7 +106,7 @@ export type PlanOption = { id: string; kind: 'monthly' | 'annual'; price: string
 /** Monthly and annual options with the store's local prices. */
 export async function loadPlanOptions(): Promise<PlanOption[]> {
   if (!storeAvailable) return [];
-  const offerings = await Purchases.getOfferings();
+  const offerings = await sdk().getOfferings();
   const current = offerings.current;
   if (!current) return [];
   const out: PlanOption[] = [];
@@ -120,7 +124,7 @@ export const storeReady = () => storeAvailable;
 /** Buys a plan; false when the person cancelled the Play dialog. */
 export async function buy(option: PlanOption): Promise<boolean> {
   try {
-    const { customerInfo } = await Purchases.purchasePackage(option.pkg);
+    const { customerInfo } = await sdk().purchasePackage(option.pkg);
     applyStore(customerInfo);
     await refreshPlan();
     return activeIn(customerInfo);
@@ -132,7 +136,7 @@ export async function buy(option: PlanOption): Promise<boolean> {
 
 export async function restore(): Promise<boolean> {
   if (!storeAvailable) return false;
-  const info = await Purchases.restorePurchases();
+  const info = await sdk().restorePurchases();
   applyStore(info);
   await refreshPlan();
   return activeIn(info);

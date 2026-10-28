@@ -1,4 +1,3 @@
-import { GoogleSignin, isErrorWithCode, isSuccessResponse, statusCodes } from '@react-native-google-signin/google-signin';
 import type { Session } from '@supabase/supabase-js';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
@@ -8,6 +7,10 @@ import { getSyncInfo, setLinked } from '@/backup/sync';
 import { PUBLIC_CONFIG } from '@/config';
 import type { Db } from '@/db/types';
 import { authConfigured, supabase } from './supabase';
+
+// Google's SDK loads on first use, so a problem in it can never stop the app from opening.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const google = (): typeof import('@react-native-google-signin/google-signin') => require('@react-native-google-signin/google-signin');
 
 /**
  * Optional accounts: Google or email and password (Supabase Auth). An account is what unlocks
@@ -71,6 +74,7 @@ export async function signInWithGoogle(): Promise<void> {
   ensureConfigured();
   if (Platform.OS === 'web') throw new Error('Entrar con Google funciona desde el teléfono.');
   if (!googleWebClientId()) throw new Error('Entrar con Google todavía no está activado. Usá tu email por ahora.');
+  const { GoogleSignin, isErrorWithCode, isSuccessResponse, statusCodes } = google();
   GoogleSignin.configure({ webClientId: googleWebClientId() });
   try {
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
@@ -155,7 +159,7 @@ export async function finishSignIn(db: Db): Promise<LinkChoice | null> {
 }
 
 export async function signOut(db: Db): Promise<void> {
-  if (Platform.OS !== 'web' && googleWebClientId()) await GoogleSignin.signOut().catch(() => {});
+  if (Platform.OS !== 'web' && googleWebClientId()) await Promise.resolve().then(() => google().GoogleSignin.signOut()).catch(() => {});
   await supabase.auth.signOut().catch(() => {});
   await clearLegacyConfig();
   await setLinked(db, false);
