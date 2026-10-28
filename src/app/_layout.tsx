@@ -15,6 +15,7 @@ import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { startBackupService } from '@/backup/service';
 import { DialogHost } from '@/components/ui/dialog';
+import { PortalProvider } from '@/components/ui/portal';
 import { getProfile, type ThemePreference } from '@/data/settings';
 import { applyReminders } from '@/notifications/schedule';
 import { openAppDatabase } from '@/db/client';
@@ -83,9 +84,12 @@ function ThemedApp() {
 
   return (
     <ThemeProvider preference={preference}>
+      {/* Layers, bottom to top: screens → sheets → dialogs → toasts (ToastProvider draws last). */}
       <ToastProvider>
-        <Navigator />
-        <DialogHost />
+        <PortalProvider>
+          <Navigator />
+          <DialogHost />
+        </PortalProvider>
       </ToastProvider>
     </ThemeProvider>
   );

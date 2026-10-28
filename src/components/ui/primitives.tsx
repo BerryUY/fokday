@@ -13,6 +13,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { MOTION } from './motion';
 import { haptic } from '@/state/toast';
 import { useColors } from '@/theme/ThemeProvider';
 import { font, radius, space, type, type Palette, type TypeVariant } from '@/theme/tokens';
@@ -52,7 +53,8 @@ export function PressableScale({ style, children, onPressIn, onPressOut, scaleTo
   hapticFeedback?: boolean;
 }) {
   const scale = useSharedValue(1);
-  const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  // Pressed state: a touch smaller and dimmer, eased in and out (no spring, no bounce).
+  const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }], opacity: 1 - (1 - scale.value) * 2.5 }));
   return (
     <AnimatedPressable
       {...rest}
@@ -61,11 +63,11 @@ export function PressableScale({ style, children, onPressIn, onPressOut, scaleTo
         onPress?.(e);
       }}
       onPressIn={(e) => {
-        scale.value = withTiming(scaleTo, { duration: 90 });
+        scale.value = withTiming(scaleTo, MOTION.press);
         onPressIn?.(e);
       }}
       onPressOut={(e) => {
-        scale.value = withTiming(1, { duration: 120 });
+        scale.value = withTiming(1, MOTION.enter);
         onPressOut?.(e);
       }}
       style={[style, animated]}
@@ -99,7 +101,8 @@ export function Card({ children, style, onPress, padded = true, tone = 'surface'
 
 // ---------- Buttons ----------
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+/** danger = soft red (cancel, remove); dangerSolid = filled red for the final destructive confirm. */
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerSolid';
 
 export function Button({ label, onPress, variant = 'primary', icon, loading, disabled, size = 'md', style, full }: {
   label: string;
@@ -113,8 +116,8 @@ export function Button({ label, onPress, variant = 'primary', icon, loading, dis
   full?: boolean;
 }) {
   const c = useColors();
-  const bg = variant === 'primary' ? c.accent : variant === 'secondary' ? c.surfaceAlt : variant === 'danger' ? c.dangerSoft : 'transparent';
-  const fg = variant === 'primary' ? c.accentText : variant === 'danger' ? c.danger : variant === 'ghost' ? c.textMuted : c.text;
+  const bg = variant === 'primary' ? c.accent : variant === 'secondary' ? c.surfaceAlt : variant === 'danger' ? c.dangerSoft : variant === 'dangerSolid' ? c.danger : 'transparent';
+  const fg = variant === 'primary' ? c.accentText : variant === 'danger' ? c.danger : variant === 'dangerSolid' ? '#FFFFFF' : variant === 'ghost' ? c.textMuted : c.text;
   const height = size === 'lg' ? 56 : size === 'sm' ? 38 : 48;
   const inactive = disabled || loading;
   return (

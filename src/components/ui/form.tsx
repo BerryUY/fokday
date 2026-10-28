@@ -1,11 +1,13 @@
 import { Feather } from '@expo/vector-icons';
 import { forwardRef, type ComponentRef, type ReactNode } from 'react';
-import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
-import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/theme/ThemeProvider';
 import { font, radius, space } from '@/theme/tokens';
 import { showConfirm } from './dialog';
+import { useBackToClose, usePresence } from './motion';
+import { Portal } from './portal';
 import { PressableScale, T } from './primitives';
 
 export const Field = forwardRef<ComponentRef<typeof TextInput>, TextInputProps & { label?: string; suffix?: string; hint?: string; large?: boolean; error?: string | null }>(
@@ -60,19 +62,29 @@ export function Stepper({ value, onChange, min = 0, max = 99, step = 1, format }
   );
 }
 
-/** Bottom sheet built on Modal: dimmed backdrop, slides up, closes on backdrop tap. */
+/**
+ * Bottom sheet in the app's overlay layer: dimmed backdrop, slides up and back down, closes on
+ * backdrop tap or the Android back button. Toasts stay visible above it.
+ */
 export function Sheet({ visible, onClose, title, children }: { visible: boolean; onClose: () => void; title?: string; children: ReactNode }) {
   const c = useColors();
   const insets = useSafeAreaInsets();
+  const { mounted, progress } = usePresence(visible);
+  const height = useSharedValue(600);
+  useBackToClose(visible, onClose);
+  const backdrop = useAnimatedStyle(() => ({ opacity: progress.value }));
+  const panel = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - progress.value) * height.value }] }));
+  if (!mounted) return null;
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
-      <Animated.View entering={FadeIn.duration(160)} style={[StyleSheet.absoluteFill, { backgroundColor: c.overlay }]}>
-        <Pressable style={{ flex: 1 }} onPress={onClose} accessibilityLabel="Cerrar" />
+    <Portal>
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: c.overlay }, backdrop]}>
+        <Pressable style={{ flex: 1 }} onPress={onClose} accessibilityLabel="Cerrar" disabled={!visible} />
       </Animated.View>
       <KeyboardAvoidingView behavior="padding" pointerEvents="box-none" style={styles.sheetWrap}>
         <Animated.View
-          entering={SlideInDown.duration(220)}
-          style={[styles.sheet, { backgroundColor: c.surface, paddingBottom: insets.bottom + space.lg }]}
+          onLayout={(e) => (height.value = e.nativeEvent.layout.height + 40)}
+          pointerEvents={visible ? 'auto' : 'none'}
+          style={[styles.sheet, { backgroundColor: c.surface, paddingBottom: insets.bottom + space.lg }, panel]}
         >
           <View style={[styles.grabber, { backgroundColor: c.border }]} />
           {title ? <T variant="h2" style={{ marginBottom: space.lg }}>{title}</T> : null}
@@ -81,7 +93,7 @@ export function Sheet({ visible, onClose, title, children }: { visible: boolean;
           </ScrollView>
         </Animated.View>
       </KeyboardAvoidingView>
-    </Modal>
+    </Portal>
   );
 }
 
