@@ -44,29 +44,31 @@ export default function ExploreExercisesScreen() {
   const [limit, setLimit] = useState(PAGE);
   const [selected, setSelected] = useState<CatalogExercise | null>(null);
 
-  const load = () => {
+  const load = () => loadExerciseCatalog().then(setAll).catch((e: Error) => setError(e.message));
+  useEffect(() => {
+    void load();
+  }, []);
+  const retry = () => {
     setError(null);
-    loadExerciseCatalog().then(setAll).catch((e: Error) => setError(e.message));
+    void load();
   };
-  useEffect(load, []);
 
   const results = useMemo(() => (all ? searchCatalog(all, query, filter) : []), [all, query, filter]);
-  useEffect(() => setLimit(PAGE), [query, filter]);
 
   return (
     <Screen title="Guía de ejercicios" subtitle={all ? `${all.length} ejercicios con fotos` : undefined}>
-      <Field value={query} onChangeText={setQuery} placeholder="Buscar: bench, sentadilla, pecho, mancuernas…" returnKeyType="search" />
+      <Field value={query} onChangeText={(q) => { setQuery(q); setLimit(PAGE); }} placeholder="Buscar: bench, sentadilla, pecho, mancuernas…" returnKeyType="search" />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: space.md }} style={{ marginHorizontal: -space.lg }}>
         <View style={{ width: space.lg - 6 }} />
-        <Chip label="Todos" compact selected={!filter} onPress={() => setFilter(null)} />
+        <Chip label="Todos" compact selected={!filter} onPress={() => { setFilter(null); setLimit(PAGE); }} />
         {CATALOG_FILTERS.map((f) => (
-          <Chip key={f} label={f} compact selected={filter === f} onPress={() => setFilter(filter === f ? null : f)} />
+          <Chip key={f} label={f} compact selected={filter === f} onPress={() => { setFilter(filter === f ? null : f); setLimit(PAGE); }} />
         ))}
         <View style={{ width: space.lg - 6 }} />
       </ScrollView>
 
       {error ? (
-        <EmptyState icon="wifi-off" title="Sin conexión" message={error} action={<Button label="Reintentar" icon="refresh-cw" onPress={load} />} />
+        <EmptyState icon="wifi-off" title="Sin conexión" message={error} action={<Button label="Reintentar" icon="refresh-cw" onPress={retry} />} />
       ) : !all ? (
         <Loading />
       ) : results.length === 0 ? (

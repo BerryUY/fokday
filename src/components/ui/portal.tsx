@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useId, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 /**
@@ -44,8 +44,6 @@ export function PortalProvider({ children }: { children: ReactNode }) {
 export function Portal({ children }: { children: ReactNode }) {
   const api = useContext(PortalContext);
   const key = useId();
-  const latest = useRef(children);
-  latest.current = children;
   useLayoutEffect(() => {
     api?.set(key, children);
   });

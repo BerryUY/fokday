@@ -1,25 +1,24 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { getProfile, getSetting, setSetting } from '@/data/settings';
+import { getMeta, setMeta } from '@/backup/snapshot';
+import { getAttendance } from '@/data/attendance';
+import { getHabits } from '@/data/habits';
+import { getLogsForDate } from '@/data/meals';
+import { getProfile, isOnboarded } from '@/data/settings';
+import { listTodos } from '@/data/todos';
+import { listWeights } from '@/data/weight';
 import type { Db } from '@/db/types';
-import { parseReminders, planReminders, type PlannedNotification, type RemindersConfig } from './plan';
+import { latestEntry } from '@/domain/weight';
+import { todayKey } from '@/lib/dates';
+import { planReminders, type PlannedNotification } from './plan';
 
 const CHANNEL_ID = 'recordatorios';
-const SETTING_KEY = 'reminders.config';
 
 // Show reminders even while the app is open.
 if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false }),
+    handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
   });
-}
-
-export async function getReminders(db: Db): Promise<RemindersConfig> {
-  return parseReminders(await getSetting(db, SETTING_KEY));
-}
-
-export async function saveReminders(db: Db, config: RemindersConfig): Promise<void> {
-  await setSetting(db, SETTING_KEY, JSON.stringify(config));
 }
 
 async function ensureChannel() {
@@ -27,44 +26,64 @@ async function ensureChannel() {
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
     name: 'Recordatorios',
     // eslint-disable-next-line import/namespace -- re-exported enum the import plugin can't follow; tsc checks it
-    importance: Notifications.AndroidImportance.DEFAULT,
+    importance: Notifications.AndroidImportance.HIGH,
   });
 }
 
-/** Asks Android for permission (needs the channel to exist first on Android 13+). */
-export async function requestReminderPermission(): Promise<boolean> {
-  if (Platform.OS === 'web') return false;
+/**
+ * Asks for permission once, right after the welcome screen (Android 13+ needs the channel
+ * to exist first). Never nags again: if the person says no, the app simply doesn't remind.
+ */
+async function ensurePermission(db: Db): Promise<boolean> {
   await ensureChannel();
   const current = await Notifications.getPermissionsAsync();
   if (current.status === 'granted') return true;
+  if ((await getMeta(db, 'notifications_asked')) === '1' || !current.canAskAgain) return false;
+  await setMeta(db, 'notifications_asked', '1');
   return (await Notifications.requestPermissionsAsync()).status === 'granted';
 }
 
-function toTrigger(p: PlannedNotification): Notifications.NotificationTriggerInput {
-  return p.trigger.type === 'weekly'
-    ? { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday: p.trigger.weekday, hour: p.trigger.hour, minute: p.trigger.minute, channelId: CHANNEL_ID }
-    : { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: p.trigger.hour, minute: p.trigger.minute, channelId: CHANNEL_ID };
+async function currentPlan(db: Db): Promise<PlannedNotification[]> {
+  const today = todayKey();
+  const [profile, attendance, logs, habits, todos, weights] = await Promise.all([
+    getProfile(db),
+    getAttendance(db, today),
+    getLogsForDate(db, today),
+    getHabits(db, today),
+    listTodos(db, today),
+    listWeights(db),
+  ]);
+  return planReminders({
+    now: new Date(),
+    features: profile.features,
+    trainingDays: profile.trainingDays,
+    attendedToday: !!attendance,
+    mealsLoggedToday: logs.length,
+    waterMlToday: habits.waterMl,
+    waterGoalMl: profile.waterGoalMl,
+    creatineToday: habits.creatine,
+    pendingTodosToday: todos.filter((t) => !t.done).length,
+    lastWeightDate: latestEntry(weights)?.date ?? null,
+  });
 }
 
 let lastApplied = '';
 
-/**
- * Replaces every scheduled reminder with what the settings call for. Nothing is scheduled
- * without permission; this never asks for it (the settings screen does, when a switch is turned on).
- */
+/** Replaces every scheduled reminder with the current plan. Skipped when nothing changed. */
 export async function applyReminders(db: Db, opts: { force?: boolean } = {}): Promise<void> {
-  if (Platform.OS === 'web') return;
-  const [config, profile] = await Promise.all([getReminders(db), getProfile(db)]);
-  const planned = planReminders(config, profile.features, profile.trainingDays);
-  const signature = JSON.stringify(planned);
+  if (Platform.OS === 'web' || !(await isOnboarded(db))) return;
+  if (!(await ensurePermission(db))) return;
+  const planned = await currentPlan(db);
+  const signature = JSON.stringify(planned.map((p) => [p.id, p.at.getTime()]));
   if (!opts.force && signature === lastApplied) return;
 
   await Notifications.cancelAllScheduledNotificationsAsync();
-  if (planned.length > 0 && (await Notifications.getPermissionsAsync()).status === 'granted') {
-    await ensureChannel();
-    for (const p of planned) {
-      await Notifications.scheduleNotificationAsync({ identifier: p.id, content: { title: p.title, body: p.body }, trigger: toTrigger(p) });
-    }
+  for (const p of planned) {
+    await Notifications.scheduleNotificationAsync({
+      identifier: p.id,
+      content: { title: p.title, body: p.body },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: p.at, channelId: CHANNEL_ID },
+    });
   }
   lastApplied = signature;
 }

@@ -8,15 +8,12 @@ import { ListRow, Loading, Screen } from '@/components/ui/layout';
 import { Button, Card, Chip, Divider, Row, SectionHeader, Segmented, T } from '@/components/ui/primitives';
 import { getGoalForDate, getProfile, HABIT_FEATURES, setGoalsFrom, updateProfile, type FeatureKey, type Profile, type ThemePreference } from '@/data/settings';
 import { EXTRA_NUTRIENTS } from '@/domain/nutrition';
-import { formatMinutes, REMINDER_DEFS, type ReminderKey } from '@/notifications/plan';
-import { applyReminders, getReminders, requestReminderPermission, saveReminders } from '@/notifications/schedule';
 import { useColors } from '@/theme/ThemeProvider';
 import { listWeights, saveWeight } from '@/data/weight';
 import { latestEntry } from '@/domain/weight';
 import { DAY_SHORT, formatDateTime, formatShort, todayKey, WEEK_ORDER } from '@/lib/dates';
 import { formatKg, formatLiters, parsePositive, toInput } from '@/lib/format';
-import { useDb, useMutation, useQuery } from '@/state/db';
-import { useToast } from '@/state/toast';
+import { useMutation, useQuery } from '@/state/db';
 import { space } from '@/theme/tokens';
 
 const OPTIONAL_FEATURES: { key: FeatureKey; label: string; description: string }[] = [
@@ -40,11 +37,8 @@ function SettingsForm({ profile, calories, protein, latest }: {
   latest: { date: string; weight: number } | null;
 }) {
   const c = useColors();
-  const db = useDb();
-  const toast = useToast();
   const run = useMutation();
   const sync = useSyncState();
-  const { data: reminders } = useQuery((d) => getReminders(d), []);
   const [name, setName] = useState(profile.name);
   const [start, setStart] = useState(toInput(profile.startWeight, 1));
   const [target, setTarget] = useState(toInput(profile.targetWeight, 1));
@@ -74,17 +68,6 @@ function SettingsForm({ profile, calories, protein, latest }: {
   const toggleDay = (d: number) => {
     const days = profile.trainingDays.includes(d) ? profile.trainingDays.filter((x) => x !== d) : [...profile.trainingDays, d];
     run((db) => updateProfile(db, { trainingDays: days }));
-  };
-
-  const changeReminder = async (key: ReminderKey, patch: { on?: boolean; minutes?: number }) => {
-    if (!reminders) return;
-    if (patch.on && !(await requestReminderPermission())) {
-      toast.show('Permití las notificaciones de Momentum en los ajustes del teléfono para recibir recordatorios.', 'error');
-      return;
-    }
-    const next = { ...reminders, [key]: { ...reminders[key], ...patch } };
-    await run((d) => saveReminders(d, next), { silent: true });
-    await applyReminders(db).catch(() => {});
   };
 
   const lastBackup = sync.info?.lastBackupAt;
@@ -194,35 +177,10 @@ function SettingsForm({ profile, calories, protein, latest }: {
         ))}
       </Card>
 
-      <SectionHeader title="Recordatorios" style={{ marginTop: space.xl }} />
-      <Card>
-        <T variant="caption" tone="dim" style={{ marginBottom: space.md }}>
-          Avisos en el celular a la hora que elijas. Todos arrancan apagados.
+      <Card tone="alt" style={{ marginTop: space.xl }}>
+        <T variant="caption" tone="muted">
+          Los recordatorios son automáticos: te avisamos solo lo que falta (gym, comidas, agua, creatina, tareas) y en un buen horario. Podés silenciarlos desde los ajustes de notificaciones del teléfono.
         </T>
-        {REMINDER_DEFS.filter((d) => !('needs' in d) || profile.features.includes(d.needs)).map((d, i) => (
-          <View key={d.key}>
-            {i > 0 ? <Divider style={{ marginVertical: space.md }} /> : null}
-            <Row style={{ justifyContent: 'space-between' }}>
-              <View style={{ flex: 1, paddingRight: space.md }}>
-                <T variant="bodyMedium">{d.label}</T>
-                <T variant="caption" tone="dim">{d.key === 'gym' && profile.trainingDays.length === 0 ? 'Marcá tus días de gym más arriba' : d.description}</T>
-              </View>
-              <Switch
-                value={!!reminders?.[d.key].on}
-                onValueChange={(on) => void changeReminder(d.key, { on })}
-                trackColor={{ true: c.accent, false: c.track }}
-                thumbColor="#FFFFFF"
-                accessibilityLabel={`Recordatorio: ${d.label}`}
-              />
-            </Row>
-            {reminders?.[d.key].on ? (
-              <Row style={{ justifyContent: 'space-between', marginTop: space.md }}>
-                <T variant="label" tone="muted">Hora</T>
-                <Stepper value={reminders[d.key].minutes} onChange={(v) => void changeReminder(d.key, { minutes: v })} min={0} max={1425} step={15} format={formatMinutes} />
-              </Row>
-            ) : null}
-          </View>
-        ))}
       </Card>
 
       <SectionHeader title="Apariencia" style={{ marginTop: space.xl }} />

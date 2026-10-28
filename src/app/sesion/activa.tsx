@@ -11,7 +11,7 @@ import { Button, Row, T } from '@/components/ui/primitives';
 import { getProfile } from '@/data/settings';
 import { cancelSession, finishSession, getActiveSession, getPreviousPerformance, getSession, type PreviousPerformance } from '@/data/workouts';
 import { formatDuration } from '@/lib/dates';
-import { useDb, useMutation, useQuery } from '@/state/db';
+import { useMutation, useQuery } from '@/state/db';
 import { haptic } from '@/state/toast';
 import { useColors } from '@/theme/ThemeProvider';
 import { radius, space } from '@/theme/tokens';
@@ -22,7 +22,6 @@ import { radius, space } from '@/theme/tokens';
  */
 export default function ActiveSessionScreen() {
   const c = useColors();
-  const db = useDb();
   const run = useMutation();
   const [now, setNow] = useState(Date.now());
   const [rest, setRest] = useState<{ endsAt: number; total: number } | null>(null);

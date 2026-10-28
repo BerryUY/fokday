@@ -17,9 +17,10 @@ export const MOTION = {
 export function usePresence(visible: boolean): { mounted: boolean; progress: SharedValue<number> } {
   const [mounted, setMounted] = useState(visible);
   const progress = useSharedValue(0);
+  // Mount as soon as it opens (state adjusted during render, React's recommended pattern).
+  if (visible && !mounted) setMounted(true);
   useEffect(() => {
     if (visible) {
-      setMounted(true);
       progress.value = withTiming(1, MOTION.enter);
     } else {
       progress.value = withTiming(0, MOTION.exit, (finished) => {

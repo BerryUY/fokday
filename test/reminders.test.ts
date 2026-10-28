@@ -1,49 +1,58 @@
-import { defaultReminders, formatMinutes, parseReminders, planReminders } from '../src/notifications/plan';
+import { planReminders, type ReminderState } from '../src/notifications/plan';
 
-describe('reminders plan', () => {
-  it('plans nothing by default', () => {
-    expect(planReminders(defaultReminders(), ['water', 'creatine'], [1, 3])).toEqual([]);
-  });
+// Tuesday 2026-10-27, 09:00 local.
+const base: ReminderState = {
+  now: new Date(2026, 9, 27, 9, 0),
+  features: [],
+  trainingDays: [],
+  attendedToday: false,
+  mealsLoggedToday: 0,
+  waterMlToday: 0,
+  waterGoalMl: 2500,
+  creatineToday: false,
+  pendingTodosToday: 0,
+  lastWeightDate: '2026-10-31',
+};
+const ids = (s: Partial<ReminderState>) => planReminders({ ...base, ...s }).map((n) => n.id);
 
-  it('plans daily reminders at the chosen time', () => {
-    const config = defaultReminders();
-    config.meals = { on: true, minutes: 20 * 60 + 30 };
-    expect(planReminders(config, [], [])).toEqual([
-      { id: 'meals', title: expect.any(String), body: expect.any(String), trigger: { type: 'daily', hour: 20, minute: 30 } },
+describe('automatic reminders', () => {
+  it('only plans the meals reminder by default, one per day for a week', () => {
+    expect(ids({})).toEqual([
+      'meals-2026-10-27', 'meals-2026-10-28', 'meals-2026-10-29', 'meals-2026-10-30', 'meals-2026-10-31', 'meals-2026-11-01', 'meals-2026-11-02',
     ]);
   });
 
-  it('plans one weekly reminder per training day, using Expo weekdays (domingo = 1)', () => {
-    const config = defaultReminders();
-    config.gym = { on: true, minutes: 18 * 60 };
-    const planned = planReminders(config, [], [1, 3, 0, 1]);
-    expect(planned.map((p) => [p.id, p.trigger])).toEqual([
-      ['gym-0', { type: 'weekly', weekday: 1, hour: 18, minute: 0 }],
-      ['gym-1', { type: 'weekly', weekday: 2, hour: 18, minute: 0 }],
-      ['gym-3', { type: 'weekly', weekday: 4, hour: 18, minute: 0 }],
-    ]);
-    expect(planReminders(config, [], [])).toEqual([]);
+  it('skips today\'s reminder once the thing is done', () => {
+    expect(ids({ mealsLoggedToday: 3 })).not.toContain('meals-2026-10-27');
+    const withCreatine = ids({ features: ['creatine'] });
+    expect(withCreatine).toContain('creatine-2026-10-27');
+    expect(ids({ features: ['creatine'], creatineToday: true })).not.toContain('creatine-2026-10-27');
+    expect(ids({ features: ['creatine'], creatineToday: true })).toContain('creatine-2026-10-28');
   });
 
-  it('skips water and creatine reminders when those trackers are off', () => {
-    const config = defaultReminders();
-    config.water = { on: true, minutes: 15 * 60 };
-    config.creatine = { on: true, minutes: 9 * 60 };
-    expect(planReminders(config, [], []).map((p) => p.id)).toEqual([]);
-    expect(planReminders(config, ['water'], []).map((p) => p.id)).toEqual(['water']);
-    expect(planReminders(config, ['water', 'creatine'], []).map((p) => p.id)).toEqual(['water', 'creatine']);
+  it('reminds the gym only on training days, unless you already went', () => {
+    const gym = ids({ trainingDays: [2, 4] }).filter((i) => i.startsWith('gym'));
+    expect(gym).toEqual(['gym-2026-10-27', 'gym-2026-10-29']);
+    expect(ids({ trainingDays: [2, 4], attendedToday: true })).not.toContain('gym-2026-10-27');
   });
 
-  it('parses stored settings defensively', () => {
-    expect(parseReminders(null)).toEqual(defaultReminders());
-    expect(parseReminders('no es json')).toEqual(defaultReminders());
-    const parsed = parseReminders(JSON.stringify({ gym: { on: true, minutes: 7 * 60 }, meals: { on: 'si', minutes: 99999 }, bogus: { on: true } }));
-    expect(parsed.gym).toEqual({ on: true, minutes: 420 });
-    expect(parsed.meals).toEqual(defaultReminders().meals);
+  it('nudges water only while behind, and only if water is on', () => {
+    expect(ids({ waterMlToday: 0 }).some((i) => i.startsWith('water'))).toBe(false);
+    expect(ids({ features: ['water'] })).toEqual(expect.arrayContaining(['water-am-2026-10-27', 'water-pm-2026-10-27']));
+    expect(ids({ features: ['water'], waterMlToday: 1200 })).not.toContain('water-am-2026-10-27');
+    expect(ids({ features: ['water'], waterMlToday: 1200 })).toContain('water-pm-2026-10-27');
   });
 
-  it('formats times', () => {
-    expect(formatMinutes(9 * 60 + 5)).toBe('09:05');
-    expect(formatMinutes(21 * 60)).toBe('21:00');
+  it('never plans anything in the past', () => {
+    const late = planReminders({ ...base, now: new Date(2026, 9, 27, 22, 0), features: ['creatine', 'water'], trainingDays: [2] });
+    expect(late.every((n) => n.at.getTime() > new Date(2026, 9, 27, 22, 0).getTime())).toBe(true);
+    expect(late.map((n) => n.id)).not.toContain('gym-2026-10-27');
+  });
+
+  it('reminds pending to-dos today and a weekly weigh-in when it is due', () => {
+    expect(ids({ pendingTodosToday: 2 })).toContain('todos-2026-10-27');
+    expect(ids({ lastWeightDate: '2026-10-30' }).some((i) => i.startsWith('weight'))).toBe(false);
+    expect(ids({ lastWeightDate: '2026-10-19' })).toContain('weight-2026-11-02');
+    expect(ids({ lastWeightDate: null })).toContain('weight-2026-11-02');
   });
 });
