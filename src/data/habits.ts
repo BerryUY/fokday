@@ -1,5 +1,5 @@
 import type { Db } from '@/db/types';
-import { nowIso, type DateKey } from '@/lib/dates';
+import { addDays, nowIso, type DateKey } from '@/lib/dates';
 
 export type DailyHabits = { creatine: boolean; waterMl: number };
 
@@ -31,4 +31,17 @@ export async function addWater(db: Db, date: DateKey, deltaMl: number): Promise<
     [date, next, nowIso()],
   );
   return next;
+}
+
+/** Consecutive days with creatine up to today (today counts only once it's marked). */
+export async function creatineStreak(db: Db, today: DateKey): Promise<number> {
+  const rows = await db.getAllAsync<{ date: string }>('SELECT date FROM daily_habits WHERE creatine = 1 AND date <= ? ORDER BY date DESC LIMIT 400', [today]);
+  const taken = new Set(rows.map((r) => r.date));
+  let day = taken.has(today) ? today : addDays(today, -1);
+  let streak = 0;
+  while (taken.has(day)) {
+    streak++;
+    day = addDays(day, -1);
+  }
+  return streak;
 }

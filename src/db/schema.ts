@@ -23,10 +23,10 @@ const V1_TABLES = [
   'daily_notes',
 ] as const;
 
-export const DATA_TABLES = [...V1_TABLES, 'daily_habits', 'activities'] as const;
+export const DATA_TABLES = [...V1_TABLES, 'daily_habits', 'activities', 'daily_todos'] as const;
 
 /** Schema version that introduced a table: older backups simply don't have it. */
-export const TABLE_ADDED_IN: Partial<Record<(typeof DATA_TABLES)[number], number>> = { daily_habits: 2, activities: 2 };
+export const TABLE_ADDED_IN: Partial<Record<(typeof DATA_TABLES)[number], number>> = { daily_habits: 2, activities: 2, daily_todos: 3 };
 
 export type DataTable = (typeof DATA_TABLES)[number];
 
@@ -271,9 +271,25 @@ CREATE TABLE activities (
 CREATE INDEX idx_activities_date ON activities (date);
 `;
 
+// A simple to-do list per day ("Para hoy").
+const V3 = `
+CREATE TABLE daily_todos (
+  id TEXT PRIMARY KEY NOT NULL,
+  date TEXT NOT NULL,
+  text TEXT NOT NULL,
+  done INTEGER NOT NULL DEFAULT 0,
+  position INTEGER NOT NULL DEFAULT 0,
+  done_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX idx_daily_todos_date ON daily_todos (date, position);
+`;
+
 export const MIGRATIONS: Migration[] = [
   { version: 1, name: 'initial schema', sql: V1 + '\n' + revisionTriggers(V1_TABLES) },
   { version: 2, name: 'optional tracking and activities', sql: V2 + '\n' + revisionTriggers(['daily_habits', 'activities']) },
+  { version: 3, name: 'daily to-do list', sql: V3 + '\n' + revisionTriggers(['daily_todos']) },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

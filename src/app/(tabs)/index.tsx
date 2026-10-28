@@ -7,6 +7,7 @@ import { useSyncState } from '@/backup/service';
 import { WeekStrip } from '@/components/calendar';
 import { ExtraTotals } from '@/components/ExtraTotals';
 import { HabitsCard } from '@/components/HabitsCard';
+import { TodoCard } from '@/components/TodoCard';
 import { NutritionRings } from '@/components/nutrition';
 import { Loading, Screen } from '@/components/ui/layout';
 import { Badge, Button, Card, IconButton, PressableScale, Row, SectionHeader, T } from '@/components/ui/primitives';
@@ -64,8 +65,12 @@ export default function HomeScreen() {
         <IconButton icon="settings" label="Ajustes" onPress={() => router.push('/ajustes')} />
       </Row>
 
-      <Animated.View entering={FadeInDown.duration(380)}>
-        <WeightGoalCard progress={progress} lastDate={last?.date ?? null} onPress={() => router.push('/peso')} onLog={() => router.push('/peso/registrar')} />
+      <Animated.View entering={FadeInDown.duration(320)}>
+        <HabitsCard date={today} />
+      </Animated.View>
+
+      <Animated.View entering={FadeInDown.delay(50).duration(320)} style={{ marginTop: space.lg }}>
+        <TodoCard date={today} />
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(70).duration(380)} style={{ marginTop: space.lg }}>
@@ -78,10 +83,6 @@ export default function HomeScreen() {
           <ExtraTotals extras={totals.extras} />
           <Button label="Registrar comida" icon="plus" onPress={() => router.push('/comidas')} style={{ marginTop: space.xl }} />
         </Card>
-      </Animated.View>
-
-      <Animated.View entering={FadeInDown.delay(100).duration(380)} style={{ marginTop: space.lg }}>
-        <HabitsCard date={today} />
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(140).duration(380)} style={{ marginTop: space.lg }}>
@@ -119,6 +120,10 @@ export default function HomeScreen() {
             )}
           </View>
         </Card>
+      </Animated.View>
+
+      <Animated.View entering={FadeInDown.delay(180).duration(380)} style={{ marginTop: space.lg }}>
+        <WeightGoalCard progress={progress} lastDate={last?.date ?? null} onPress={() => router.push('/peso')} onLog={() => router.push('/peso/registrar')} />
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(210).duration(380)} style={{ marginTop: space.lg }}>

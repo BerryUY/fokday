@@ -1,4 +1,4 @@
-import { addWater, getHabits, setCreatine } from '@/data/habits';
+import { addWater, creatineStreak, getHabits, setCreatine } from '@/data/habits';
 import { getLogsForDate, getDailyTotals, logMeal, repeatMealLog, saveMeal, getMeal, duplicateDay } from '@/data/meals';
 import { completeOnboarding, getProfile, isOnboarded, updateProfile } from '@/data/settings';
 import { parseExtras, serializeExtras } from '@/domain/nutrition';
@@ -95,5 +95,17 @@ describe('optional tracking', () => {
     const third = await createTestDb();
     await restoreSnapshot(third, legacy.snapshot);
     expect(await getHabits(third, '2026-10-21')).toEqual({ creatine: false, waterMl: 0 });
+  });
+});
+
+describe('creatine streak', () => {
+  it('counts consecutive days, today only once marked', async () => {
+    const db = await createTestDb();
+    for (const d of ['2026-10-24', '2026-10-25', '2026-10-26', '2026-10-27']) await setCreatine(db, d, true);
+    expect(await creatineStreak(db, '2026-10-28')).toBe(4);
+    await setCreatine(db, '2026-10-28', true);
+    expect(await creatineStreak(db, '2026-10-28')).toBe(5);
+    await setCreatine(db, '2026-10-26', false);
+    expect(await creatineStreak(db, '2026-10-28')).toBe(2);
   });
 });
