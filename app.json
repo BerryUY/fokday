@@ -7,7 +7,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "backgroundColor": "#0A0A0B",
+    "backgroundColor": "#0B0C0E",
     "ios": {
       "supportsTablet": false
     },
@@ -16,7 +16,7 @@
       "allowBackup": true,
       "versionCode": 3,
       "adaptiveIcon": {
-        "backgroundColor": "#0A0A0B",
+        "backgroundColor": "#0B0C0E",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
@@ -53,7 +53,7 @@
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#C8F560",
+          "color": "#2CF07A",
           "defaultChannel": "recordatorios"
         }
       ],
@@ -73,9 +73,9 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
-          "imageWidth": 120,
+          "imageWidth": 140,
           "resizeMode": "contain",
-          "backgroundColor": "#0A0A0B"
+          "backgroundColor": "#0B0C0E"
         }
       ],
       "expo-sharing",

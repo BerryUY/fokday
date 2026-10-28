@@ -13,11 +13,14 @@ type ToastApi = { show: (message: string, kind?: Kind) => void };
 
 const ToastContext = createContext<ToastApi>({ show: () => {} });
 
-export function haptic(kind: 'success' | 'light' | 'warning' = 'light') {
+export function haptic(kind: 'success' | 'light' | 'medium' | 'heavy' | 'warning' = 'light') {
   if (Platform.OS === 'web') return;
   if (kind === 'success') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   else if (kind === 'warning') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-  else void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  else {
+    const style = kind === 'heavy' ? Haptics.ImpactFeedbackStyle.Heavy : kind === 'medium' ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light;
+    void Haptics.impactAsync(style).catch(() => {});
+  }
 }
 
 export function ToastProvider({ children }: { children: ReactNode }) {

@@ -10,12 +10,13 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAccount } from '@/auth/account';
 import { startBackupService } from '@/backup/service';
 import { refreshPlan, syncPurchasesAccount, usePro } from '@/billing/pro';
+import { LaunchAnimation } from '@/components/brand/LaunchAnimation';
 import { DialogHost } from '@/components/ui/dialog';
 import { PortalProvider } from '@/components/ui/portal';
 import { getProfile, type ThemePreference } from '@/data/settings';
@@ -77,6 +78,8 @@ function ThemedApp() {
   const [accent, setAccent] = useState<AccentKey>('lima');
   const { account, loading } = useAccount();
   const pro = usePro();
+  const [launching, setLaunching] = useState(true);
+  const launched = useCallback(() => setLaunching(false), []);
 
   useEffect(() => {
     getProfile(db)
@@ -108,6 +111,8 @@ function ThemedApp() {
           <DialogHost />
         </PortalProvider>
       </ToastProvider>
+      {/* Same background as the native splash, so the hand-off is seamless. */}
+      {launching ? <LaunchAnimation background="#0B0C0E" onDone={launched} /> : null}
     </ThemeProvider>
   );
 }

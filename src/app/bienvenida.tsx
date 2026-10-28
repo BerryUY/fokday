@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { finishSignIn, signInWithGoogle, useAccount, type LinkChoice } from '@/auth/account';
 import { authConfigured } from '@/auth/supabase';
 import { LinkChoiceSheet } from '@/components/CloudLink';
+import { FokDayMark } from '@/components/brand/FokDayMark';
 import { Button, Chip, IconButton, Row, T } from '@/components/ui/primitives';
 import { completeOnboarding, isOnboarded, updateProfile, type FeatureKey } from '@/data/settings';
 import { EXTRA_NUTRIENTS } from '@/domain/nutrition';
@@ -532,17 +533,10 @@ function SummaryRow({ icon, label, value }: { icon: IconName; label: string; val
 
 /** The app mark (three rising bars) drawn with views, so it needs no image. */
 function BrandMark() {
-  const c = useColors();
   return (
-    <View style={[styles.mark, { backgroundColor: c.surface, borderColor: c.border }]}>
-      {[0.45, 0.72, 1].map((alpha, i) => (
-        <Animated.View
-          key={i}
-          entering={FadeIn.delay(120 * i).duration(320)}
-          style={{ width: 16, height: 22 + i * 14, borderRadius: 8, backgroundColor: c.accent, opacity: alpha }}
-        />
-      ))}
-    </View>
+    <Animated.View entering={FadeIn.duration(400)}>
+      <FokDayMark size={110} />
+    </Animated.View>
   );
 }
 
