@@ -27,6 +27,9 @@ const milanesa = {
   confidence: 'media',
 };
 
+beforeEach(() => jest.spyOn(console, 'warn').mockImplementation(() => {}));
+afterEach(() => jest.restoreAllMocks());
+
 describe('Gemini food analyzer', () => {
   it('sends the photo with the key in a header and returns rounded values', async () => {
     const calls: Call[] = [];
@@ -74,6 +77,30 @@ describe('Gemini food analyzer', () => {
   ])('maps HTTP %i to a message for the person', async (status, body, message) => {
     const analyze = createGeminiAnalyzer('k', fakeFetch(status, body));
     await expect(analyze('x')).rejects.toThrow(message);
+  });
+
+  it('falls back to the next free model when one is busy, out of quota or gone', async () => {
+    const calls: string[] = [];
+    const replies = [{ status: 503, body: { error: { status: 'UNAVAILABLE', message: 'The model is overloaded.' } } }, { status: 429, body: {} }, { status: 200, body: answer(milanesa) }];
+    const fetchFn = async (url: string) => {
+      calls.push(url.split('/models/')[1].split(':')[0]);
+      const r = replies.shift()!;
+      return { ok: r.status < 300, status: r.status, json: async () => r.body };
+    };
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const food = await createGeminiAnalyzer('secret-key', fetchFn, ['a', 'b', 'c'])('x');
+    expect(calls).toEqual(['a', 'b', 'c']);
+    expect(food.name).toBe('Milanesa con puré');
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(String(warn.mock.calls[0][0])).toContain('The model is overloaded');
+    expect(String(warn.mock.calls[0][0])).not.toContain('secret-key');
+  });
+
+  it('stops at errors another model would not fix', async () => {
+    const calls: Call[] = [];
+    const analyze = createGeminiAnalyzer('k', fakeFetch(403, {}, calls), ['a', 'b']);
+    await expect(analyze('x')).rejects.toThrow('IA: La IA no está bien configurada');
+    expect(calls).toHaveLength(1);
   });
 
   it('handles blocked and cut-off answers', async () => {

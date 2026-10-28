@@ -6,7 +6,11 @@ import type { FoodAnalysis } from './handlers.ts';
  * Plain REST, so it needs no SDK and runs the same in Deno and in the Jest tests.
  */
 
-export const GEMINI_MODEL = 'gemini-3.8-flash';
+/**
+ * Free-tier models, best first. When one is overloaded (5xx), out of free quota (429; quotas are
+ * per model) or gone (404), the next one is tried, so a busy model rarely reaches the person.
+ */
+export const GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite'];
 
 type FetchFn = (url: string, init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal }) => Promise<{
   ok: boolean;
@@ -41,27 +45,48 @@ type GeminiResponse = {
   error?: { status?: string; message?: string };
 };
 
-export function createGeminiAnalyzer(apiKey: string, fetchFn: FetchFn = fetch as unknown as FetchFn, model = GEMINI_MODEL) {
-  return async function analyzeFood(jpegBase64: string): Promise<FoodAnalysis> {
-    const res = await fetchFn(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents: [{ role: 'user', parts: [{ text: USER_PROMPT }, { inlineData: { mimeType: 'image/jpeg', data: jpegBase64 } }] }],
-        generationConfig: { responseMimeType: 'application/json', responseSchema: SCHEMA, maxOutputTokens: 8192 },
-      }),
-      signal: AbortSignal.timeout(50_000),
-    });
-    const body = (await res.json().catch(() => ({}))) as GeminiResponse;
+type Attempt = { status: number; body: GeminiResponse };
 
-    if (!res.ok) {
+const retryable = (status: number) => status === 404 || status === 429 || status >= 500;
+
+export function createGeminiAnalyzer(apiKey: string, fetchFn: FetchFn = fetch as unknown as FetchFn, models = GEMINI_MODELS) {
+  async function call(model: string, jpegBase64: string): Promise<Attempt> {
+    try {
+      const res = await fetchFn(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+          contents: [{ role: 'user', parts: [{ text: USER_PROMPT }, { inlineData: { mimeType: 'image/jpeg', data: jpegBase64 } }] }],
+          generationConfig: { responseMimeType: 'application/json', responseSchema: SCHEMA, maxOutputTokens: 8192 },
+        }),
+        signal: AbortSignal.timeout(25_000),
+      });
+      return { status: res.status, body: (await res.json().catch(() => ({}))) as GeminiResponse };
+    } catch (e) {
+      // Timeouts and network errors count as "busy" so the next model gets a chance.
+      return { status: 503, body: { error: { status: 'NETWORK', message: e instanceof Error ? e.message : String(e) } } };
+    }
+  }
+
+  return async function analyzeFood(jpegBase64: string): Promise<FoodAnalysis> {
+    let attempt: Attempt = { status: 503, body: {} };
+    for (const model of models) {
+      attempt = await call(model, jpegBase64);
+      if (attempt.status < 300) break;
+      // Logged without the key so the reason shows up in the function logs.
+      console.warn(`Gemini ${model} → ${attempt.status} ${attempt.body.error?.status ?? ''}: ${attempt.body.error?.message ?? ''}`.slice(0, 500));
+      if (!retryable(attempt.status)) break;
+    }
+    const { status, body } = attempt;
+
+    if (status >= 300) {
       const reason = `${body.error?.status ?? ''} ${body.error?.message ?? ''}`;
-      if (res.status === 429) throw new Error('IA: Se llenó el cupo gratis de la IA por ahora. Probá en un rato o cargala a mano.');
-      if (res.status === 401 || res.status === 403 || /API_KEY|API key/i.test(reason)) throw new Error('IA: La IA no está bien configurada en el servidor.');
-      if (res.status === 400) throw new Error('IA: No pudimos leer la foto. Probá con otra.');
-      if (res.status >= 500) throw new Error('IA: El servicio de IA está ocupado. Probá de nuevo en un minuto.');
-      throw new Error(`Gemini respondió ${res.status}: ${reason.trim()}`);
+      if (status === 429) throw new Error('IA: Se llenó el cupo gratis de la IA por ahora. Probá en un rato o cargala a mano.');
+      if (status === 401 || status === 403 || /API_KEY|API key/i.test(reason)) throw new Error('IA: La IA no está bien configurada en el servidor.');
+      if (status === 400) throw new Error('IA: No pudimos leer la foto. Probá con otra.');
+      if (status >= 500) throw new Error('IA: El servicio de IA está ocupado. Probá de nuevo en un minuto.');
+      throw new Error(`Gemini respondió ${status}: ${reason.trim()}`);
     }
 
     if (body.promptFeedback?.blockReason) throw new Error('IA: No pudimos analizar esta foto. Cargala a mano.');
