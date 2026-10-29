@@ -175,6 +175,7 @@ export default function ScanScreen() {
             </View>
             <Button label="Buscar" variant="secondary" disabled={out || typed.length < 8 || looking} onPress={() => void lookup(typed)} />
           </Row>
+          {!out ? <QuotaCard kind="barcode" /> : null}
           {notFound ? (
             <Card tone="alt" style={{ gap: space.sm }}>
               <T variant="label" tone="muted">No encontramos el código {notFound} en la base de alimentos. No se te descontó el escaneo.</T>

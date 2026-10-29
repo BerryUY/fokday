@@ -111,7 +111,7 @@ Agua, creatina, caminatas y tu lista del día. Los recordatorios te avisan solo 
 🔒 Tus datos son tuyos
 Funciona sin internet. Si querés, entrás con tu cuenta y se respaldan solos en la nube.
 
-FokDay Pro: 20 fotos con IA por día sin videos, resumen semanal con IA, estadísticas de 90 días e historial completo, progreso por ejercicio y temas de color.
+FokDay Pro: 20 fotos con IA por día sin videos, escáner de códigos ilimitado, resumen semanal con IA, estadísticas de 90 días e historial completo, progreso por ejercicio y temas de color.
 
 Las calorías que estima la IA son aproximadas y no reemplazan el consejo de un profesional de la salud.
 

@@ -125,8 +125,9 @@ export type QuotaKind = 'photo' | 'barcode' | 'summary';
 export type LimitSet = { free: number; bonusMax: number; videosPerExtra: number; pro: number };
 export const QUOTA_DEFAULTS: Record<QuotaKind, LimitSet> = {
   photo: { free: 1, bonusMax: 1, videosPerExtra: 1, pro: 20 },
-  // No AI behind the scanner (Open Food Facts): free for everyone; the cap only stops abuse.
-  barcode: { free: 200, bonusMax: 0, videosPerExtra: 1, pro: 200 },
+  // A Pro feature with a free taste. No AI behind it (Open Food Facts is free), so the
+  // limits are a product choice, not a cost one; Pro's cap only stops abuse.
+  barcode: { free: 1, bonusMax: 5, videosPerExtra: 1, pro: 200 },
   // The weekly summary is Pro only; a small cap keeps the shared AI quota safe from loops.
   summary: { free: 0, bonusMax: 0, videosPerExtra: 1, pro: 3 },
 };

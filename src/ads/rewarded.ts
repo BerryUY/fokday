@@ -7,7 +7,7 @@ const ads = (): typeof import('react-native-google-mobile-ads') => require('reac
 
 /**
  * Optional rewarded videos: a free account watches a short video to earn one more AI photo
- * or barcode scan (one video each). No banners or interstitials anywhere. The reward is
+ * or barcode scan (one video each, up to 1 photo and 5 scans a day). No banners or interstitials anywhere. The reward is
  * credited by the FokDay server when AdMob calls it back (signed server-side verification); the
  * phone never grants it, it only waits for the server to confirm.
  */

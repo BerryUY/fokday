@@ -493,8 +493,8 @@ describe('accounts, plans and rewarded videos', () => {
 });
 
 describe('default daily limits', () => {
-  it('free: 1 AI photo plus 1 more for one video; barcode free for everyone (no AI behind it)', () => {
+  it('free: 1 AI photo plus 1 more for one video; barcode 1 a day plus 1 per video up to 5 (Pro feature)', () => {
     expect(QUOTA_DEFAULTS.photo).toEqual({ free: 1, bonusMax: 1, videosPerExtra: 1, pro: 20 });
-    expect(QUOTA_DEFAULTS.barcode).toMatchObject({ free: 200, bonusMax: 0, pro: 200 });
+    expect(QUOTA_DEFAULTS.barcode).toEqual({ free: 1, bonusMax: 5, videosPerExtra: 1, pro: 200 });
   });
 });

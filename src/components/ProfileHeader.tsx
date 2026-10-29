@@ -77,7 +77,7 @@ export function ProfileHeader({ name }: { name: string }) {
             <Feather name="zap" size={20} color={c.accent} />
             <View style={{ flex: 1 }}>
               <T variant="bodyMedium">Probá FokDay Pro</T>
-              <T variant="caption" tone="muted">20 fotos con IA por día, resumen semanal y más</T>
+              <T variant="caption" tone="muted">20 fotos con IA por día, escáner ilimitado y más</T>
             </View>
             <Feather name="chevron-right" size={18} color={c.textDim} />
           </Row>

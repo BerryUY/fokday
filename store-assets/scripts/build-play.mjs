@@ -70,7 +70,7 @@ const brand = (y, ink = false) => `<div class="brandrow" style="left:84px;top:${
   const p = phone({ src: S('comidas'), w: 720, x: 430, y: 820 });
   slides.push(`${head(1080, 1920)}<div class="slide ink grain">
   ${chevrons({ x: 540, y: 640, w: 900, rot: 8, opacity: 0.16 })}
-  ${copy({ y: 110, lbl: 'Comidas', h: 'Calorías con <span class="lime">una foto.</span>', sub: 'La IA estima calorías y macros. Y si es un paquete, escaneás el código gratis.' })}
+  ${copy({ y: 110, lbl: 'Comidas', h: 'Calorías con <span class="lime">una foto.</span>', sub: 'La IA estima calorías y macros. Y si es un paquete, escaneás el código de barras.' })}
   ${p.html}
   ${zoom(S('comidas'), 40, 640, 14, 140, 384, 114, 700)}
   <div class="sub" style="left:84px;top:1060px;width:320px;font-size:34px;color:var(--text)">1 foto gratis por día, y otra más mirando un video.</div>
