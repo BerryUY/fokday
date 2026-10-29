@@ -38,11 +38,11 @@ Todo lo que dice "vos" son claves o cuentas que solo vos podés crear. Ninguna c
 ### 1.4 RevenueCat (suscripciones)
 1. Cuenta en <https://www.revenuecat.com>. Crear el proyecto FokDay y la app **Play Store** con el paquete `uy.santiago.momentum` y la **cuenta de servicio** de Play (la guía de RevenueCat explica cómo crearla).
 2. Importar los productos de `fokday_pro` y crear:
-   - el **entitlement `pro`** con los dos productos adentro;
+   - el **entitlement `fokday_pro`** con los dos productos adentro (la app también acepta `pro`);
    - la **oferta `default`** con los paquetes *Monthly* y *Annual*.
 3. Pasame la **clave pública de Android** (empieza con `goog_`): va en `src/config.ts` → `revenueCatAndroidKey`.
 4. Cargá la **clave secreta** (Project settings → API keys → secret, empieza con `sk_`) en Supabase → Edge Functions → Secrets como `REVENUECAT_SECRET_KEY`. No me la pases.
-5. **Testers de la beta con Pro gratis:** en RevenueCat → Customers, buscá a cada uno (su ID es el de su cuenta FokDay) → *Grant promotional entitlement* → `pro`. Otra opción: decime el email y lo marco como Pro desde la base.
+5. **Testers de la beta con Pro gratis:** en RevenueCat → Customers, buscá a cada uno (su ID es el de su cuenta FokDay) → *Grant promotional entitlement* → `fokday_pro`. Otra opción: decime el email y lo marco como Pro desde la base.
 
 ### 1.5 AdMob (videos con premio)
 1. Cuenta en <https://admob.google.com>, agregar la app Android (cuando ya esté en Play, o "no está publicada").
@@ -63,7 +63,7 @@ Publicá estas dos páginas en una dirección pública, por ejemplo GitHub Pages
 - `docs/privacidad.html`: política de privacidad.
 - `docs/eliminar-cuenta.html`: cómo borrar la cuenta (Play lo pide).
 
-Antes, completá tu email de contacto en las dos (buscá `[completar con tu email de contacto]`).
+Publicadas en https://fokday.vercel.app/privacidad.html y https://fokday.vercel.app/eliminar-cuenta.html (contacto: fokday.app@gmail.com).
 
 ---
 

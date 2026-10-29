@@ -48,8 +48,11 @@ async function checkPro(authUserId: string): Promise<boolean> {
   });
   if (!res.ok) throw new Error(`RevenueCat ${res.status}`);
   const body = (await res.json()) as { subscriber?: { entitlements?: Record<string, { expires_date: string | null }> } };
-  const ent = body.subscriber?.entitlements?.pro;
-  const pro = !!ent && (ent.expires_date === null || Date.parse(ent.expires_date) > Date.now());
+  // `fokday_pro` is the entitlement RevenueCat created; `pro` is the original name.
+  const pro = ['fokday_pro', 'pro'].some((id) => {
+    const ent = body.subscriber?.entitlements?.[id];
+    return !!ent && (ent.expires_date === null || Date.parse(ent.expires_date) > Date.now());
+  });
   proCache.set(authUserId, { at: Date.now(), pro });
   return pro;
 }

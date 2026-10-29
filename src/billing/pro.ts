@@ -11,7 +11,8 @@ import { PUBLIC_CONFIG } from '@/config';
  * phone only uses this state to show or lock screens.
  */
 
-export const ENTITLEMENT = 'pro';
+/** RevenueCat entitlement ids that unlock Pro (`pro` is the original name; RevenueCat created `fokday_pro`). */
+export const ENTITLEMENTS = ['fokday_pro', 'pro'];
 const ANDROID_PACKAGE = 'uy.santiago.momentum';
 const storeAvailable = Platform.OS === 'android' && !!PUBLIC_CONFIG.revenueCatAndroidKey;
 
@@ -52,7 +53,7 @@ export const usePro = () => usePlan().pro;
 /** The current plan outside React (e.g. while waiting for a reward to be credited). */
 export const getPlan = (): PlanState => state;
 
-const activeIn = (info: CustomerInfo) => !!info.entitlements.active[ENTITLEMENT];
+const activeIn = (info: CustomerInfo) => ENTITLEMENTS.some((id) => !!info.entitlements.active[id]);
 const applyStore = (info: CustomerInfo) => {
   storePro = activeIn(info);
   set({ pro: storePro || serverPro });
