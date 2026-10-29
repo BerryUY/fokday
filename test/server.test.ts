@@ -442,6 +442,17 @@ describe('accounts, plans and rewarded videos', () => {
     expect((await cloudApi.status(ana, pro)).barcode).toMatchObject({ pro: true, limit: 200 });
   });
 
+  it('renews the day at midnight in Uruguay, not at 21:00 (UTC midnight)', async () => {
+    let t = new Date('2026-10-29T23:30:00Z'); // 20:30 in Montevideo
+    const { fetchImpl } = accounts({ now: () => t, limits: { photo: { free: 1, bonusMax: 0, videosPerExtra: 1, pro: 20 } } });
+    const cfg = { url: URL, token: jwt('ana') };
+    await cloudApi.analyzeFood(cfg, photo, fetchImpl);
+    t = new Date('2026-10-30T02:00:00Z'); // 23:00, still the same day there
+    await expect(cloudApi.analyzeFood(cfg, photo, fetchImpl)).rejects.toMatchObject({ status: 429 });
+    t = new Date('2026-10-30T03:30:00Z'); // 00:30, a new day
+    expect((await cloudApi.analyzeFood(cfg, photo, fetchImpl)).remaining).toBe(0);
+  });
+
   it('never goes past the limit with many photos at once, and gives back failed ones', async () => {
     let calls = 0;
     const { fetchImpl, store } = accounts({ analyzeFood: async () => { calls++; await new Promise((r) => setTimeout(r, 5)); return analysis; } });

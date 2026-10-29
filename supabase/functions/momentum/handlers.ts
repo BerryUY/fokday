@@ -205,7 +205,12 @@ async function isPro(auth: Authed, env: Env): Promise<boolean> {
   }
 }
 
-const today = (env: Env) => (env.now ?? (() => new Date()))().toISOString().slice(0, 10);
+/**
+ * Daily limits renew at midnight in Uruguay (UTC−3, like Argentina), the same "today" the app
+ * uses. A UTC day ended at 21:00 there, so a late-night photo used up the next day's.
+ */
+const DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Montevideo', year: 'numeric', month: '2-digit', day: '2-digit' });
+const today = (env: Env) => DAY.format((env.now ?? (() => new Date()))());
 
 /** Today's allowance of one feature. bonus: extras earned; bonusLeft: extras still earnable; videos: watched today. */
 export type Quota = { pro: boolean; used: number; limit: number; bonus: number; bonusLeft: number; videos: number; videosPerExtra: number };
