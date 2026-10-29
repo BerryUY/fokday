@@ -14,11 +14,13 @@ import { getGoalForDate, getProfile, HABIT_FEATURES, setGoalsFrom, updateProfile
 import { EXTRA_NUTRIENTS } from '@/domain/nutrition';
 import { useColors } from '@/theme/ThemeProvider';
 import { listWeights, saveWeight } from '@/data/weight';
-import { latestEntry } from '@/domain/weight';
+import { isValidWeight, latestEntry, WEIGHT_RANGE } from '@/domain/weight';
 import { DAY_SHORT, formatDateTime, formatShort, todayKey, WEEK_ORDER } from '@/lib/dates';
 import { formatKg, formatLiters, parsePositive, toInput } from '@/lib/format';
 import { useMutation, useQuery } from '@/state/db';
 import { ACCENTS, space, withAccent } from '@/theme/tokens';
+
+const validKg = (v: number | null) => (v !== null && isValidWeight(v) ? v : null);
 
 const OPTIONAL_FEATURES: { key: FeatureKey; label: string; description: string }[] = [
   ...HABIT_FEATURES,
@@ -54,8 +56,8 @@ function SettingsForm({ profile, calories, protein, latest }: {
 
   useEffect(() => setRest(profile.defaultRestSeconds), [profile.defaultRestSeconds]);
 
-  const startValue = parsePositive(start);
-  const targetValue = parsePositive(target);
+  const startValue = validKg(parsePositive(start));
+  const targetValue = validKg(parsePositive(target));
   const currentValue = parsePositive(current);
   const kcalValue = parsePositive(kcal);
   const protValue = parsePositive(prot);
@@ -86,8 +88,8 @@ function SettingsForm({ profile, calories, protein, latest }: {
         <View style={{ gap: space.lg }}>
           <Field label="Tu nombre" value={name} onChangeText={setName} placeholder="Para el saludo" />
           <Row gap={space.md} align="flex-start">
-            <View style={{ flex: 1 }}><Field label="Peso de inicio" value={start} onChangeText={setStart} keyboardType="decimal-pad" suffix="kg" error={start && !startValue ? 'Inválido' : null} /></View>
-            <View style={{ flex: 1 }}><Field label="Peso meta" value={target} onChangeText={setTarget} keyboardType="decimal-pad" suffix="kg" error={target && !targetValue ? 'Inválido' : null} /></View>
+            <View style={{ flex: 1 }}><Field label="Peso de inicio" value={start} onChangeText={setStart} keyboardType="decimal-pad" suffix="kg" error={start && !startValue ? `${WEIGHT_RANGE.min} a ${WEIGHT_RANGE.max} kg` : null} /></View>
+            <View style={{ flex: 1 }}><Field label="Peso meta" value={target} onChangeText={setTarget} keyboardType="decimal-pad" suffix="kg" error={target && !targetValue ? `${WEIGHT_RANGE.min} a ${WEIGHT_RANGE.max} kg` : null} /></View>
           </Row>
           <Row gap={space.md} align="flex-start">
             <View style={{ flex: 1 }}><Field label="Calorías diarias" value={kcal} onChangeText={setKcal} keyboardType="numeric" suffix="kcal" error={kcal && !kcalValue ? 'Inválido' : null} /></View>
@@ -252,6 +254,8 @@ function SettingsForm({ profile, calories, protein, latest }: {
         />
         <Divider style={{ marginHorizontal: space.lg }} />
         <ListRow icon="book" title="Biblioteca de ejercicios" onPress={() => router.push('/ejercicios')} />
+        <Divider style={{ marginHorizontal: space.lg }} />
+        <ListRow icon="compass" title="Ver el tour de la app" subtitle="Un repaso de 30 segundos" onPress={() => router.push('/tour')} />
         {videosAvailable() ? (
           <>
             <Divider style={{ marginHorizontal: space.lg }} />

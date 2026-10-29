@@ -2,6 +2,8 @@ import type { Db } from '@/db/types';
 import { INITIAL_GOAL_DATE, SETTING_DEFAULTS } from '@/db/seed';
 import { nowIso, type DateKey } from '@/lib/dates';
 import { newId } from '@/lib/ids';
+import type { ActivityLevel, Sex } from '@/domain/energy';
+import { isValidWeight, WEIGHT_RANGE_MESSAGE } from '@/domain/weight';
 import { ACCENTS, type AccentKey } from '@/theme/tokens';
 
 export type ThemePreference = 'dark' | 'light' | 'system';
@@ -83,6 +85,9 @@ export async function getProfile(db: Db): Promise<Profile> {
 }
 
 export async function updateProfile(db: Db, patch: Partial<Profile>): Promise<void> {
+  for (const kg of [patch.startWeight, patch.targetWeight]) {
+    if (kg !== undefined && !isValidWeight(kg)) throw new Error(WEIGHT_RANGE_MESSAGE);
+  }
   await db.withTransactionAsync(async () => {
     if (patch.name !== undefined) await setSetting(db, 'profile.name', patch.name.trim());
     if (patch.startWeight !== undefined) await setSetting(db, 'weight.start', String(patch.startWeight));
@@ -95,6 +100,25 @@ export async function updateProfile(db: Db, patch: Partial<Profile>): Promise<vo
     if (patch.features !== undefined) await setSetting(db, 'features.enabled', JSON.stringify(FEATURE_KEYS.filter((k) => patch.features!.includes(k))));
     if (patch.waterGoalMl !== undefined) await setSetting(db, 'water.goal_ml', String(Math.round(patch.waterGoalMl)));
   });
+}
+
+// ---- Body data (for the calorie formula) ----
+
+export type BodyData = { sex: Sex; heightCm: number; birthYear: number; activity: ActivityLevel };
+
+export async function saveBody(db: Db, body: BodyData): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    await setSetting(db, 'body.sex', body.sex);
+    await setSetting(db, 'body.height_cm', String(Math.round(body.heightCm)));
+    await setSetting(db, 'body.birth_year', String(body.birthYear));
+    await setSetting(db, 'body.activity', body.activity);
+  });
+}
+
+export async function getBody(db: Db): Promise<BodyData | null> {
+  const [sex, height, year, activity] = await Promise.all(['body.sex', 'body.height_cm', 'body.birth_year', 'body.activity'].map((k) => getSetting(db, k)));
+  if (!sex || !height || !year || !activity) return null;
+  return { sex: sex as Sex, heightCm: Number(height), birthYear: Number(year), activity: activity as ActivityLevel };
 }
 
 // ---- First-run setup ----
@@ -116,8 +140,7 @@ export type OnboardingInput = {
 
 /** Saves the person's own profile, goals and first weigh-in, then marks setup as done. */
 export async function completeOnboarding(db: Db, input: OnboardingInput, today: DateKey): Promise<void> {
-  if (!(input.currentWeight >= 20 && input.currentWeight <= 300)) throw new Error('Ingresá un peso actual válido en kg (entre 20 y 300).');
-  if (!(input.targetWeight >= 20 && input.targetWeight <= 300)) throw new Error('Ingresá una meta válida en kg (entre 20 y 300).');
+  if (!isValidWeight(input.currentWeight) || !isValidWeight(input.targetWeight)) throw new Error(WEIGHT_RANGE_MESSAGE);
   if (!(input.calories > 0) || !(input.protein > 0)) throw new Error('Los objetivos tienen que ser mayores a cero.');
   // Not one transaction (the helpers open their own); the flag goes last, so a failure just shows the form again.
   await updateProfile(db, {

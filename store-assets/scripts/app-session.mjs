@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const BASE = process.env.APP_URL || 'http://localhost:8082';
-const PROFILE = path.resolve('.app-profile');
+const PROFILE = path.resolve(process.env.APP_PROFILE || '.app-profile');
 const DEMO = path.resolve('demo/fokday-demo.json');
 
 export async function openApp() {

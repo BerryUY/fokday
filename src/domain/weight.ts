@@ -2,6 +2,11 @@ import { addDays, type DateKey } from '@/lib/dates';
 
 export type WeightPoint = { date: DateKey; weight: number };
 
+/** Every weight in the app (entries, start, goal, milestones): heavy but real, never a typo like 900. */
+export const WEIGHT_RANGE = { min: 20, max: 350 } as const;
+export const isValidWeight = (kg: number) => kg >= WEIGHT_RANGE.min && kg <= WEIGHT_RANGE.max;
+export const WEIGHT_RANGE_MESSAGE = `Ingresá un peso válido en kg (entre ${WEIGHT_RANGE.min} y ${WEIGHT_RANGE.max}).`;
+
 export type WeightDirection = 'gain' | 'lose' | 'maintain';
 
 /** Which way the goal points. A target within 0.5 kg of the start means keeping the weight. */

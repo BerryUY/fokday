@@ -141,15 +141,17 @@ export default function FoodPhotoScreen() {
       {phase.kind === 'pick' ? (
         <Animated.View entering={FadeIn.duration(220)} style={{ gap: space.md }}>
           <Card style={{ padding: space.xl, alignItems: 'center', gap: space.sm }}>
-            <View style={[styles.hero, { backgroundColor: c.accentSoft }]}>
-              <Feather name="camera" size={34} color={c.accent} />
+            <View style={[styles.hero, { backgroundColor: outOfPhotos ? c.surfaceAlt : c.accentSoft }]}>
+              <Feather name={outOfPhotos ? 'lock' : 'camera'} size={34} color={outOfPhotos ? c.textMuted : c.accent} />
             </View>
-            <T variant="h2" style={{ textAlign: 'center', marginTop: space.sm }}>Sacale una foto a tu plato</T>
-            <T variant="body" tone="muted" style={{ textAlign: 'center' }}>La IA estima calorías, proteína y más. Después podés corregir todo antes de guardar.</T>
+            <T variant="h2" style={{ textAlign: 'center', marginTop: space.sm }}>{outOfPhotos ? 'Ya usaste tus fotos de hoy' : 'Sacale una foto a tu plato'}</T>
+            <T variant="body" tone="muted" style={{ textAlign: 'center' }}>
+              {outOfPhotos ? 'Mañana se renuevan. Mientras tanto, podés ganar otra mirando un video o pasarte a Pro.' : 'La IA estima calorías, proteína y más. Después podés corregir todo antes de guardar.'}
+            </T>
           </Card>
           {outOfPhotos ? <QuotaCard kind="photo" /> : null}
-          <Button label="Sacar foto" icon="camera" size="lg" disabled={outOfPhotos} onPress={() => void pick('camera')} />
-          <Button label="Elegir de la galería" icon="image" variant="secondary" disabled={outOfPhotos} onPress={() => void pick('library')} />
+          <Button label={outOfPhotos ? 'Sacar foto · bloqueado' : 'Sacar foto'} icon={outOfPhotos ? 'lock' : 'camera'} size="lg" disabled={outOfPhotos} onPress={() => void pick('camera')} />
+          <Button label={outOfPhotos ? 'Galería · bloqueado' : 'Elegir de la galería'} icon={outOfPhotos ? 'lock' : 'image'} variant="secondary" disabled={outOfPhotos} onPress={() => void pick('library')} />
           {!outOfPhotos ? <QuotaCard kind="photo" /> : null}
           <T variant="caption" tone="dim" style={{ textAlign: 'center' }}>Consejo: que se vea todo el plato y, si podés, un cubierto al lado para la escala.</T>
         </Animated.View>

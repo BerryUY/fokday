@@ -13,6 +13,8 @@ import { duplicateDay, getLogsForDate, listMeals, logMeal } from '@/data/meals';
 import { getGoalForDate, setGoalsFrom } from '@/data/settings';
 import { guessCategory, MEAL_CATEGORIES, sumDailyTotals } from '@/domain/nutrition';
 import { QuickAddSheet } from '@/components/QuickAddSheet';
+import { left } from '@/components/QuotaCard';
+import { usePlan } from '@/billing/pro';
 import { addDays, formatRelative, todayKey } from '@/lib/dates';
 import { formatKcal, formatProtein, parsePositive, toInput } from '@/lib/format';
 import { useMutation, useQuery } from '@/state/db';
@@ -191,19 +193,23 @@ export default function ComidasScreen() {
   );
 }
 
-/** The main way to log food: one photo. Big, filled, impossible to miss. */
+/** The main way to log food: one photo. Big, filled, impossible to miss; locked when today's are used. */
 function PhotoHero({ onPress }: { onPress: () => void }) {
   const c = useColors();
+  const out = left(usePlan().ai) === 0;
+  const fg = out ? c.text : c.accentText;
   return (
-    <PressableScale onPress={onPress} hapticFeedback accessibilityRole="button" accessibilityLabel="Foto con IA" style={[styles.hero, { backgroundColor: c.accent }]}>
-      <View style={[styles.heroIcon, { backgroundColor: 'rgba(0,0,0,0.12)' }]}>
-        <Feather name="camera" size={30} color={c.accentText} />
+    <PressableScale onPress={onPress} hapticFeedback accessibilityRole="button" accessibilityLabel={out ? 'Foto con IA, sin fotos por hoy' : 'Foto con IA'} style={[styles.hero, { backgroundColor: out ? c.surfaceAlt : c.accent }]}>
+      <View style={[styles.heroIcon, { backgroundColor: out ? c.surface : 'rgba(0,0,0,0.12)' }]}>
+        <Feather name={out ? 'lock' : 'camera'} size={30} color={out ? c.textMuted : c.accentText} />
       </View>
       <View style={{ flex: 1 }}>
-        <T variant="title" color={c.accentText}>Foto con IA</T>
-        <T variant="label" color={c.accentText} style={{ opacity: 0.75 }}>Sacale una foto al plato: la IA calcula calorías y macros.</T>
+        <T variant="title" color={fg}>Foto con IA</T>
+        <T variant="label" color={out ? c.textMuted : c.accentText} style={{ opacity: out ? 1 : 0.75 }}>
+          {out ? 'Ya usaste tus fotos de hoy. Ganá otra con un video o pasate a Pro.' : 'Sacale una foto al plato: la IA calcula calorías y macros.'}
+        </T>
       </View>
-      <Feather name="arrow-right" size={22} color={c.accentText} />
+      <Feather name="arrow-right" size={22} color={out ? c.textDim : c.accentText} />
     </PressableScale>
   );
 }

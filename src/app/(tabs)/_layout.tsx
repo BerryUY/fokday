@@ -1,9 +1,9 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Redirect } from 'expo-router';
 import { TopTabs, type MaterialTopTabBarProps } from 'expo-router/js-top-tabs';
-import type { ComponentProps } from 'react';
+import { useEffect, useState, type ComponentProps } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isOnboarded } from '@/data/settings';
 import { useQuery } from '@/state/db';
@@ -12,8 +12,9 @@ import { useColors } from '@/theme/ThemeProvider';
 import { font } from '@/theme/tokens';
 
 type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
+type TabMeta = { label: string; icon: IconName; iconActive: IconName };
 
-const TABS: Record<string, { label: string; icon: IconName; iconActive: IconName }> = {
+const TABS: Record<string, TabMeta> = {
   index: { label: 'Inicio', icon: 'home-variant-outline', iconActive: 'home-variant' },
   comidas: { label: 'Comidas', icon: 'silverware-fork-knife', iconActive: 'silverware-fork-knife' },
   entrenar: { label: 'Entrenar', icon: 'dumbbell', iconActive: 'dumbbell' },
@@ -21,48 +22,73 @@ const TABS: Record<string, { label: string; icon: IconName; iconActive: IconName
 };
 
 const ITEM_H = 52;
-const grow = LinearTransition.duration(240);
+const PAD = 6;
+const GAP = 4;
+/** The open tab is this many times wider than a closed one. */
+const GROW = 2.4;
+const OPEN = { duration: 340, easing: Easing.out(Easing.cubic) };
 
 /**
  * Floating bar: the other sections are just icons, the current one is a filled pill with its
- * name. The pill widens into place, so the bar reads at a glance.
+ * name. Changing section opens the new pill (it widens and its name slides in) while the old one
+ * closes, so the move is visible instead of a plain switch.
  */
 function TabBar({ state, navigateToTab }: MaterialTopTabBarProps) {
   const c = useColors();
   const insets = useSafeAreaInsets();
+  const [width, setWidth] = useState(0);
   const routes = state.routes.filter((r) => TABS[r.name]);
+  const current = state.routes[state.index]?.key;
+  const unit = (width - PAD * 2 - GAP * (routes.length - 1)) / (routes.length - 1 + GROW);
 
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-      <View style={[styles.bar, { backgroundColor: c.scheme === 'dark' ? 'rgba(24,24,27,0.97)' : 'rgba(255,255,255,0.97)', borderColor: c.border }]}>
-        {routes.map((route) => {
-          const meta = TABS[route.name];
-          const focused = state.routes[state.index]?.key === route.key;
-          return (
-            <Animated.View key={route.key} layout={grow} style={{ flex: focused ? 2.4 : 1 }}>
-              <Pressable
-                accessibilityRole="tab"
-                accessibilityState={{ selected: focused }}
-                accessibilityLabel={meta.label}
+      <View
+        onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+        style={[styles.bar, { backgroundColor: c.scheme === 'dark' ? 'rgba(24,24,27,0.97)' : 'rgba(255,255,255,0.97)', borderColor: c.border }]}
+      >
+        {width > 0
+          ? routes.map((route) => (
+              <TabItem
+                key={route.key}
+                meta={TABS[route.name]}
+                focused={route.key === current}
+                closed={unit}
+                open={unit * GROW}
                 onPress={() => {
-                  if (focused) return;
+                  if (route.key === current) return;
                   haptic('light');
                   navigateToTab(route.key);
                 }}
-                style={[styles.item, focused && { backgroundColor: c.accent }]}
-              >
-                <MaterialCommunityIcons name={focused ? meta.iconActive : meta.icon} size={24} color={focused ? c.accentText : c.textDim} />
-                {focused ? (
-                  <Animated.Text entering={FadeIn.duration(200).delay(60)} maxFontSizeMultiplier={1.2} numberOfLines={1} style={[styles.label, { color: c.accentText }]}>
-                    {meta.label}
-                  </Animated.Text>
-                ) : null}
-              </Pressable>
-            </Animated.View>
-          );
-        })}
+              />
+            ))
+          : null}
       </View>
     </View>
+  );
+}
+
+function TabItem({ meta, focused, closed, open, onPress }: { meta: TabMeta; focused: boolean; closed: number; open: number; onPress: () => void }) {
+  const c = useColors();
+  const p = useSharedValue(focused ? 1 : 0);
+  useEffect(() => {
+    p.set(withTiming(focused ? 1 : 0, OPEN));
+  }, [focused, p]);
+
+  const box = useAnimatedStyle(() => ({ width: closed + (open - closed) * p.get() }));
+  const fill = useAnimatedStyle(() => ({ opacity: p.get(), transform: [{ scaleX: 0.6 + 0.4 * p.get() }, { scaleY: 0.85 + 0.15 * p.get() }] }));
+  const label = useAnimatedStyle(() => ({ opacity: p.get() * p.get(), maxWidth: 110 * p.get(), marginLeft: 8 * p.get(), transform: [{ translateX: -10 * (1 - p.get()) }] }));
+
+  return (
+    <Animated.View style={[{ height: ITEM_H }, box]}>
+      <Pressable accessibilityRole="tab" accessibilityState={{ selected: focused }} accessibilityLabel={meta.label} onPress={onPress} style={styles.item}>
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.fill, { backgroundColor: c.accent }, fill]} />
+        <MaterialCommunityIcons name={focused ? meta.iconActive : meta.icon} size={24} color={focused ? c.accentText : c.textDim} />
+        <Animated.Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={[styles.label, { color: c.accentText }, label]}>
+          {meta.label}
+        </Animated.Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -92,14 +118,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderRadius: 30,
     borderWidth: StyleSheet.hairlineWidth,
-    padding: 6,
-    gap: 4,
+    padding: PAD,
+    gap: GAP,
+    minHeight: ITEM_H + PAD * 2,
     shadowColor: '#000',
     shadowOpacity: 0.35,
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 10 },
     elevation: 12,
   },
-  item: { height: ITEM_H, borderRadius: ITEM_H / 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 12 },
-  label: { fontFamily: font.bold, fontSize: 15, letterSpacing: -0.2, flexShrink: 1 },
+  item: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, overflow: 'hidden' },
+  fill: { borderRadius: ITEM_H / 2 },
+  label: { fontFamily: font.bold, fontSize: 15, letterSpacing: -0.2 },
 });

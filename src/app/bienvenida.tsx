@@ -10,7 +10,9 @@ import { LinkChoiceSheet } from '@/components/CloudLink';
 import { GoogleButton } from '@/components/GoogleButton';
 import { FokDayMark } from '@/components/brand/FokDayMark';
 import { Button, Chip, IconButton, Row, T } from '@/components/ui/primitives';
-import { completeOnboarding, isOnboarded, updateProfile, type FeatureKey } from '@/data/settings';
+import { completeOnboarding, isOnboarded, saveBody, updateProfile, type FeatureKey } from '@/data/settings';
+import { ACTIVITY_LEVELS, AGE_RANGE, dailyTargets, HEIGHT_RANGE, type ActivityLevel, type Sex } from '@/domain/energy';
+import { WEIGHT_RANGE } from '@/domain/weight';
 import { EXTRA_NUTRIENTS } from '@/domain/nutrition';
 import { suggestTarget, suggestTargets, targetMatchesGoal, type Goal } from '@/domain/onboarding';
 import { DAY_SHORT, todayKey, WEEK_ORDER } from '@/lib/dates';
@@ -21,7 +23,21 @@ import { useColors } from '@/theme/ThemeProvider';
 import { radius, space } from '@/theme/tokens';
 
 type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
-type StepKey = 'hola' | 'nombre' | 'objetivo' | 'peso' | 'meta' | 'nutricion' | 'gym' | 'extras' | 'nube' | 'listo';
+type StepKey = 'hola' | 'nombre' | 'objetivo' | 'peso' | 'cuerpo' | 'actividad' | 'meta' | 'nutricion' | 'gym' | 'extras' | 'nube' | 'listo';
+
+const SEXES: { key: Sex; label: string }[] = [
+  { key: 'female', label: 'Mujer' },
+  { key: 'male', label: 'Hombre' },
+  { key: 'unspecified', label: 'Prefiero no decir' },
+];
+
+const ACTIVITY_ICONS: Record<ActivityLevel, IconName> = {
+  sedentary: 'sofa-outline',
+  light: 'walk',
+  moderate: 'run',
+  high: 'run-fast',
+  athlete: 'trophy-outline',
+};
 
 const GOALS: { key: Goal; title: string; subtitle: string; icon: IconName }[] = [
   { key: 'gain', title: 'Subir de peso', subtitle: 'Ganar masa muscular o kilos', icon: 'trending-up' },
@@ -69,6 +85,10 @@ export default function WelcomeScreen() {
   const [protein, setProtein] = useState(120);
   const [targetsTouched, setTargetsTouched] = useState(false);
   const [days, setDays] = useState<number[]>([1, 3, 5]);
+  const [sex, setSex] = useState<Sex | null>(null);
+  const [age, setAge] = useState(28);
+  const [height, setHeight] = useState(170);
+  const [activity, setActivity] = useState<ActivityLevel | null>(null);
   const [features, setFeatures] = useState<FeatureKey[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -77,13 +97,15 @@ export default function WelcomeScreen() {
     if (onboarded && !finishing.current) router.replace('/');
   }, [onboarded]);
 
-  const steps: StepKey[] = ['hola', 'nombre', 'objetivo', 'peso', ...(goal === 'maintain' ? [] : ['meta' as const]), 'nutricion', 'gym', 'extras', ...(authConfigured ? ['nube' as const] : []), 'listo'];
+  const steps: StepKey[] = ['hola', 'nombre', 'objetivo', 'peso', 'cuerpo', 'actividad', ...(goal === 'maintain' ? [] : ['meta' as const]), 'nutricion', 'gym', 'extras', ...(authConfigured ? ['nube' as const] : []), 'listo'];
   const key = steps[Math.min(step, steps.length - 1)];
   const progress = step / (steps.length - 1);
 
   // Suggestions follow earlier answers until the person edits them.
   const effectiveTarget = goal === 'maintain' ? weight : targetTouched ? target : suggestTarget(weight, goal ?? 'gain');
-  const suggested = suggestTargets(weight, goal ?? 'maintain');
+  // Calculated from body and activity (Mifflin-St Jeor); the simple per-kg guess only as a fallback.
+  const calc = sex && activity ? dailyTargets({ weightKg: weight, heightCm: height, age, sex, activity }, goal ?? 'maintain', effectiveTarget) : null;
+  const suggested = calc ?? suggestTargets(weight, goal ?? 'maintain');
   const effCalories = targetsTouched ? calories : suggested.calories;
   const effProtein = targetsTouched ? protein : suggested.protein;
   const targetOk = !goal || targetMatchesGoal(weight, effectiveTarget, goal);
@@ -104,6 +126,7 @@ export default function WelcomeScreen() {
         todayKey(),
       );
       await updateProfile(d, { features });
+      if (sex && activity) await saveBody(d, { sex, heightCm: height, birthYear: new Date().getFullYear() - age, activity });
     });
     if (ok === undefined) {
       finishing.current = false;
@@ -140,6 +163,8 @@ export default function WelcomeScreen() {
     nombre: <Button label="Continuar" size="lg" onPress={next} disabled={!name.trim()} />,
     objetivo: <Button label="Continuar" size="lg" onPress={next} disabled={!goal} />,
     peso: <Button label="Continuar" size="lg" onPress={next} />,
+    cuerpo: <Button label="Continuar" size="lg" onPress={next} disabled={!sex} />,
+    actividad: <Button label="Continuar" size="lg" onPress={next} disabled={!activity} />,
     meta: <Button label="Continuar" size="lg" onPress={next} disabled={!targetOk} />,
     nutricion: <Button label="Continuar" size="lg" onPress={next} />,
     gym: <Button label="Continuar" size="lg" onPress={next} />,
@@ -222,6 +247,57 @@ export default function WelcomeScreen() {
             </>
           ) : null}
 
+          {key === 'cuerpo' ? (
+            <>
+              <Question title="Contanos un poco de vos" subtitle="Con esto calculamos tus calorías con una fórmula científica, no con un número genérico." />
+              <View style={{ gap: space.sm }}>
+                <T variant="label" tone="muted">Sexo (lo pide la fórmula)</T>
+                <Row style={{ flexWrap: 'wrap' }} gap={space.sm}>
+                  {SEXES.map((x) => (
+                    <Chip
+                      key={x.key}
+                      label={x.label}
+                      selected={sex === x.key}
+                      onPress={() => {
+                        haptic('light');
+                        setSex(x.key);
+                      }}
+                    />
+                  ))}
+                </Row>
+              </View>
+              <View style={{ gap: space.sm }}>
+                <T variant="label" tone="muted">Edad</T>
+                <NumberPicker value={age} onChange={setAge} min={AGE_RANGE.min} max={AGE_RANGE.max} step={1} unit="años" label="Edad" />
+              </View>
+              <View style={{ gap: space.sm }}>
+                <T variant="label" tone="muted">Altura</T>
+                <NumberPicker value={height} onChange={setHeight} min={HEIGHT_RANGE.min} max={HEIGHT_RANGE.max} step={1} unit="cm" label="Altura" />
+              </View>
+            </>
+          ) : null}
+
+          {key === 'actividad' ? (
+            <>
+              <Question title="¿Cuánto te movés en una semana normal?" subtitle="Contando el gym, el trabajo y todo lo que caminás." />
+              <View style={{ gap: space.md }}>
+                {ACTIVITY_LEVELS.map((a) => (
+                  <OptionCard
+                    key={a.key}
+                    icon={ACTIVITY_ICONS[a.key]}
+                    title={a.label}
+                    subtitle={a.description}
+                    selected={activity === a.key}
+                    onPress={() => {
+                      haptic('light');
+                      setActivity(a.key);
+                    }}
+                  />
+                ))}
+              </View>
+            </>
+          ) : null}
+
           {key === 'meta' ? (
             <>
               <Question title="¿A qué peso querés llegar?" subtitle="Una meta realista. Después podés sumar hitos intermedios." />
@@ -250,7 +326,10 @@ export default function WelcomeScreen() {
 
           {key === 'nutricion' ? (
             <>
-              <Question title="Tus objetivos de cada día" subtitle="Te sugerimos estos valores según tu peso y tu meta. Ajustalos si ya tenés los tuyos." />
+              <Question
+                title="Tus objetivos de cada día"
+                subtitle={calc ? 'Calculados con tu peso, altura, edad y actividad. Ajustalos si ya tenés los tuyos.' : 'Te sugerimos estos valores según tu peso y tu meta. Ajustalos si ya tenés los tuyos.'}
+              />
               <View style={{ gap: space.md }}>
                 <TargetRow
                   icon="fire"
@@ -283,6 +362,18 @@ export default function WelcomeScreen() {
                   }}
                 />
               </View>
+              {calc ? (
+                <View style={[styles.summary, { backgroundColor: c.surface, borderColor: c.border }]}>
+                  <SummaryRow icon="sleep" label="En reposo (fórmula Mifflin-St Jeor)" value={`≈ ${formatNumber(calc.resting)} kcal`} />
+                  <SummaryRow icon="walk" label="Con tu actividad, para mantenerte" value={`≈ ${formatNumber(calc.maintenance)} kcal`} />
+                  <SummaryRow
+                    icon="flag-checkered"
+                    label="Para tu objetivo"
+                    value={goal === 'lose' ? 'Un 20% menos, para bajar de a poco' : goal === 'gain' ? 'Un 10% más, para subir sin pasarte' : 'Lo mismo que gastás'}
+                  />
+                  <SummaryRow icon="food-steak" label="Proteína" value={goal === 'lose' ? '2 g por kilo, para cuidar el músculo' : '1,6 g por kilo'} />
+                </View>
+              ) : null}
               <T variant="caption" tone="dim">Es una guía aproximada, no una indicación médica. Si te acompaña un nutricionista, usá sus números.</T>
             </>
           ) : null}
@@ -462,35 +553,50 @@ function Tile({ icon, title, selected, onPress }: { icon: IconName; title: strin
 
 /** Big number with −/+ (0,5 kg steps) that can also be typed. */
 function WeightPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  return <NumberPicker value={value} onChange={onChange} min={WEIGHT_RANGE.min} max={WEIGHT_RANGE.max} step={0.5} unit="kg" label="Peso en kilos" big />;
+}
+
+/** Number with −/+ that can also be typed; clamped to [min, max] and rounded to the step. */
+function NumberPicker({ value, onChange, min, max, step, unit, label, big }: {
+  value: number;
+  onChange: (v: number) => void;
+  min: number;
+  max: number;
+  step: number;
+  unit: string;
+  label: string;
+  big?: boolean;
+}) {
   const c = useColors();
   // While typing, the field shows the draft; otherwise it always reflects the current value.
   const [draft, setDraft] = useState<string | null>(null);
+  const shown = step < 1 ? formatKg(value) : String(value);
   const set = (v: number) => {
     haptic('light');
-    onChange(Math.min(300, Math.max(30, Math.round(v * 2) / 2)));
+    onChange(Math.min(max, Math.max(min, Math.round(v / step) * step)));
   };
   return (
     <Row style={{ justifyContent: 'center', gap: space.lg }}>
-      <RoundButton icon="minus" label="Restar medio kilo" onPress={() => set(value - 0.5)} />
-      <View style={{ alignItems: 'center', minWidth: 140 }}>
+      <RoundButton icon="minus" label={`Restar ${label.toLowerCase()}`} onPress={() => set(value - step)} />
+      <View style={{ alignItems: 'center', minWidth: big ? 140 : 110 }}>
         <TextInput
-          value={draft ?? formatKg(value)}
+          value={draft ?? shown}
           onChangeText={setDraft}
-          onFocus={() => setDraft(formatKg(value))}
+          onFocus={() => setDraft(shown)}
           onEndEditing={() => {
             const v = parsePositive(draft ?? '');
             if (v) set(v);
             setDraft(null);
           }}
-          keyboardType="decimal-pad"
+          keyboardType={step < 1 ? 'decimal-pad' : 'number-pad'}
           selectTextOnFocus
           maxFontSizeMultiplier={1.2}
-          style={[styles.weightInput, { color: c.text }]}
-          accessibilityLabel="Peso en kilos"
+          style={[styles.weightInput, { color: c.text }, !big && { fontSize: 44 }]}
+          accessibilityLabel={label}
         />
-        <T variant="label" tone="dim">kg</T>
+        <T variant="label" tone="dim">{unit}</T>
       </View>
-      <RoundButton icon="plus" label="Sumar medio kilo" onPress={() => set(value + 0.5)} />
+      <RoundButton icon="plus" label={`Sumar ${label.toLowerCase()}`} onPress={() => set(value + step)} />
     </Row>
   );
 }

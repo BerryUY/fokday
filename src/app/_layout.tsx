@@ -132,6 +132,7 @@ function Navigator() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="bienvenida" options={{ gestureEnabled: false }} />
         <Stack.Screen name="sesion/activa" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="tour" options={{ animation: 'fade_from_bottom' }} />
       </Stack>
     </View>
   );

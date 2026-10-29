@@ -1,4 +1,5 @@
 import type { Db } from '@/db/types';
+import { isValidWeight, WEIGHT_RANGE_MESSAGE } from '@/domain/weight';
 import { nowIso, type DateKey } from '@/lib/dates';
 import { newId } from '@/lib/ids';
 
@@ -17,7 +18,7 @@ export async function getWeight(db: Db, id: string): Promise<WeightEntry | null>
 }
 
 function validate(weight: number) {
-  if (!(weight >= 20 && weight <= 300)) throw new Error('Ingresá un peso válido en kg (entre 20 y 300).');
+  if (!isValidWeight(weight)) throw new Error(WEIGHT_RANGE_MESSAGE);
 }
 
 /** One measurement per day: logging a date that already has one replaces it. */

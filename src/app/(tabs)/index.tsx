@@ -9,8 +9,10 @@ import { ExtraTotals } from '@/components/ExtraTotals';
 import { HabitsCard } from '@/components/HabitsCard';
 import { StreakBanner, StreakChip } from '@/components/streak';
 import { TodoCard } from '@/components/TodoCard';
+import { TourCard } from '@/components/TourCard';
 import { WeeklySummaryCard } from '@/components/WeeklySummaryCard';
-import { usePro } from '@/billing/pro';
+import { usePlan, usePro } from '@/billing/pro';
+import { left } from '@/components/QuotaCard';
 import { NutritionRings } from '@/components/nutrition';
 import { Loading, Screen } from '@/components/ui/layout';
 import { Badge, Button, Card, IconButton, PressableScale, Row, T } from '@/components/ui/primitives';
@@ -35,6 +37,7 @@ import { font, radius, space } from '@/theme/tokens';
 export default function HomeScreen() {
   const c = useColors();
   const pro = usePro();
+  const outOfPhotos = left(usePlan().ai) === 0;
   const sync = useSyncState();
   const run = useMutation();
   const today = todayKey();
@@ -82,6 +85,8 @@ export default function HomeScreen() {
         <T variant="title" style={{ marginTop: 2 }}>{greeting()}{profile.name ? `, ${profile.name}` : ''}</T>
       </View>
 
+      <TourCard />
+
       {!streak.doneToday ? (
         <Animated.View entering={enter(0)} style={{ marginBottom: space.lg }}>
           <StreakBanner streak={streak} />
@@ -103,19 +108,20 @@ export default function HomeScreen() {
             onPress={() => router.push({ pathname: '/comida/foto', params: { date: today } })}
             hapticFeedback
             accessibilityRole="button"
-            accessibilityLabel="Foto con IA"
-            style={[styles.photo, { backgroundColor: c.accent }]}
+            accessibilityLabel={outOfPhotos ? 'Foto con IA, sin fotos por hoy' : 'Foto con IA'}
+            style={[styles.photo, { backgroundColor: outOfPhotos ? c.surfaceAlt : c.accent }]}
           >
-            <View style={[styles.photoIcon, { backgroundColor: 'rgba(0,0,0,0.12)' }]}>
-              <Feather name="camera" size={22} color={c.accentText} />
+            <View style={[styles.photoIcon, { backgroundColor: outOfPhotos ? c.surface : 'rgba(0,0,0,0.12)' }]}>
+              <Feather name={outOfPhotos ? 'lock' : 'camera'} size={22} color={outOfPhotos ? c.textMuted : c.accentText} />
             </View>
             <View style={{ flex: 1 }}>
-              <T variant="h3" color={c.accentText}>Foto con IA</T>
-              <T variant="caption" color={c.accentText} style={{ opacity: 0.75 }}>Sacale una foto al plato y listo</T>
+              <T variant="h3" color={outOfPhotos ? c.text : c.accentText}>Foto con IA</T>
+              <T variant="caption" color={outOfPhotos ? c.textMuted : c.accentText} style={{ opacity: outOfPhotos ? 1 : 0.75 }}>
+                {outOfPhotos ? 'Sin fotos por hoy · ganá otra con un video' : 'Sacale una foto al plato y listo'}
+              </T>
             </View>
-            <Feather name="arrow-right" size={20} color={c.accentText} />
+            <Feather name="arrow-right" size={20} color={outOfPhotos ? c.textDim : c.accentText} />
           </PressableScale>
-          <Button label="Registrar de otra forma" icon="plus" variant="ghost" size="sm" style={{ marginTop: space.xs }} onPress={() => router.push('/comidas')} />
         </Card>
       </Animated.View>
 
