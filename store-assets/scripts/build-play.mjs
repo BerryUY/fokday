@@ -10,7 +10,7 @@ const MARK = JSON.parse(fs.readFileSync('research/mark.json', 'utf8')).MARK;
 
 const head = (w, h, css = '') => `<!doctype html><html lang="es"><head><meta charset="utf-8">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&family=JetBrains+Mono:wght@500;600&display=block" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Stack+Sans+Headline:wght@400..700&family=JetBrains+Mono:wght@500;600&display=block" rel="stylesheet">
 <link rel="stylesheet" href="../store.css"><style>:root{--w:${w}px;--h:${h}px}${css}</style></head><body>`;
 const end = '</body></html>';
 
@@ -54,7 +54,7 @@ const copy = ({ x = 84, y, bottom, w = 912, lbl = '', h, size = 128, sub, lblCol
   ${lbl ? `<div class="lbl">${up(lblColor)}${lbl}</div>` : ''}<div class="h" style="font-size:${size}px">${h}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
 const brand = (y, ink = false) => `<div class="brandrow" style="left:84px;top:${y}px">${wordmark(46, ink)}</div>`;
 
-// 01 · Hook: the whole day in one app
+// 01 · Hook: the whole day in one app (Inicio: streak, calories, the photo button)
 {
   const p = phone({ src: S('home'), w: 860, x: 110, y: 820 });
   slides.push(`${head(1080, 1920)}<div class="slide ink grain">
@@ -70,42 +70,41 @@ const brand = (y, ink = false) => `<div class="brandrow" style="left:84px;top:${
   const p = phone({ src: S('comidas'), w: 720, x: 430, y: 820 });
   slides.push(`${head(1080, 1920)}<div class="slide ink grain">
   ${chevrons({ x: 540, y: 640, w: 900, rot: 8, opacity: 0.16 })}
-  ${copy({ y: 110, lbl: 'Comidas', h: 'Calorías con <span class="lime">una foto.</span>', sub: 'La IA estima calorías y macros. Si es un paquete, escaneás el código de barras.' })}
+  ${copy({ y: 110, lbl: 'Comidas', h: 'Calorías con <span class="lime">una foto.</span>', sub: 'La IA estima calorías y macros. Y si es un paquete, escaneás el código gratis.' })}
   ${p.html}
-  ${zoom(S('comidas'), 40, 640, 14, 132, 386, 82, 700)}
-  <div class="sub" style="left:84px;top:1020px;width:320px;font-size:34px;color:var(--text)">2 fotos gratis por día, y más mirando un video.</div>
+  ${zoom(S('comidas'), 40, 640, 14, 140, 384, 114, 700)}
+  <div class="sub" style="left:84px;top:1060px;width:320px;font-size:34px;color:var(--text)">1 foto gratis por día, y otra más mirando un video.</div>
 </div>${end}`);
 }
 
-// 03 · Gym: log every set (light)
+// 03 · Gym: the routine, set by set (light)
 {
-  const p = phone({ src: S('sesion'), w: 820, x: 130, y: 760 });
+  const p = phone({ src: S('entrenar'), w: 820, x: 130, y: 760 });
   slides.push(`${head(1080, 1920)}<div class="slide paper grain">
   ${chevrons({ x: 420, y: 520, w: 900, rot: 6, opacity: 1, glow: false, mono: '#E4E4DF' })}
-  ${copy({ y: 110, lbl: 'Gimnasio', lblColor: 'var(--lime-deep)', h: 'Anotá <span class="deep">cada serie.</span>', sub: 'Ves lo que levantaste la vez anterior y el descanso corre solo.' })}
+  ${copy({ y: 110, lbl: 'Gimnasio', lblColor: 'var(--lime-deep)', h: 'Anotá <span class="deep">cada serie.</span>', sub: 'Tu rutina del día, lo que levantaste la vez anterior y el descanso con timer.' })}
   ${p.html}
-  ${zoom(S('sesion'), 70, 1180, 22, 250, 372, 110, 940)}
+  ${zoom(S('sesion'), 70, 1260, 22, 250, 372, 104, 940)}
 </div>${end}`);
 }
 
-// 04 · Progress: phone in 3D + enlarged weight card
+// 04 · Streak: don't break it
 {
-  const p = phone({ src: S('progreso'), w: 660, x: 0, y: 800, style: 'transform:perspective(2200px) rotateY(16deg) rotateZ(-2deg);transform-origin:left center' });
-  slides.push(`${head(1080, 1920)}<div class="slide ink grain">
-  ${chevrons({ x: 380, y: 1040, w: 1000, rot: -10, opacity: 0.14 })}
-  ${copy({ y: 110, lbl: 'Progreso', h: 'Mirá cómo <span class="lime">avanzás.</span>', sub: 'Peso, calorías, proteína y constancia, en gráficos simples.' })}
+  const p = phone({ src: S('racha'), w: 760, x: 160, y: 820 });
+  slides.push(`${head(1080, 1920, '.flame{color:#FF9632}')}<div class="slide ink grain">
+  <div style="position:absolute;left:50%;top:1180px;width:1300px;height:1300px;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,rgba(255,150,50,.26),rgba(255,150,50,0) 62%);z-index:1"></div>
+  ${copy({ y: 110, lbl: 'Tu racha', lblColor: '#FF9632', h: 'No cortes <span class="flame">tu racha.</span>', sub: 'Cada comida, peso o entreno suma un día. Y te avisamos antes de que se corte.' })}
   ${p.html}
-  ${zoom(S('progreso'), 460, 1090, 14, 350, 384, 380, 580)}
 </div>${end}`);
 }
 
-// 05 · Weight + history: two phones
+// 05 · Progress + calendar: two phones
 {
-  const a = phone({ src: S('peso'), w: 600, x: 50, y: 800 });
-  const b = phone({ src: S('historial'), w: 560, x: 480, y: 930, style: 'z-index:6' });
+  const a = phone({ src: S('progreso'), w: 600, x: 50, y: 800 });
+  const b = phone({ src: S('progreso-cal'), w: 560, x: 480, y: 930, style: 'z-index:6' });
   slides.push(`${head(1080, 1920)}<div class="slide surface grain">
   ${chevrons({ x: -200, y: 760, w: 1400, opacity: 0.12 })}
-  ${copy({ y: 110, lbl: 'Seguimiento', h: 'Cada día,<br><span class="lime">a la vista.</span>', sub: 'Tu peso con metas en el camino, y el calendario de todo lo que hiciste.' })}
+  ${copy({ y: 110, lbl: 'Progreso', h: 'Mirá cómo <span class="lime">avanzás.</span>', sub: 'Peso, calorías y proteína contra tu meta, y el calendario de todo lo que hiciste.' })}
   ${a.html}${b.html}
 </div>${end}`);
 }

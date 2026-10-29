@@ -20,7 +20,7 @@ npx jest -c store-assets/jest.demo.config.cjs   # desde la raíz del repo: arma 
 npx expo start --web --port 8082                # desde la raíz, en otra terminal
 export MSYS_NO_PATHCONV=1                        # solo en Git Bash
 node scripts/app-session.mjs import             # importa el respaldo de ejemplo en un perfil de Chrome aparte (.app-profile)
-node scripts/app-session.mjs shoot home /       # y así cada pantalla: comidas /comidas, entrenar /entrenar, progreso /progreso, peso /peso, historial /historial, pro /pro
+node scripts/app-session.mjs shoot home /       # y así cada pantalla: comidas /comidas, entrenar /entrenar, racha /racha, progreso /progreso, "progreso-cal /progreso 2600" (calendario), pro /pro
 node scripts/app-session.mjs session            # arranca la rutina del día y completa dos series (sesion.png)
 node scripts/build-play.mjs
 W=1080 H=1920 node scripts/render.mjs slides/play output/play-screenshots
