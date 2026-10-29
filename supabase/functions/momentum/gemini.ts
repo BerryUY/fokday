@@ -10,13 +10,13 @@ import type { FoodAnalysis, WeekSummary } from './handlers.ts';
  * Free-tier models, best first. When one is overloaded (5xx), out of free quota (429; quotas are
  * per model) or gone (404), the next one is tried, so a busy model rarely reaches the person.
  */
-export const GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+export const GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite'];
 
 /**
- * The weekly summary starts on other models, so a Pro summary never spends the photos' free quota
- * (it is per model) and still has fallbacks when Google is busy.
+ * The weekly summary starts on Flash-Lite (the free model with the most daily room), so on the
+ * free key it spends the photos' first models last. With the Pro key it uses the paid tier.
  */
-export const SUMMARY_MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3.5-flash-lite'];
+export const SUMMARY_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash'];
 
 type FetchFn = (url: string, init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal }) => Promise<{
   ok: boolean;
@@ -53,49 +53,111 @@ type GeminiResponse = {
 
 type Attempt = { status: number; body: GeminiResponse };
 
-const TOTAL_BUDGET_MS = 40_000;
-const PER_MODEL_TIMEOUT_MS = 18_000;
+/**
+ * One Gemini API key. Rate limits are per Google Cloud project, so Pro uses a key from a separate
+ * project with billing (paid tier) and never competes with free users for the free quota.
+ * serviceTier 'priority' asks Google to serve it first when it is overloaded (paid only; when the
+ * priority allowance runs out Google downgrades it to standard instead of failing).
+ */
+export type GeminiKey = { apiKey: string; serviceTier?: 'priority' | 'standard' };
+
+/** The answer budget (the app waits 75 s) and how long one model gets. */
+const TOTAL_BUDGET_MS = 60_000;
+const PER_MODEL_TIMEOUT_MS = 30_000;
+/** A model that hasn't answered by then gets a second one racing it; the first answer wins. */
+const HEDGE_AFTER_MS = 12_000;
+const MAX_IN_FLIGHT = 2;
+
+/** Less thinking = faster answers; estimating a plate doesn't need deep reasoning. */
+const THINKING: Record<string, string> = { 'gemini-3.8-flash': 'low', 'gemini-3.6-flash': 'minimal', 'gemini-3.5-flash-lite': 'minimal' };
 
 const retryable = (status: number) => status === 404 || status === 429 || status >= 500;
 
 /**
- * One JSON request with model fallback: a busy (5xx), out-of-quota (429) or missing (404) model
- * hands over to the next, all within the app's 45 s timeout. Errors starting with "IA:" are
- * shown to the person.
+ * One JSON request that doesn't give up on a busy Google: it goes through every key and model
+ * (paid key first for Pro), starts a second model when the first is slow, moves on at once when
+ * one is overloaded (5xx), out of quota (429) or gone (404), and keeps the first good answer.
+ * Errors starting with "IA:" are shown to the person.
  */
-function createGeminiCaller(apiKey: string, fetchFn: FetchFn, models: string[]) {
-  async function call(model: string, body: unknown, timeoutMs: number): Promise<Attempt> {
+function createGeminiCaller(keys: string | GeminiKey[], fetchFn: FetchFn, models: string[]) {
+  const keyList: GeminiKey[] = typeof keys === 'string' ? [{ apiKey: keys }] : keys;
+  const routes = keyList.flatMap((key) => models.map((model) => ({ key, model })));
+
+  async function post(model: string, apiKey: string, body: unknown, signal: AbortSignal): Promise<Attempt> {
+    const res = await fetchFn(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify(body),
+      signal,
+    });
+    return { status: res.status, body: (await res.json().catch(() => ({}))) as GeminiResponse };
+  }
+
+  async function call(route: (typeof routes)[number], body: Record<string, unknown>, timeoutMs: number, stop: AbortSignal): Promise<Attempt> {
+    const signal = AbortSignal.any([stop, AbortSignal.timeout(timeoutMs)]);
+    const thinking = THINKING[route.model];
+    const tuned: Record<string, unknown> = {
+      ...body,
+      ...(route.key.serviceTier ? { serviceTier: route.key.serviceTier } : {}),
+      ...(thinking ? { generationConfig: { ...(body.generationConfig as object), thinkingConfig: { thinkingLevel: thinking } } } : {}),
+    };
     try {
-      const res = await fetchFn(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-      return { status: res.status, body: (await res.json().catch(() => ({}))) as GeminiResponse };
+      let attempt = await post(route.model, route.key.apiKey, tuned, signal);
+      // A model that rejects the speed settings still gets the plain request.
+      if (attempt.status === 400 && (thinking || route.key.serviceTier) && /thinking|service.?tier/i.test(attempt.body.error?.message ?? '')) {
+        attempt = await post(route.model, route.key.apiKey, body, signal);
+      }
+      return attempt;
     } catch (e) {
       // Timeouts and network errors count as "busy" so the next model gets a chance.
       return { status: 503, body: { error: { status: 'NETWORK', message: e instanceof Error ? e.message : String(e) } } };
     }
   }
 
-  return async function generate(body: unknown, what: { unreadable: string; blocked: string }): Promise<string> {
+  function race(body: Record<string, unknown>): Promise<Attempt> {
     const deadline = Date.now() + TOTAL_BUDGET_MS;
-    let attempt: Attempt = { status: 503, body: {} };
-    for (const model of models) {
-      const left = deadline - Date.now();
-      if (left < 4_000) break;
-      attempt = await call(model, body, Math.min(PER_MODEL_TIMEOUT_MS, left));
-      if (attempt.status < 300) break;
-      // Logged without the key so the reason shows up in the function logs.
-      console.warn(`Gemini ${model} → ${attempt.status} ${attempt.body.error?.status ?? ''}: ${attempt.body.error?.message ?? ''}`.slice(0, 500));
-      if (!retryable(attempt.status)) break;
-    }
-    const { status, body: res } = attempt;
+    const stop = new AbortController();
+    return new Promise((resolve) => {
+      let next = 0;
+      let inFlight = 0;
+      let finished = false;
+      let last: Attempt = { status: 503, body: {} };
+      const finish = (attempt: Attempt) => {
+        if (finished) return;
+        finished = true;
+        stop.abort();
+        resolve(attempt);
+      };
+      const launch = () => {
+        if (finished || inFlight >= MAX_IN_FLIGHT || next >= routes.length) return;
+        const left = deadline - Date.now();
+        if (left < 4_000) return;
+        const route = routes[next++];
+        inFlight++;
+        const hedge = setTimeout(launch, HEDGE_AFTER_MS);
+        void call(route, body, Math.min(PER_MODEL_TIMEOUT_MS, left), stop.signal).then((attempt) => {
+          clearTimeout(hedge);
+          inFlight--;
+          if (finished) return;
+          if (attempt.status < 300) return finish(attempt);
+          // Logged without the key so the reason shows up in the function logs.
+          console.warn(`Gemini ${route.model} → ${attempt.status} ${attempt.body.error?.status ?? ''}: ${attempt.body.error?.message ?? ''}`.slice(0, 500));
+          last = attempt;
+          if (!retryable(attempt.status)) return finish(attempt);
+          launch();
+          if (inFlight === 0) finish(last);
+        });
+      };
+      launch();
+    });
+  }
+
+  return async function generate(body: Record<string, unknown>, what: { unreadable: string; blocked: string }): Promise<string> {
+    const { status, body: res } = await race(body);
 
     if (status >= 300) {
       const reason = `${res.error?.status ?? ''} ${res.error?.message ?? ''}`;
-      if (status === 429) throw new Error('IA: Se llenó el cupo gratis de la IA por ahora. Probá en un rato o cargala a mano.');
+      if (status === 429) throw new Error('IA: Se llenó el cupo de la IA por ahora. Probá en un rato o cargala a mano.');
       if (status === 401 || status === 403 || /API_KEY|API key/i.test(reason)) throw new Error('IA: La IA no está bien configurada en el servidor.');
       if (status === 400) throw new Error(what.unreadable);
       if (status >= 500) throw new Error('IA: El servicio de IA está ocupado. Probá de nuevo en un minuto.');
@@ -113,8 +175,8 @@ function createGeminiCaller(apiKey: string, fetchFn: FetchFn, models: string[]) 
   };
 }
 
-export function createGeminiAnalyzer(apiKey: string, fetchFn: FetchFn = fetch as unknown as FetchFn, models = GEMINI_MODELS) {
-  const generate = createGeminiCaller(apiKey, fetchFn, models);
+export function createGeminiAnalyzer(keys: string | GeminiKey[], fetchFn: FetchFn = fetch as unknown as FetchFn, models = GEMINI_MODELS) {
+  const generate = createGeminiCaller(keys, fetchFn, models);
   return async function analyzeFood(jpegBase64: string): Promise<FoodAnalysis> {
     const text = await generate(
       {
@@ -168,8 +230,8 @@ export function parseWeekSummary(text: string): WeekSummary | null {
   return s.title && (s.wins.length || s.tip) ? s : null;
 }
 
-export function createWeekSummarizer(apiKey: string, fetchFn: FetchFn = fetch as unknown as FetchFn, models = SUMMARY_MODELS) {
-  const generate = createGeminiCaller(apiKey, fetchFn, models);
+export function createWeekSummarizer(keys: string | GeminiKey[], fetchFn: FetchFn = fetch as unknown as FetchFn, models = SUMMARY_MODELS) {
+  const generate = createGeminiCaller(keys, fetchFn, models);
   return async function summarizeWeek(week: Record<string, unknown>): Promise<WeekSummary> {
     const text = await generate(
       {

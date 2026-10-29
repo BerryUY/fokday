@@ -65,14 +65,16 @@ export class ApiError extends Error {
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 const TIMEOUT_MS = 45_000;
+/** The AI calls wait longer: the server tries every model for up to 60 s before giving up. */
+const AI_TIMEOUT_MS = 75_000;
 
 export function normalizeBaseUrl(url: string): string {
   return url.trim().replace(/\/+$/, '').replace(/\/api$/, '');
 }
 
-async function request<T>(config: { url: string; token?: string }, path: string, init: RequestInit = {}, fetchImpl: FetchLike = fetch): Promise<T> {
+async function request<T>(config: { url: string; token?: string }, path: string, init: RequestInit = {}, fetchImpl: FetchLike = fetch, timeoutMs = TIMEOUT_MS): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   let res: Response;
   try {
     res = await fetchImpl(`${normalizeBaseUrl(config.url)}/api/${path}`, {
@@ -124,7 +126,7 @@ export const cloudApi = {
 
   /** Sends a food photo (JPEG, base64) for the AI to estimate; needs a cloud profile. */
   analyzeFood(config: CloudConfig, jpegBase64: string, fetchImpl?: FetchLike) {
-    return request<{ food: FoodAnalysis; remaining: number; ai: Quota }>(config, 'food/analyze', { method: 'POST', body: JSON.stringify({ image: jpegBase64 }) }, fetchImpl);
+    return request<{ food: FoodAnalysis; remaining: number; ai: Quota }>(config, 'food/analyze', { method: 'POST', body: JSON.stringify({ image: jpegBase64 }) }, fetchImpl, AI_TIMEOUT_MS);
   },
 
   /** Looks a barcode up within today's allowance; 404 when the product is unknown (not counted). */
@@ -139,7 +141,7 @@ export const cloudApi = {
 
   /** Pro: a short AI summary of the week from its numbers. */
   weeklySummary(config: CloudConfig, week: Record<string, unknown>, fetchImpl?: FetchLike) {
-    return request<{ summary?: unknown; text: string }>(config, 'ai/weekly-summary', { method: 'POST', body: JSON.stringify({ week }) }, fetchImpl);
+    return request<{ summary?: unknown; text: string }>(config, 'ai/weekly-summary', { method: 'POST', body: JSON.stringify({ week }) }, fetchImpl, AI_TIMEOUT_MS);
   },
 
   searchPublicFoods(config: CloudConfig, query: string, fetchImpl?: FetchLike) {

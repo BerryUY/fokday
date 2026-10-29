@@ -1,7 +1,7 @@
 import { handleRequest, MAX_PAYLOAD_BYTES, type Env, type LimitSet, type QuotaKind } from './handlers.ts';
 import { createFoodAnalyzer } from './ai.ts';
 import { createAdRewardVerifier, fetchAdMobKeys } from './adReward.ts';
-import { createGeminiAnalyzer, createWeekSummarizer } from './gemini.ts';
+import { createGeminiAnalyzer, createWeekSummarizer, type GeminiKey } from './gemini.ts';
 import { createBarcodeLookup } from './openFoodFacts.ts';
 import { createAuthHelpers, createSupabaseStore, readConfig } from './store.ts';
 
@@ -26,10 +26,20 @@ const auth = createAuthHelpers(url, secretKey);
 
 // The AI turns on once a key is set in the function's secrets: GEMINI_API_KEY (free tier
 // in Google AI Studio) is preferred; ANTHROPIC_API_KEY (paid) is used only if there is no Gemini key.
+// GEMINI_API_KEY_PRO is a key from a second Google Cloud project with billing (paid tier): Pro
+// photos and summaries go there first, so they never wait behind free users and only Pro use is
+// billed. Pro photos ask for priority service (secret GEMINI_PRO_SERVICE_TIER=standard turns it off).
 const geminiKey = Deno.env.get('GEMINI_API_KEY');
+const geminiProKey = Deno.env.get('GEMINI_API_KEY_PRO');
 const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
-const analyzeFood = geminiKey ? createGeminiAnalyzer(geminiKey) : anthropicKey ? createFoodAnalyzer(anthropicKey) : undefined;
-const summarizeWeek = geminiKey ? createWeekSummarizer(geminiKey) : undefined;
+const freeKeys: GeminiKey[] = geminiKey ? [{ apiKey: geminiKey }] : [];
+const proTier = (Deno.env.get('GEMINI_PRO_SERVICE_TIER') === 'standard' ? 'standard' : 'priority') as GeminiKey['serviceTier'];
+const proKeys: GeminiKey[] = [...(geminiProKey ? [{ apiKey: geminiProKey, serviceTier: proTier }] : []), ...freeKeys];
+const freeAnalyzer = freeKeys.length ? createGeminiAnalyzer(freeKeys) : anthropicKey ? createFoodAnalyzer(anthropicKey) : undefined;
+const proAnalyzer = geminiProKey ? createGeminiAnalyzer(proKeys) : freeAnalyzer;
+const analyzeFood = freeAnalyzer && ((jpeg: string, opts?: { pro: boolean }) => (opts?.pro && proAnalyzer ? proAnalyzer : freeAnalyzer)(jpeg));
+// The summary is Pro only; on the paid key it runs at standard tier (it isn't urgent).
+const summarizeWeek = proKeys.length ? createWeekSummarizer(proKeys.map((k) => ({ apiKey: k.apiKey }))) : undefined;
 
 const lookupBarcode = createBarcodeLookup('FokDay/1.3 (Android; app de hábitos)');
 const verifyAdReward = createAdRewardVerifier(fetchAdMobKeys);

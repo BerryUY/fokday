@@ -104,8 +104,8 @@ export type Env = {
   limits?: { [K in QuotaKind]?: Partial<LimitSet> };
   /** Looks a barcode up in Open Food Facts; null when the product is unknown. */
   lookupBarcode?: (code: string) => Promise<BarcodeProduct | null>;
-  /** Reads a JPEG (base64) and estimates its nutrition. Missing when the server has no AI key. */
-  analyzeFood?: (jpegBase64: string) => Promise<FoodAnalysis>;
+  /** Reads a JPEG (base64) and estimates its nutrition; Pro goes through the paid key. Missing when the server has no AI key. */
+  analyzeFood?: (jpegBase64: string, opts?: { pro: boolean }) => Promise<FoodAnalysis>;
   /** Writes the Pro weekly summary from the week's numbers. */
   summarizeWeek?: (week: WeekInput) => Promise<WeekSummary>;
   /** Checks a Supabase access token; null when it is invalid or expired. */
@@ -443,7 +443,7 @@ export async function handleAnalyzeFood(req: ApiRequest, store: BackupStore, env
   }
   let food: FoodAnalysis;
   try {
-    food = await env.analyzeFood(image);
+    food = await env.analyzeFood(image, { pro: q.pro });
   } catch (e) {
     await store.refundUse(auth.profile.id, day, 'photo');
     const message = e instanceof Error && e.message.startsWith('IA:') ? e.message.slice(3).trim() : 'No pudimos analizar la foto. Probá de nuevo.';

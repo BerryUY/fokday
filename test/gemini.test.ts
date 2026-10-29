@@ -69,7 +69,7 @@ describe('Gemini food analyzer', () => {
   });
 
   it.each([
-    [429, {}, 'IA: Se llenó el cupo gratis'],
+    [429, {}, 'IA: Se llenó el cupo de la IA'],
     [400, { error: { status: 'INVALID_ARGUMENT', message: 'API key not valid. Please pass a valid API key.' } }, 'IA: La IA no está bien configurada'],
     [403, {}, 'IA: La IA no está bien configurada'],
     [400, { error: { status: 'INVALID_ARGUMENT', message: 'Unable to process input image.' } }, 'IA: No pudimos leer la foto'],
@@ -138,5 +138,56 @@ describe('Gemini weekly summary', () => {
     expect((await createWeekSummarizer('k', flaky)({})).title).toBe('Semana firme');
     expect(calls.map((c) => c.url.split('/models/')[1].split(':')[0])).toEqual(SUMMARY_MODELS.slice(0, 2));
     await expect(createWeekSummarizer('k', fakeFetch(200, answer({ title: '', wins: [] })))({})).rejects.toThrow('IA:');
+  });
+});
+
+describe('Gemini never giving up early', () => {
+  const ok = { ok: true, status: 200, json: async () => answer(milanesa) };
+
+  it('races a second model when the first is slow, and the first answer wins', async () => {
+    jest.useFakeTimers();
+    const calls: string[] = [];
+    const fetchFn = (url: string, init: { signal?: AbortSignal }) => {
+      const model = url.split('/models/')[1].split(':')[0];
+      calls.push(model);
+      if (model === 'slow') {
+        return new Promise<typeof ok>((_, reject) => init.signal?.addEventListener('abort', () => reject(new Error('aborted'))));
+      }
+      return Promise.resolve(ok);
+    };
+    const pending = createGeminiAnalyzer('k', fetchFn, ['slow', 'fast'])('x');
+    await jest.advanceTimersByTimeAsync(12_000);
+    expect((await pending).name).toBe('Milanesa con puré');
+    expect(calls).toEqual(['slow', 'fast']);
+    jest.useRealTimers();
+  });
+
+  it('goes to the paid key first with priority, and to the free key when the paid one is busy', async () => {
+    const seen: { key: string; model: string; tier: unknown }[] = [];
+    const fetchFn = async (url: string, init: { headers: Record<string, string>; body: string }) => {
+      const body = JSON.parse(init.body) as { serviceTier?: string };
+      seen.push({ key: init.headers['x-goog-api-key'], model: url.split('/models/')[1].split(':')[0], tier: body.serviceTier });
+      return init.headers['x-goog-api-key'] === 'paid' ? { ok: false, status: 503, json: async () => ({}) } : ok;
+    };
+    const keys = [{ apiKey: 'paid', serviceTier: 'priority' as const }, { apiKey: 'free' }];
+    expect((await createGeminiAnalyzer(keys, fetchFn, ['m'])('x')).name).toBe('Milanesa con puré');
+    expect(seen).toEqual([
+      { key: 'paid', model: 'm', tier: 'priority' },
+      { key: 'free', model: 'm', tier: undefined },
+    ]);
+  });
+
+  it('asks for less thinking, and retries plainly if a model rejects that', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const fetchFn = async (_url: string, init: { body: string }) => {
+      const body = JSON.parse(init.body) as { generationConfig: Record<string, unknown> };
+      bodies.push(body);
+      return body.generationConfig.thinkingConfig
+        ? { ok: false, status: 400, json: async () => ({ error: { status: 'INVALID_ARGUMENT', message: 'thinking_level is not supported' } }) }
+        : ok;
+    };
+    expect((await createGeminiAnalyzer('k', fetchFn, ['gemini-3.8-flash'])('x')).name).toBe('Milanesa con puré');
+    expect((bodies[0].generationConfig as Record<string, unknown>).thinkingConfig).toEqual({ thinkingLevel: 'low' });
+    expect(bodies).toHaveLength(2);
   });
 });

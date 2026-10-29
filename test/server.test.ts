@@ -502,6 +502,15 @@ describe('accounts, plans and rewarded videos', () => {
     expect((await reward(fetchImpl, "x' or 1=1 --", 'tx')).status).toBe(400);
   });
 
+  it('tells the AI whether the photo is from a Pro account, so Pro uses its own paid key', async () => {
+    const seen: (boolean | undefined)[] = [];
+    const { fetchImpl, env, store } = accounts({ analyzeFood: async (_img, opts) => (seen.push(opts?.pro), analysis) });
+    const ana = { url: URL, token: jwt('ana') };
+    await cloudApi.analyzeFood(ana, photo, fetchImpl);
+    await cloudApi.analyzeFood(ana, photo, wire(store, { ...env, checkPro: async () => true }));
+    expect(seen).toEqual([false, true]);
+  });
+
   it('writes the weekly summary only for Pro', async () => {
     const { fetchImpl, env, store } = accounts({ summarizeWeek: async (w) => ({ title: 'Semana sólida', wins: ['Gym ' + String(w.gymDays)], improve: [], tip: 'Seguí así.', focus: 'Constancia' }) });
     const ana = { url: URL, token: jwt('ana') };
