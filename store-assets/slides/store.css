@@ -1,0 +1,56 @@
+/* FokDay Play Store set. Tokens from src/theme/tokens.ts and src/brand/mark.ts. */
+:root{
+  --ink:#09090A; --surface:#141416; --surface-2:#1C1C1F; --line:#26262B;
+  --text:#F5F5F4; --muted:#A1A1A6; --dim:#6B6B72;
+  --lime:#C8F560; --lime-ink:#0B0F02;
+  --green:#2CF07A; --green-hi:#5CFF9D; --green-lo:#16D163;
+  --paper:#F4F4F1; --paper-ink:#0E0E10; --paper-muted:#5E5E66; --lime-deep:#5E8C0A;
+  --display:'Inter',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:var(--w,1080px);height:var(--h,1920px);overflow:hidden;background:var(--ink)}
+body{font-family:var(--display);color:var(--text);-webkit-font-smoothing:antialiased;text-rendering:geometricPrecision}
+.slide{position:relative;width:var(--w,1080px);height:var(--h,1920px);overflow:hidden;isolation:isolate}
+.ink{background:var(--ink)} .surface{background:var(--surface)} .paper{background:var(--paper);color:var(--paper-ink)} .limebg{background:var(--lime);color:var(--lime-ink)}
+
+.grain::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:50;opacity:.07;mix-blend-mode:screen;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .8 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
+.paper.grain::after,.limebg.grain::after{mix-blend-mode:multiply;opacity:.05;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .3  0 0 0 0 .3  0 0 0 0 .2  0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
+
+.h{position:absolute;font-weight:800;letter-spacing:-.045em;line-height:.94;z-index:10}
+.sub{position:absolute;font-weight:500;font-size:40px;line-height:1.28;letter-spacing:-.01em;color:var(--muted);z-index:10}
+.paper .sub{color:var(--paper-muted)} .limebg .sub{color:rgba(11,15,2,.72)}
+.lbl{position:absolute;font-family:var(--mono);font-weight:500;font-size:24px;letter-spacing:.16em;text-transform:uppercase;display:flex;align-items:center;gap:14px;z-index:10;color:var(--muted)}
+.paper .lbl{color:var(--paper-muted)} .limebg .lbl{color:rgba(11,15,2,.7)}
+.lbl svg{height:.9em;width:auto}
+.lime{color:var(--lime)} .deep{color:var(--lime-deep)}
+
+.wm{display:inline-flex;align-items:center;gap:.28em;font-weight:800;letter-spacing:-.045em;line-height:1;white-space:nowrap}
+.wm img{height:1.15em;width:auto}
+
+/* Android phone */
+.phone{position:absolute;border-radius:var(--r);background:#1b1c1f;padding:var(--b);z-index:5;
+  box-shadow:inset 0 0 0 2px #34353a,0 0 0 1.5px #0a0a0b,0 3px 6px rgba(0,0,0,.35),0 30px 60px -12px rgba(0,0,0,.55),0 80px 140px -30px rgba(0,0,0,.6)}
+.paper .phone,.limebg .phone{box-shadow:inset 0 0 0 2px #34353a,0 0 0 1.5px #0a0a0b,0 3px 6px rgba(14,14,16,.2),0 30px 60px -12px rgba(14,14,16,.3),0 80px 140px -30px rgba(14,14,16,.35)}
+.phone .screen{position:relative;width:100%;height:100%;border-radius:var(--sr);overflow:hidden;background:#09090A}
+.phone .status{position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;align-items:center;color:#F5F5F4;font-weight:600;z-index:3}
+.phone .status .ic{display:flex;align-items:center;gap:.35em}
+.phone .hole{position:absolute;left:50%;transform:translateX(-50%);border-radius:50%;background:#000;box-shadow:inset 0 0 0 1.5px #1d1e22;z-index:4}
+.phone .shot{position:absolute;left:0;right:0}
+.phone .shot img{width:100%;display:block}
+.phone .gest{position:absolute;left:0;right:0;bottom:0;background:#09090A;display:flex;align-items:center;justify-content:center;z-index:3}
+.phone .gest i{display:block;width:30%;height:22%;border-radius:99px;background:#F5F5F4;opacity:.8}
+.phone .glare{position:absolute;inset:0;background:linear-gradient(115deg,rgba(255,255,255,.07) 0%,rgba(255,255,255,0) 32%);pointer-events:none;z-index:6}
+
+/* enlarged crop of a real screen */
+.zoom{position:absolute;border-radius:28px;z-index:12;
+  box-shadow:0 0 0 2px rgba(200,245,96,.55),0 4px 10px rgba(0,0,0,.35),0 30px 70px -10px rgba(0,0,0,.65)}
+.paper .zoom{box-shadow:0 0 0 2px rgba(94,140,10,.5),0 4px 10px rgba(14,14,16,.15),0 30px 70px -10px rgba(14,14,16,.35)}
+.chev{position:absolute;z-index:1;pointer-events:none}
+
+/* headline + sub in normal flow, so a longer line pushes the sub down instead of overlapping */
+.copy{position:absolute;display:flex;flex-direction:column;gap:30px;z-index:10}
+.copy .h,.copy .sub,.copy .lbl{position:static}
+.copy .lbl{margin-bottom:6px}
+.brandrow{position:absolute;z-index:10;display:flex;align-items:center}
