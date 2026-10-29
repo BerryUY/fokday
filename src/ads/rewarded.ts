@@ -76,6 +76,21 @@ export async function watchRewardedVideo(kind: RewardKind, accountId: string): P
   });
 }
 
+/**
+ * Whether this person must be able to review their ads choice (GDPR countries and similar). Elsewhere
+ * Google shows no form at all, so the Ajustes row only appears where the law asks for it.
+ */
+export async function adsPrivacyRequired(): Promise<boolean> {
+  if (!videosAvailable()) return false;
+  try {
+    const { AdsConsent, AdsConsentPrivacyOptionsRequirementStatus } = ads();
+    const info = await AdsConsent.requestInfoUpdate();
+    return info.privacyOptionsRequirementStatus === AdsConsentPrivacyOptionsRequirementStatus.REQUIRED;
+  } catch {
+    return false;
+  }
+}
+
 /** Lets the person review the ads consent choice (required where the law asks for it). */
 export async function showAdsPrivacyOptions(): Promise<void> {
   if (!videosAvailable()) return;

@@ -17,14 +17,16 @@ const google = (): typeof import('@react-native-google-signin/google-signin') =>
  * the cloud (backups, AI photo, barcode, shared library, Pro); everything else works without one.
  */
 
-export type Account = { id: string; email: string | null; name: string | null; provider: string };
+/** avatarUrl: the Google profile picture, used until the person picks their own. */
+export type Account = { id: string; email: string | null; name: string | null; provider: string; avatarUrl: string | null };
 
 const toAccount = (session: Session | null): Account | null => {
   const u = session?.user;
   if (!u) return null;
   const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
   const name = [meta.full_name, meta.name].find((v) => typeof v === 'string' && v.trim()) as string | undefined;
-  return { id: u.id, email: u.email ?? null, name: name ?? null, provider: String(u.app_metadata?.provider ?? 'email') };
+  const picture = [meta.avatar_url, meta.picture].find((v) => typeof v === 'string' && v.startsWith('https://')) as string | undefined;
+  return { id: u.id, email: u.email ?? null, name: name ?? null, provider: String(u.app_metadata?.provider ?? 'email'), avatarUrl: picture ?? null };
 };
 
 /** The signed-in account (null when signed out) and whether it is still loading. */

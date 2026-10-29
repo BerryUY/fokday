@@ -2,15 +2,16 @@ import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, Switch, View } from 'react-native';
-import { showAdsPrivacyOptions, videosAvailable } from '@/ads/rewarded';
+import { adsPrivacyRequired, showAdsPrivacyOptions } from '@/ads/rewarded';
 import { useSyncState } from '@/backup/service';
 import { usePro } from '@/billing/pro';
+import { BodyCard } from '@/components/BodyCard';
 import { ProfileHeader } from '@/components/ProfileHeader';
 import { ProBadge } from '@/components/ProGate';
 import { Field, Stepper } from '@/components/ui/form';
 import { ListRow, Loading, Screen } from '@/components/ui/layout';
 import { Button, Card, Chip, Divider, Row, SectionHeader, Segmented, T } from '@/components/ui/primitives';
-import { getGoalForDate, getProfile, HABIT_FEATURES, setGoalsFrom, updateProfile, type FeatureKey, type Profile, type ThemePreference } from '@/data/settings';
+import { getBody, getGoalForDate, getProfile, HABIT_FEATURES, setGoalsFrom, updateProfile, type BodyData, type FeatureKey, type Profile, type ThemePreference } from '@/data/settings';
 import { EXTRA_NUTRIENTS } from '@/domain/nutrition';
 import { useColors } from '@/theme/ThemeProvider';
 import { listWeights, saveWeight } from '@/data/weight';
@@ -29,23 +30,26 @@ const OPTIONAL_FEATURES: { key: FeatureKey; label: string; description: string }
 
 export default function SettingsScreen() {
   const { data } = useQuery(async (db) => {
-    const [profile, goal, weights] = await Promise.all([getProfile(db), getGoalForDate(db, todayKey()), listWeights(db)]);
-    return { profile, goal, latest: latestEntry(weights) };
+    const [profile, goal, weights, body] = await Promise.all([getProfile(db), getGoalForDate(db, todayKey()), listWeights(db), getBody(db)]);
+    return { profile, goal, latest: latestEntry(weights), body };
   }, []);
   if (!data) return <Screen title="Ajustes"><Loading /></Screen>;
-  return <SettingsForm profile={data.profile} calories={data.goal.calories} protein={data.goal.protein} latest={data.latest} />;
+  return <SettingsForm profile={data.profile} calories={data.goal.calories} protein={data.goal.protein} latest={data.latest} body={data.body} />;
 }
 
-function SettingsForm({ profile, calories, protein, latest }: {
+function SettingsForm({ profile, calories, protein, latest, body }: {
   profile: Profile;
   calories: number;
   protein: number;
   latest: { date: string; weight: number } | null;
+  body: BodyData | null;
 }) {
   const c = useColors();
   const run = useMutation();
   const sync = useSyncState();
   const pro = usePro();
+  // The ads choice only needs a row where the law asks for it (and Pro has no ads at all).
+  const { data: adsPrivacy } = useQuery(async () => !pro && (await adsPrivacyRequired()), [pro]);
   const [name, setName] = useState(profile.name);
   const [start, setStart] = useState(toInput(profile.startWeight, 1));
   const [target, setTarget] = useState(toInput(profile.targetWeight, 1));
@@ -116,6 +120,17 @@ function SettingsForm({ profile, calories, protein, latest }: {
           />
         </Row>
       </Card>
+
+      <SectionHeader title="Tu cuerpo y actividad" style={{ marginTop: space.xl }} />
+      <BodyCard
+        body={body}
+        weightKg={latest?.weight ?? profile.startWeight}
+        targetWeightKg={profile.targetWeight}
+        onGoals={(k, p) => {
+          setKcal(toInput(k, 0));
+          setProt(toInput(p, 1));
+        }}
+      />
 
       <SectionHeader title="Entrenamiento" style={{ marginTop: space.xl }} />
       <Card>
@@ -256,10 +271,10 @@ function SettingsForm({ profile, calories, protein, latest }: {
         <ListRow icon="book" title="Biblioteca de ejercicios" onPress={() => router.push('/ejercicios')} />
         <Divider style={{ marginHorizontal: space.lg }} />
         <ListRow icon="compass" title="Ver el tour de la app" subtitle="Un repaso de 30 segundos" onPress={() => router.push('/tour')} />
-        {videosAvailable() ? (
+        {adsPrivacy ? (
           <>
             <Divider style={{ marginHorizontal: space.lg }} />
-            <ListRow icon="shield" title="Privacidad de anuncios" subtitle="Tu elección sobre los videos con premio" onPress={() => void showAdsPrivacyOptions()} />
+            <ListRow icon="shield" title="Privacidad de anuncios" subtitle="Tu elección sobre los videos opcionales" onPress={() => void showAdsPrivacyOptions()} />
           </>
         ) : null}
       </Card>

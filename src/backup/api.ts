@@ -139,7 +139,7 @@ export const cloudApi = {
 
   /** Pro: a short AI summary of the week from its numbers. */
   weeklySummary(config: CloudConfig, week: Record<string, unknown>, fetchImpl?: FetchLike) {
-    return request<{ text: string }>(config, 'ai/weekly-summary', { method: 'POST', body: JSON.stringify({ week }) }, fetchImpl);
+    return request<{ summary?: unknown; text: string }>(config, 'ai/weekly-summary', { method: 'POST', body: JSON.stringify({ week }) }, fetchImpl);
   },
 
   searchPublicFoods(config: CloudConfig, query: string, fetchImpl?: FetchLike) {

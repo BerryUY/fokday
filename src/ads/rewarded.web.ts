@@ -11,4 +11,8 @@ export async function watchRewardedVideo(_kind: RewardKind, _accountId: string):
   throw new Error('Los videos funcionan desde el teléfono.');
 }
 
+export async function adsPrivacyRequired(): Promise<boolean> {
+  return false;
+}
+
 export async function showAdsPrivacyOptions(): Promise<void> {}

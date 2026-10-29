@@ -1,4 +1,4 @@
-import { createGeminiAnalyzer } from '../supabase/functions/momentum/gemini';
+import { createGeminiAnalyzer, createWeekSummarizer, GEMINI_MODELS, SUMMARY_MODELS } from '../supabase/functions/momentum/gemini';
 
 /** The Gemini analyzer against a fake REST endpoint: request shape, parsing and friendly errors. */
 
@@ -107,5 +107,36 @@ describe('Gemini food analyzer', () => {
     await expect(createGeminiAnalyzer('k', fakeFetch(200, { promptFeedback: { blockReason: 'SAFETY' } }))('x')).rejects.toThrow('IA: No pudimos analizar esta foto');
     await expect(createGeminiAnalyzer('k', fakeFetch(200, answer(milanesa, 'MAX_TOKENS')))('x')).rejects.toThrow('IA: La respuesta quedó incompleta');
     await expect(createGeminiAnalyzer('k', fakeFetch(200, { candidates: [{ finishReason: 'STOP', content: { parts: [{ text: 'no es json' }] } }] }))('x')).rejects.toThrow('IA: No pudimos analizar la foto');
+  });
+});
+
+describe('Gemini weekly summary', () => {
+  const week = { title: 'Semana firme', wins: ['Subiste 5 kg en sentadilla', 'Proteína 5 de 7 días'], improve: ['Agua: 1,4 L de 2 L'], tip: 'Sumá un huevo al desayuno.', focus: 'Proteína temprano', extra: 1 };
+
+  it('returns the structured summary from the summary models, never the photo ones first', async () => {
+    const calls: Call[] = [];
+    const summarize = createWeekSummarizer('test-key', fakeFetch(200, answer(week), calls));
+    expect(await summarize({ dias_de_gym: 3 })).toEqual({
+      title: 'Semana firme',
+      wins: ['Subiste 5 kg en sentadilla', 'Proteína 5 de 7 días'],
+      improve: ['Agua: 1,4 L de 2 L'],
+      tip: 'Sumá un huevo al desayuno.',
+      focus: 'Proteína temprano',
+    });
+    expect(calls[0].url).toContain(SUMMARY_MODELS[0]);
+    expect(SUMMARY_MODELS[0]).not.toBe(GEMINI_MODELS[0]);
+  });
+
+  it('moves to the next model when one is busy, and fails kindly when the answer is empty', async () => {
+    const calls: Call[] = [];
+    let n = 0;
+    const flaky = async (url: string, init: { headers: Record<string, string>; body: string }) => {
+      calls.push({ url, headers: init.headers, body: JSON.parse(init.body) });
+      n += 1;
+      return n === 1 ? { ok: false, status: 503, json: async () => ({ error: { status: 'UNAVAILABLE' } }) } : { ok: true, status: 200, json: async () => answer(week) };
+    };
+    expect((await createWeekSummarizer('k', flaky)({})).title).toBe('Semana firme');
+    expect(calls.map((c) => c.url.split('/models/')[1].split(':')[0])).toEqual(SUMMARY_MODELS.slice(0, 2));
+    await expect(createWeekSummarizer('k', fakeFetch(200, answer({ title: '', wins: [] })))({})).rejects.toThrow('IA:');
   });
 });

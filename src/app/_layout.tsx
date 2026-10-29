@@ -17,6 +17,7 @@ import { startBackupService } from '@/backup/service';
 import { refreshPlan, syncPurchasesAccount, usePro } from '@/billing/pro';
 import { LaunchAnimation } from '@/components/brand/LaunchAnimation';
 import { StreakCelebration } from '@/components/streak';
+import { SummaryNotice } from '@/components/SummaryNotice';
 import { DialogHost } from '@/components/ui/dialog';
 import { PortalProvider } from '@/components/ui/portal';
 import { getProfile, type ThemePreference } from '@/data/settings';
@@ -111,6 +112,7 @@ function ThemedApp() {
         <PortalProvider>
           <Navigator />
           <StreakCelebration enabled={!launching} />
+          <SummaryNotice />
           <DialogHost />
         </PortalProvider>
       </ToastProvider>

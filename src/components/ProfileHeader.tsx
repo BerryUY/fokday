@@ -50,7 +50,7 @@ export function ProfileHeader({ name }: { name: string }) {
     <>
       <Card style={{ padding: space.xl, marginBottom: space.md }}>
         <Row gap={space.lg}>
-          <Avatar uri={avatar ?? null} name={displayName} onPress={() => void run((d) => pickAvatar(d), { silent: true })} />
+          <Avatar uri={avatar ?? account?.avatarUrl ?? null} name={displayName} onPress={() => void run((d) => pickAvatar(d), { silent: true })} />
           <PressableScale style={{ flex: 1 }} onPress={() => router.push(account ? '/cuenta' : '/cuenta/entrar')} accessibilityRole="button" accessibilityLabel="Tu cuenta">
             <Row gap={space.sm}>
               <View style={{ flex: 1 }}>

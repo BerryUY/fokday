@@ -91,6 +91,8 @@ export type AuthUser = { id: string; email: string | null; name: string | null }
 
 /** Compact numbers of one week, built on the phone, for the Pro weekly summary. */
 export type WeekInput = Record<string, unknown>;
+/** The Pro weekly summary: a title, wins, what to improve, one tip and next week's focus. */
+export type WeekSummary = { title: string; wins: string[]; improve: string[]; tip: string; focus: string };
 
 export type Env = {
   /** sha256 (hex) of the owner's invite code (legacy sign-up without an account). */
@@ -105,7 +107,7 @@ export type Env = {
   /** Reads a JPEG (base64) and estimates its nutrition. Missing when the server has no AI key. */
   analyzeFood?: (jpegBase64: string) => Promise<FoodAnalysis>;
   /** Writes the Pro weekly summary from the week's numbers. */
-  summarizeWeek?: (week: WeekInput) => Promise<string>;
+  summarizeWeek?: (week: WeekInput) => Promise<WeekSummary>;
   /** Checks a Supabase access token; null when it is invalid or expired. */
   verifyAuthToken?: (jwt: string) => Promise<AuthUser | null>;
   /** Removes the Supabase account itself (account deletion). */
@@ -591,12 +593,14 @@ export async function handleWeeklySummary(req: ApiRequest, store: BackupStore, e
   if (!q.pro) return { status: 402, json: { error: 'El resumen semanal es parte de Pro.' } };
   if (!env.summarizeWeek) return { status: 503, json: { error: 'El análisis con IA todavía no está activado en el servidor.' } };
   const week = (req.body as { week?: unknown } | null)?.week;
-  if (!week || typeof week !== 'object' || Array.isArray(week) || JSON.stringify(week).length > 4000) return { status: 400, json: { error: 'Datos de la semana inválidos.' } };
+  if (!week || typeof week !== 'object' || Array.isArray(week) || JSON.stringify(week).length > 6000) return { status: 400, json: { error: 'Datos de la semana inválidos.' } };
   if (q.used >= q.limit || !(await store.tryUse(auth.profile.id, day, 'summary', q.limit))) {
     return { status: 429, json: { error: 'Ya armaste los resúmenes de hoy. Probá mañana.' } };
   }
   try {
-    return { status: 200, json: { text: await env.summarizeWeek(week as WeekInput) } };
+    const summary = await env.summarizeWeek(week as WeekInput);
+    // text is for app versions that only show plain text.
+    return { status: 200, json: { summary, text: [summary.title + '.', ...summary.wins, ...summary.improve, summary.tip].join(' ').slice(0, 900) } };
   } catch (e) {
     await store.refundUse(auth.profile.id, day, 'summary');
     const message = e instanceof Error && e.message.startsWith('IA:') ? e.message.slice(3).trim() : 'No pudimos armar el resumen. Probá más tarde.';
