@@ -1,7 +1,9 @@
-import { handleRequest, MAX_PAYLOAD_BYTES, type Env, type LimitSet, type QuotaKind } from './handlers.ts';
+import { handleRequest, MAX_PAYLOAD_BYTES, type Env, type FoodAnalysis, type LimitSet, type QuotaKind } from './handlers.ts';
 import { createFoodAnalyzer } from './ai.ts';
 import { createAdRewardVerifier, fetchAdMobKeys } from './adReward.ts';
-import { createGeminiAnalyzer, createWeekSummarizer, type GeminiKey } from './gemini.ts';
+import { chainAnalyzers } from './analysis.ts';
+import { CLOUDFLARE_BUDGET_MS, createCloudflareAnalyzer } from './cloudflare.ts';
+import { createGeminiAnalyzer, createWeekSummarizer, GEMINI_BUDGET_MS, type GeminiKey } from './gemini.ts';
 import { createBarcodeLookup } from './openFoodFacts.ts';
 import { createAuthHelpers, createSupabaseStore, readConfig } from './store.ts';
 
@@ -35,8 +37,17 @@ const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
 const freeKeys: GeminiKey[] = geminiKey ? [{ apiKey: geminiKey }] : [];
 const proTier = (Deno.env.get('GEMINI_PRO_SERVICE_TIER') === 'standard' ? 'standard' : 'priority') as GeminiKey['serviceTier'];
 const proKeys: GeminiKey[] = [...(geminiProKey ? [{ apiKey: geminiProKey, serviceTier: proTier }] : []), ...freeKeys];
-const freeAnalyzer = freeKeys.length ? createGeminiAnalyzer(freeKeys) : anthropicKey ? createFoodAnalyzer(anthropicKey) : undefined;
-const proAnalyzer = geminiProKey ? createGeminiAnalyzer(proKeys) : freeAnalyzer;
+// When Google is overloaded, photos move on to Cloudflare Workers AI (CLOUDFLARE_ACCOUNT_ID and
+// CLOUDFLARE_AI_TOKEN; free daily allowance) instead of failing. Gemini then gets a shorter budget
+// so both fit in one app request.
+const cfAccount = Deno.env.get('CLOUDFLARE_ACCOUNT_ID');
+const cfToken = Deno.env.get('CLOUDFLARE_AI_TOKEN');
+const cloudflare = cfAccount && cfToken ? createCloudflareAnalyzer({ accountId: cfAccount, token: cfToken }) : undefined;
+const geminiBudget = cloudflare ? GEMINI_BUDGET_MS - CLOUDFLARE_BUDGET_MS + 10_000 : GEMINI_BUDGET_MS;
+const withBackup = (primary: (jpeg: string) => Promise<FoodAnalysis>) => (cloudflare ? chainAnalyzers(primary, cloudflare) : primary);
+const freeGemini = freeKeys.length ? createGeminiAnalyzer(freeKeys, undefined, undefined, geminiBudget) : anthropicKey ? createFoodAnalyzer(anthropicKey) : undefined;
+const freeAnalyzer = freeGemini ? withBackup(freeGemini) : cloudflare;
+const proAnalyzer = geminiProKey ? withBackup(createGeminiAnalyzer(proKeys, undefined, undefined, geminiBudget)) : freeAnalyzer;
 const analyzeFood = freeAnalyzer && ((jpeg: string, opts?: { pro: boolean }) => (opts?.pro && proAnalyzer ? proAnalyzer : freeAnalyzer)(jpeg));
 // The summary is Pro only; on the paid key it runs at standard tier (it isn't urgent).
 const summarizeWeek = proKeys.length ? createWeekSummarizer(proKeys.map((k) => ({ apiKey: k.apiKey }))) : undefined;

@@ -1,4 +1,4 @@
-import { FIELD_DESCRIPTIONS as D, parseAnalysis, REQUIRED_FIELDS, SYSTEM_PROMPT, USER_PROMPT } from './analysis.ts';
+import { AiError, FIELD_DESCRIPTIONS as D, parseAnalysis, REQUIRED_FIELDS, SYSTEM_PROMPT, USER_PROMPT } from './analysis.ts';
 import type { FoodAnalysis, WeekSummary } from './handlers.ts';
 
 /**
@@ -61,15 +61,15 @@ type Attempt = { status: number; body: GeminiResponse };
  */
 export type GeminiKey = { apiKey: string; serviceTier?: 'priority' | 'standard' };
 
-/** The answer budget (the app waits 75 s) and how long one model gets. */
-const TOTAL_BUDGET_MS = 60_000;
-const PER_MODEL_TIMEOUT_MS = 30_000;
+/**
+ * The answer budget (the app waits 75 s per try) and how long one model gets. Models keep their
+ * default thinking: precision matters more than a few seconds.
+ */
+export const GEMINI_BUDGET_MS = 60_000;
+const PER_MODEL_TIMEOUT_MS = 35_000;
 /** A model that hasn't answered by then gets a second one racing it; the first answer wins. */
-const HEDGE_AFTER_MS = 12_000;
+const HEDGE_AFTER_MS = 20_000;
 const MAX_IN_FLIGHT = 2;
-
-/** Less thinking = faster answers; estimating a plate doesn't need deep reasoning. */
-const THINKING: Record<string, string> = { 'gemini-3.8-flash': 'low', 'gemini-3.6-flash': 'minimal', 'gemini-3.5-flash-lite': 'minimal' };
 
 const retryable = (status: number) => status === 404 || status === 429 || status >= 500;
 
@@ -79,7 +79,7 @@ const retryable = (status: number) => status === 404 || status === 429 || status
  * one is overloaded (5xx), out of quota (429) or gone (404), and keeps the first good answer.
  * Errors starting with "IA:" are shown to the person.
  */
-function createGeminiCaller(keys: string | GeminiKey[], fetchFn: FetchFn, models: string[]) {
+function createGeminiCaller(keys: string | GeminiKey[], fetchFn: FetchFn, models: string[], budgetMs: number) {
   const keyList: GeminiKey[] = typeof keys === 'string' ? [{ apiKey: keys }] : keys;
   const routes = keyList.flatMap((key) => models.map((model) => ({ key, model })));
 
@@ -95,16 +95,11 @@ function createGeminiCaller(keys: string | GeminiKey[], fetchFn: FetchFn, models
 
   async function call(route: (typeof routes)[number], body: Record<string, unknown>, timeoutMs: number, stop: AbortSignal): Promise<Attempt> {
     const signal = AbortSignal.any([stop, AbortSignal.timeout(timeoutMs)]);
-    const thinking = THINKING[route.model];
-    const tuned: Record<string, unknown> = {
-      ...body,
-      ...(route.key.serviceTier ? { serviceTier: route.key.serviceTier } : {}),
-      ...(thinking ? { generationConfig: { ...(body.generationConfig as object), thinkingConfig: { thinkingLevel: thinking } } } : {}),
-    };
+    const tuned = route.key.serviceTier ? { ...body, serviceTier: route.key.serviceTier } : body;
     try {
       let attempt = await post(route.model, route.key.apiKey, tuned, signal);
-      // A model that rejects the speed settings still gets the plain request.
-      if (attempt.status === 400 && (thinking || route.key.serviceTier) && /thinking|service.?tier/i.test(attempt.body.error?.message ?? '')) {
+      // If the service tier is ever rejected, the plain request still goes through.
+      if (attempt.status === 400 && tuned !== body && /service.?tier/i.test(attempt.body.error?.message ?? '')) {
         attempt = await post(route.model, route.key.apiKey, body, signal);
       }
       return attempt;
@@ -115,7 +110,7 @@ function createGeminiCaller(keys: string | GeminiKey[], fetchFn: FetchFn, models
   }
 
   function race(body: Record<string, unknown>): Promise<Attempt> {
-    const deadline = Date.now() + TOTAL_BUDGET_MS;
+    const deadline = Date.now() + budgetMs;
     const stop = new AbortController();
     return new Promise((resolve) => {
       let next = 0;
@@ -157,17 +152,18 @@ function createGeminiCaller(keys: string | GeminiKey[], fetchFn: FetchFn, models
 
     if (status >= 300) {
       const reason = `${res.error?.status ?? ''} ${res.error?.message ?? ''}`;
-      if (status === 429) throw new Error('IA: Se llenó el cupo de la IA por ahora. Probá en un rato o cargala a mano.');
-      if (status === 401 || status === 403 || /API_KEY|API key/i.test(reason)) throw new Error('IA: La IA no está bien configurada en el servidor.');
-      if (status === 400) throw new Error(what.unreadable);
-      if (status >= 500) throw new Error('IA: El servicio de IA está ocupado. Probá de nuevo en un minuto.');
-      throw new Error(`Gemini respondió ${status}: ${reason.trim()}`);
+      // Busy errors let the caller try another provider; the rest go straight to the person.
+      if (status === 429) throw new AiError('IA: Se llenó el cupo de la IA por ahora. Probá en un rato o cargala a mano.', true);
+      if (status === 401 || status === 403 || /API_KEY|API key/i.test(reason)) throw new AiError('IA: La IA no está bien configurada en el servidor.', true);
+      if (status === 400) throw new AiError(what.unreadable);
+      if (status >= 500) throw new AiError('IA: El servicio de IA está ocupado. Probá de nuevo en un minuto.', true);
+      throw new AiError(`Gemini respondió ${status}: ${reason.trim()}`, true);
     }
 
-    if (res.promptFeedback?.blockReason) throw new Error(what.blocked);
+    if (res.promptFeedback?.blockReason) throw new AiError(what.blocked);
     const candidate = res.candidates?.[0];
-    if (candidate?.finishReason === 'MAX_TOKENS') throw new Error('IA: La respuesta quedó incompleta. Probá de nuevo.');
-    if (candidate?.finishReason && candidate.finishReason !== 'STOP') throw new Error(what.blocked);
+    if (candidate?.finishReason === 'MAX_TOKENS') throw new AiError('IA: La respuesta quedó incompleta. Probá de nuevo.', true);
+    if (candidate?.finishReason && candidate.finishReason !== 'STOP') throw new AiError(what.blocked);
     return (candidate?.content?.parts ?? [])
       .filter((p) => typeof p.text === 'string' && !p.thought)
       .map((p) => p.text)
@@ -175,8 +171,8 @@ function createGeminiCaller(keys: string | GeminiKey[], fetchFn: FetchFn, models
   };
 }
 
-export function createGeminiAnalyzer(keys: string | GeminiKey[], fetchFn: FetchFn = fetch as unknown as FetchFn, models = GEMINI_MODELS) {
-  const generate = createGeminiCaller(keys, fetchFn, models);
+export function createGeminiAnalyzer(keys: string | GeminiKey[], fetchFn: FetchFn = fetch as unknown as FetchFn, models = GEMINI_MODELS, budgetMs = GEMINI_BUDGET_MS) {
+  const generate = createGeminiCaller(keys, fetchFn, models, budgetMs);
   return async function analyzeFood(jpegBase64: string): Promise<FoodAnalysis> {
     const text = await generate(
       {
@@ -231,7 +227,7 @@ export function parseWeekSummary(text: string): WeekSummary | null {
 }
 
 export function createWeekSummarizer(keys: string | GeminiKey[], fetchFn: FetchFn = fetch as unknown as FetchFn, models = SUMMARY_MODELS) {
-  const generate = createGeminiCaller(keys, fetchFn, models);
+  const generate = createGeminiCaller(keys, fetchFn, models, GEMINI_BUDGET_MS);
   return async function summarizeWeek(week: Record<string, unknown>): Promise<WeekSummary> {
     const text = await generate(
       {
@@ -242,7 +238,7 @@ export function createWeekSummarizer(keys: string | GeminiKey[], fetchFn: FetchF
       { unreadable: 'IA: No pudimos armar el resumen. Probá más tarde.', blocked: 'IA: No pudimos armar el resumen. Probá más tarde.' },
     );
     const summary = parseWeekSummary(text);
-    if (!summary) throw new Error('IA: No pudimos armar el resumen. Probá más tarde.');
+    if (!summary) throw new AiError('IA: No pudimos armar el resumen. Probá más tarde.', true);
     return summary;
   };
 }

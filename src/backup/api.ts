@@ -195,3 +195,24 @@ export const cloudApi = {
     return { meta, envelope: { format: BACKUP_FORMAT, checksum: meta.checksum, snapshot } };
   },
 };
+
+/** Waits between tries while every AI provider is overloaded (each try takes up to ~70 s on the server). */
+export const AI_RETRY_WAITS_MS = [3_000, 10_000, 20_000];
+
+/**
+ * The food photo, without giving up on a busy AI: when the server says every provider is
+ * overloaded (503) or the connection drops, it waits and tries again, telling the screen once
+ * so it can say so. Real problems (no food in the photo, out of photos) come back right away.
+ */
+export async function analyzeFoodPatiently(config: CloudConfig, jpegBase64: string, onBusy: () => void, waits = AI_RETRY_WAITS_MS, fetchImpl?: FetchLike) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await cloudApi.analyzeFood(config, jpegBase64, fetchImpl);
+    } catch (e) {
+      const busy = e instanceof ApiError && (e.status === 503 || e.status === null);
+      if (!busy || attempt >= waits.length) throw e;
+      onBusy();
+      await new Promise((r) => setTimeout(r, waits[attempt]));
+    }
+  }
+}

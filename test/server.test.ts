@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { AiError } from '../supabase/functions/momentum/analysis';
 import { cloudApi, type FetchLike } from '@/backup/api';
 import { applyRestore, getSyncInfo, prepareCloudRestore, runBackup, setLinked, type SyncDeps } from '@/backup/sync';
 import { getDailyTotals, listMeals, logMeal } from '@/data/meals';
@@ -509,6 +510,13 @@ describe('accounts, plans and rewarded videos', () => {
     await cloudApi.analyzeFood(ana, photo, fetchImpl);
     await cloudApi.analyzeFood(ana, photo, wire(store, { ...env, checkPro: async () => true }));
     expect(seen).toEqual([false, true]);
+  });
+
+  it('answers 503 busy when every AI provider is overloaded, and gives the photo back', async () => {
+    const { fetchImpl } = accounts({ analyzeFood: async () => { throw new AiError('IA: El servicio de IA está ocupado.', true); } });
+    const ana = { url: URL, token: jwt('ana') };
+    await expect(cloudApi.analyzeFood(ana, photo, fetchImpl)).rejects.toMatchObject({ status: 503 });
+    expect((await cloudApi.status(ana, fetchImpl)).ai.used).toBe(0);
   });
 
   it('writes the weekly summary only for Pro', async () => {

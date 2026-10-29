@@ -6,6 +6,37 @@ import type { FoodAnalysis } from './handlers.ts';
  * Errors that start with "IA:" are shown to the person.
  */
 
+/**
+ * An AI failure. busy: another try (or another provider) may well work: overloaded, out of quota,
+ * timed out, or a garbled answer. Not busy: retrying won't help (no food in the photo, bad image).
+ */
+export class AiError extends Error {
+  constructor(message: string, readonly busy = false) {
+    super(message);
+  }
+}
+
+export const isBusy = (e: unknown) => e instanceof AiError && e.busy;
+
+/**
+ * Tries each analyzer in order, moving on only when one is busy, so a photo reaches another
+ * provider instead of an error.
+ */
+export function chainAnalyzers<A extends unknown[], R>(...steps: ((...args: A) => Promise<R>)[]) {
+  return async (...args: A): Promise<R> => {
+    let last: unknown = new AiError('IA: El servicio de IA está ocupado. Probá de nuevo en un minuto.', true);
+    for (const step of steps) {
+      try {
+        return await step(...args);
+      } catch (e) {
+        if (!isBusy(e)) throw e;
+        last = e;
+      }
+    }
+    throw last;
+  };
+}
+
 export const SYSTEM_PROMPT =
   'Sos un nutricionista que estima calorías y macronutrientes a partir de una foto de comida. ' +
   'Estimá la porción completa que se ve (no por 100 g), usando tamaños de porción habituales en Uruguay y Argentina. ' +
@@ -31,14 +62,14 @@ const clamp = (v: unknown, max: number) => (typeof v === 'number' && Number.isFi
 
 /** Turns the model's JSON text into a FoodAnalysis, or throws an "IA:" error. */
 export function parseAnalysis(text: string | undefined): FoodAnalysis {
-  if (!text) throw new Error('IA: No pudimos analizar la foto. Probá de nuevo.');
+  if (!text) throw new AiError('IA: No pudimos analizar la foto. Probá de nuevo.', true);
   let raw: Record<string, unknown>;
   try {
     raw = JSON.parse(text) as Record<string, unknown>;
   } catch {
-    throw new Error('IA: No pudimos analizar la foto. Probá de nuevo.');
+    throw new AiError('IA: No pudimos analizar la foto. Probá de nuevo.', true);
   }
-  if (raw.is_food === false) throw new Error('IA: No vemos comida en la foto. Probá con otra.');
+  if (raw.is_food === false) throw new AiError('IA: No vemos comida en la foto. Probá con otra.');
 
   const items = Array.isArray(raw.items)
     ? (raw.items as { name?: unknown; grams?: unknown }[])

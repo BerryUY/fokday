@@ -156,7 +156,7 @@ describe('Gemini never giving up early', () => {
       return Promise.resolve(ok);
     };
     const pending = createGeminiAnalyzer('k', fetchFn, ['slow', 'fast'])('x');
-    await jest.advanceTimersByTimeAsync(12_000);
+    await jest.advanceTimersByTimeAsync(20_000);
     expect((await pending).name).toBe('Milanesa con puré');
     expect(calls).toEqual(['slow', 'fast']);
     jest.useRealTimers();
@@ -177,17 +177,14 @@ describe('Gemini never giving up early', () => {
     ]);
   });
 
-  it('asks for less thinking, and retries plainly if a model rejects that', async () => {
+  it('keeps the full thinking of the model for precision, and marks overload as busy so another provider can try', async () => {
     const bodies: Record<string, unknown>[] = [];
-    const fetchFn = async (_url: string, init: { body: string }) => {
-      const body = JSON.parse(init.body) as { generationConfig: Record<string, unknown> };
-      bodies.push(body);
-      return body.generationConfig.thinkingConfig
-        ? { ok: false, status: 400, json: async () => ({ error: { status: 'INVALID_ARGUMENT', message: 'thinking_level is not supported' } }) }
-        : ok;
-    };
-    expect((await createGeminiAnalyzer('k', fetchFn, ['gemini-3.8-flash'])('x')).name).toBe('Milanesa con puré');
-    expect((bodies[0].generationConfig as Record<string, unknown>).thinkingConfig).toEqual({ thinkingLevel: 'low' });
-    expect(bodies).toHaveLength(2);
+    const analyze = createGeminiAnalyzer('k', async (_url: string, init: { body: string }) => {
+      bodies.push(JSON.parse(init.body));
+      return { ok: false, status: 503, json: async () => ({}) };
+    }, ['gemini-3.8-flash']);
+    await expect(analyze('x')).rejects.toMatchObject({ busy: true });
+    expect((bodies[0].generationConfig as Record<string, unknown>).thinkingConfig).toBeUndefined();
+    await expect(createGeminiAnalyzer('k', fakeFetch(200, answer({ ...milanesa, is_food: false })))('x')).rejects.toMatchObject({ busy: false });
   });
 });

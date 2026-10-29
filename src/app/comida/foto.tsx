@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Image, StyleSheet, Switch, View } from 'react-native';
 import Animated, { Easing, FadeIn, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
-import { ApiError, cloudApi, type FoodAnalysis } from '@/backup/api';
+import { analyzeFoodPatiently, ApiError, type FoodAnalysis } from '@/backup/api';
 import { refreshPlan, setQuota, usePlan } from '@/billing/pro';
 import { left, QuotaCard } from '@/components/QuotaCard';
 import { Burst } from '@/components/juice/Burst';
@@ -25,7 +25,7 @@ import { haptic, useToast } from '@/state/toast';
 import { useColors } from '@/theme/ThemeProvider';
 import { radius, space } from '@/theme/tokens';
 
-type Phase = { kind: 'pick' } | { kind: 'analyzing'; uri: string } | { kind: 'result'; uri: string; food: FoodAnalysis; remaining: number };
+type Phase = { kind: 'pick' } | { kind: 'analyzing'; uri: string; busy: boolean } | { kind: 'result'; uri: string; food: FoodAnalysis; remaining: number };
 
 /** A small JPEG is enough for the AI and keeps the upload fast (~100 KB). */
 async function toSmallJpeg(uri: string): Promise<string> {
@@ -75,9 +75,9 @@ export default function FoodPhotoScreen() {
     const result = source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
     if (result.canceled || !result.assets?.[0]) return;
     const uri = result.assets[0].uri;
-    setPhase({ kind: 'analyzing', uri });
+    setPhase({ kind: 'analyzing', uri, busy: false });
     try {
-      const { food, remaining, ai } = await cloudApi.analyzeFood(config, await toSmallJpeg(uri));
+      const { food, remaining, ai } = await analyzeFoodPatiently(config, await toSmallJpeg(uri), () => setPhase({ kind: 'analyzing', uri, busy: true }));
       setQuota('ai', ai);
       setName(food.name);
       setKcal(toInput(food.calories, 0));
@@ -160,7 +160,7 @@ export default function FoodPhotoScreen() {
       {phase.kind === 'analyzing' ? (
         <View style={{ gap: space.lg }}>
           <Image source={{ uri: phase.uri }} style={[styles.photo, { backgroundColor: c.surfaceAlt }]} />
-          <Analyzing />
+          <Analyzing busy={phase.busy} />
         </View>
       ) : null}
 
@@ -213,8 +213,8 @@ export default function FoodPhotoScreen() {
   );
 }
 
-/** A soft pulsing card while the AI works (usually a few seconds). */
-function Analyzing() {
+/** A soft pulsing card while the AI works; when it's busy, it says it keeps trying. */
+function Analyzing({ busy }: { busy: boolean }) {
   const c = useColors();
   const pulse = useSharedValue(0.5);
   useEffect(() => {
@@ -224,7 +224,10 @@ function Analyzing() {
   return (
     <Animated.View style={[styles.analyzing, { backgroundColor: c.surface }, style]}>
       <Feather name="cpu" size={20} color={c.accent} />
-      <T variant="bodyMedium">Analizando tu comida…</T>
+      <View style={{ flex: 1 }}>
+        <T variant="bodyMedium">Analizando tu comida…</T>
+        {busy ? <T variant="caption" tone="muted">La IA está con mucha demanda. Seguimos intentando, quedate en esta pantalla.</T> : null}
+      </View>
     </Animated.View>
   );
 }

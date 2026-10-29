@@ -447,7 +447,9 @@ export async function handleAnalyzeFood(req: ApiRequest, store: BackupStore, env
   } catch (e) {
     await store.refundUse(auth.profile.id, day, 'photo');
     const message = e instanceof Error && e.message.startsWith('IA:') ? e.message.slice(3).trim() : 'No pudimos analizar la foto. Probá de nuevo.';
-    return { status: 502, json: { error: message } };
+    // 503 + busy: every provider was overloaded, so the app keeps trying instead of showing an error.
+    const busy = !!e && typeof e === 'object' && (e as { busy?: unknown }).busy === true;
+    return { status: busy ? 503 : 502, json: { error: message, busy } };
   }
   const ai = { ...q, used: q.used + 1 };
   return { status: 200, json: { food, remaining: Math.max(0, ai.limit - ai.used), ai } };
