@@ -10,7 +10,7 @@ export const PUBLIC_CONFIG = {
   /** Supabase publishable key: public by design; every table is closed to it (RLS without policies). */
   supabasePublishableKey: 'sb_publishable_SwzPD8gg9vVtjNowByM_fw_x9DQ1KtF',
   /** Google OAuth "Web" client id (from Google Cloud); empty until Google sign-in is set up. */
-  googleWebClientId: '',
+  googleWebClientId: '852230461173-lnh7afh6no2ej0pbdrfrq1qbbli1c0cp.apps.googleusercontent.com',
   /** RevenueCat public Android SDK key (starts with goog_); empty until RevenueCat is set up. */
   revenueCatAndroidKey: '',
   /** AdMob rewarded ad unit (ca-app-pub-…/…); empty uses Google's test unit. */
