@@ -64,10 +64,10 @@ export default function ComidasScreen() {
         <Loading />
       ) : (
         <>
+          <PhotoHero onPress={() => router.push({ pathname: '/comida/foto', params: { date } })} />
           <View style={styles.actions}>
-            <QuickAction icon="camera" label="Foto con IA" accent onPress={() => router.push({ pathname: '/comida/foto', params: { date } })} />
             <QuickAction icon="maximize" label="Escanear" onPress={() => router.push({ pathname: '/comida/escanear', params: { date } })} />
-            <QuickAction icon="zap" label="Sumar rápido" onPress={() => setQuickOpen(true)} />
+            <QuickAction icon="zap" label="Rápido" onPress={() => setQuickOpen(true)} />
             <QuickAction icon="globe" label="Biblioteca" onPress={() => router.push({ pathname: '/comida/biblioteca', params: { date } })} />
           </View>
 
@@ -191,13 +191,30 @@ export default function ComidasScreen() {
   );
 }
 
-/** Big, friendly entry points: photo, quick numbers, community library. */
-function QuickAction({ icon, label, onPress, accent }: { icon: 'camera' | 'zap' | 'globe' | 'maximize'; label: string; onPress: () => void; accent?: boolean }) {
+/** The main way to log food: one photo. Big, filled, impossible to miss. */
+function PhotoHero({ onPress }: { onPress: () => void }) {
   const c = useColors();
   return (
-    <PressableScale onPress={onPress} hapticFeedback accessibilityRole="button" accessibilityLabel={label} style={[styles.action, { backgroundColor: accent ? c.accent : c.surface }]}>
-      <Feather name={icon} size={22} color={accent ? c.accentText : c.accent} />
-      <T variant="label" color={accent ? c.accentText : c.text} numberOfLines={1} maxFontSizeMultiplier={1.2} style={{ fontWeight: '600' }}>{label}</T>
+    <PressableScale onPress={onPress} hapticFeedback accessibilityRole="button" accessibilityLabel="Foto con IA" style={[styles.hero, { backgroundColor: c.accent }]}>
+      <View style={[styles.heroIcon, { backgroundColor: 'rgba(0,0,0,0.12)' }]}>
+        <Feather name="camera" size={30} color={c.accentText} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <T variant="title" color={c.accentText}>Foto con IA</T>
+        <T variant="label" color={c.accentText} style={{ opacity: 0.75 }}>Sacale una foto al plato: la IA calcula calorías y macros.</T>
+      </View>
+      <Feather name="arrow-right" size={22} color={c.accentText} />
+    </PressableScale>
+  );
+}
+
+/** The other ways to log, smaller: scanner, quick numbers, community library. */
+function QuickAction({ icon, label, onPress }: { icon: 'zap' | 'globe' | 'maximize'; label: string; onPress: () => void }) {
+  const c = useColors();
+  return (
+    <PressableScale onPress={onPress} hapticFeedback accessibilityRole="button" accessibilityLabel={label} style={[styles.action, { backgroundColor: c.surface }]}>
+      <Feather name={icon} size={20} color={c.accent} />
+      <T variant="label" numberOfLines={1} maxFontSizeMultiplier={1.2} style={{ fontWeight: '600' }}>{label}</T>
     </PressableScale>
   );
 }
@@ -229,8 +246,10 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md, marginTop: space.lg },
   tileWrap: { width: '47.8%', flexGrow: 1 },
   tileWide: { width: '100%' },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginBottom: space.lg },
-  action: { flexBasis: '47%', flexGrow: 1, minHeight: 60, borderRadius: radius.lg, paddingHorizontal: space.lg, paddingVertical: space.md, gap: space.sm, flexDirection: 'row', alignItems: 'center' },
+  hero: { flexDirection: 'row', alignItems: 'center', gap: space.lg, borderRadius: radius.xl, padding: space.xl, marginBottom: space.sm },
+  heroIcon: { width: 60, height: 60, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  actions: { flexDirection: 'row', gap: space.sm, marginBottom: space.lg },
+  action: { flex: 1, minHeight: 72, borderRadius: radius.lg, paddingHorizontal: space.sm, paddingVertical: space.md, gap: 6, alignItems: 'center', justifyContent: 'center' },
   tile: { borderRadius: radius.lg, padding: space.lg, minHeight: 128 },
   tileIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   fav: { width: 158, borderRadius: radius.lg, padding: space.md, justifyContent: 'space-between' },

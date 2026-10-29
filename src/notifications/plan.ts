@@ -19,9 +19,13 @@ export type ReminderState = {
   pendingTodosToday: number;
   /** YYYY-MM-DD of the last weigh-in, or null. */
   lastWeightDate: string | null;
+  /** Current app streak (days in a row with something logged) and whether today already counts. */
+  streak: number;
+  streakDoneToday: boolean;
 };
 
-export type PlannedNotification = { id: string; title: string; body: string; at: Date };
+/** `racha` goes to its own Android channel (own sound and vibration, flame color). */
+export type PlannedNotification = { id: string; title: string; body: string; at: Date; channel?: 'racha' };
 
 export const PLAN_DAYS = 7;
 
@@ -33,9 +37,10 @@ const key = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
 
 export function planReminders(s: ReminderState): PlannedNotification[] {
   const out: PlannedNotification[] = [];
-  const add = (id: string, title: string, body: string, when: Date) => {
-    if (when.getTime() > s.now.getTime() + 60_000) out.push({ id, title, body, at: when });
+  const add = (id: string, title: string, body: string, when: Date, channel?: 'racha') => {
+    if (when.getTime() > s.now.getTime() + 60_000) out.push({ id, title, body, at: when, ...(channel ? { channel } : {}) });
   };
+  const days = (n: number) => `${n} ${n === 1 ? 'día' : 'días'}`;
   const has = (f: FeatureKey) => s.features.includes(f);
 
   for (let d = 0; d < PLAN_DAYS; d++) {
@@ -58,7 +63,21 @@ export function planReminders(s: ReminderState): PlannedNotification[] {
       const n = s.pendingTodosToday;
       add(`todos-${k}`, 'Para hoy', `Te ${n === 1 ? 'queda 1 tarea' : `quedan ${n} tareas`} por terminar.`, at(s.now, d, 19));
     }
-    if (!(today && s.mealsLoggedToday >= 2)) {
+    // The streak nudge replaces the generic one when the day doesn't count yet; once it counts,
+    // only a light meals reminder remains.
+    if (!(today && s.streakDoneToday)) {
+      const alive = today ? s.streak : s.streak + d;
+      add(
+        `streak-${k}`,
+        today && s.streak > 0 ? `🔥 Tu racha de ${days(s.streak)} está en juego` : today ? '🔥 Arrancá tu racha hoy' : '🔥 Mantené tu racha viva',
+        'Registrá una comida, tu peso o tu entreno para sumar el día.',
+        at(s.now, d, 20),
+        'racha',
+      );
+      if (today && alive >= 2) {
+        add(`streak-last-${k}`, `⏳ Últimas horas para tu racha de ${days(alive)}`, 'Con un registro rápido alcanza. ¡No la pierdas!', at(s.now, d, 22, 30), 'racha');
+      }
+    } else if (s.mealsLoggedToday < 2) {
       add(`meals-${k}`, '¿Anotaste lo que comiste?', 'Registrarlo te lleva un minuto (o una foto).', at(s.now, d, 21));
     }
   }

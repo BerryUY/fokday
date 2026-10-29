@@ -3,9 +3,9 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, Switch, View } from 'react-native';
 import { showAdsPrivacyOptions, videosAvailable } from '@/ads/rewarded';
-import { useAccount } from '@/auth/account';
 import { useSyncState } from '@/backup/service';
 import { usePro } from '@/billing/pro';
+import { ProfileHeader } from '@/components/ProfileHeader';
 import { ProBadge } from '@/components/ProGate';
 import { Field, Stepper } from '@/components/ui/form';
 import { ListRow, Loading, Screen } from '@/components/ui/layout';
@@ -43,7 +43,6 @@ function SettingsForm({ profile, calories, protein, latest }: {
   const c = useColors();
   const run = useMutation();
   const sync = useSyncState();
-  const { account } = useAccount();
   const pro = usePro();
   const [name, setName] = useState(profile.name);
   const [start, setStart] = useState(toInput(profile.startWeight, 1));
@@ -80,25 +79,7 @@ function SettingsForm({ profile, calories, protein, latest }: {
 
   return (
     <Screen title="Ajustes">
-      <Card padded={false} style={{ paddingVertical: space.xs, marginBottom: space.xl }}>
-        <ListRow
-          icon={account ? 'user-check' : 'log-in'}
-          iconTone="accent"
-          title={account ? account.name ?? account.email ?? 'Tu cuenta' : 'Entrar o crear cuenta'}
-          subtitle={account ? account.email ?? 'Tu cuenta' : 'Guardá tu progreso y activá la foto con IA y el escáner'}
-          onPress={() => router.push(account ? '/cuenta' : '/cuenta/entrar')}
-        />
-      </Card>
-
-      <Card padded={false} style={{ paddingVertical: space.xs, marginBottom: space.xl }}>
-        <ListRow
-          icon="zap"
-          iconTone="accent"
-          title={pro ? 'FokDay Pro activo' : 'Probá FokDay Pro'}
-          subtitle={pro ? 'Gracias por bancar la app' : 'Más fotos con IA, escáner ilimitado, resumen semanal y más'}
-          onPress={() => router.push('/pro')}
-        />
-      </Card>
+      <ProfileHeader name={profile.name} />
 
       <SectionHeader title="Perfil y objetivos" />
       <Card>

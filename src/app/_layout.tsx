@@ -1,11 +1,10 @@
 import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-  Inter_800ExtraBold,
+  StackSansHeadline_400Regular,
+  StackSansHeadline_500Medium,
+  StackSansHeadline_600SemiBold,
+  StackSansHeadline_700Bold,
   useFonts,
-} from '@expo-google-fonts/inter';
+} from '@expo-google-fonts/stack-sans-headline';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -17,6 +16,7 @@ import { useAccount } from '@/auth/account';
 import { startBackupService } from '@/backup/service';
 import { refreshPlan, syncPurchasesAccount, usePro } from '@/billing/pro';
 import { LaunchAnimation } from '@/components/brand/LaunchAnimation';
+import { StreakCelebration } from '@/components/streak';
 import { DialogHost } from '@/components/ui/dialog';
 import { PortalProvider } from '@/components/ui/portal';
 import { getProfile, type ThemePreference } from '@/data/settings';
@@ -32,7 +32,7 @@ import { setSoundsEnabled } from '@/lib/sound';
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold });
+  const [fontsLoaded, fontError] = useFonts({ StackSansHeadline_400Regular, StackSansHeadline_500Medium, StackSansHeadline_600SemiBold, StackSansHeadline_700Bold });
   const [db, setDb] = useState<Db | null>(null);
   const [dbError, setDbError] = useState<Error | null>(null);
 
@@ -110,6 +110,7 @@ function ThemedApp() {
       <ToastProvider>
         <PortalProvider>
           <Navigator />
+          <StreakCelebration enabled={!launching} />
           <DialogHost />
         </PortalProvider>
       </ToastProvider>

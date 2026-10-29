@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { finishSignIn, resetPasswordWithCode, sendPasswordCode, signInWithEmail, signInWithGoogle, signUpWithEmail, validEmail, type LinkChoice } from '@/auth/account';
 import { LinkChoiceSheet } from '@/components/CloudLink';
+import { GoogleButton } from '@/components/GoogleButton';
 import { Field } from '@/components/ui/form';
 import { Screen } from '@/components/ui/layout';
 import { Button, Card, Row, T } from '@/components/ui/primitives';
@@ -59,7 +60,7 @@ export default function SignInScreen() {
                 Con una cuenta tus datos se respaldan solos y los recuperás en otro teléfono. También activa la foto con IA, el escáner de códigos y la biblioteca compartida.
               </T>
             </Card>
-            <Button label="Continuar con Google" icon="log-in" size="lg" loading={busy === 'google'} onPress={() => run('google', async () => { await signInWithGoogle(); await done(); })} />
+            <GoogleButton loading={busy === 'google'} onPress={() => run('google', async () => { await signInWithGoogle(); await done(); })} />
             <Button label="Entrar con email" icon="mail" variant="secondary" size="lg" onPress={() => setMode('signin')} />
             <Button label="Crear cuenta con email" variant="ghost" onPress={() => setMode('signup')} />
           </>

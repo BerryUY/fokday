@@ -12,14 +12,25 @@ const base: ReminderState = {
   creatineToday: false,
   pendingTodosToday: 0,
   lastWeightDate: '2026-10-31',
+  streak: 4,
+  streakDoneToday: true,
 };
 const ids = (s: Partial<ReminderState>) => planReminders({ ...base, ...s }).map((n) => n.id);
 
 describe('automatic reminders', () => {
-  it('only plans the meals reminder by default, one per day for a week', () => {
+  it('by default: the meals reminder today, then a streak nudge each coming day', () => {
     expect(ids({})).toEqual([
-      'meals-2026-10-27', 'meals-2026-10-28', 'meals-2026-10-29', 'meals-2026-10-30', 'meals-2026-10-31', 'meals-2026-11-01', 'meals-2026-11-02',
+      'meals-2026-10-27', 'streak-2026-10-28', 'streak-2026-10-29', 'streak-2026-10-30', 'streak-2026-10-31', 'streak-2026-11-01', 'streak-2026-11-02',
     ]);
+  });
+
+  it('protects the streak while today does not count yet', () => {
+    const plan = planReminders({ ...base, streakDoneToday: false });
+    const today = plan.filter((n) => n.id.endsWith('2026-10-27'));
+    expect(today.map((n) => n.id)).toEqual(['streak-2026-10-27', 'streak-last-2026-10-27']);
+    expect(today[0]).toMatchObject({ title: '🔥 Tu racha de 4 días está en juego', channel: 'racha' });
+    expect(today[0].at.getHours()).toBe(20);
+    expect(planReminders({ ...base, streak: 0, streakDoneToday: false })[0].title).toBe('🔥 Arrancá tu racha hoy');
   });
 
   it('skips today\'s reminder once the thing is done', () => {

@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { finishSignIn, signInWithGoogle, useAccount, type LinkChoice } from '@/auth/account';
 import { authConfigured } from '@/auth/supabase';
 import { LinkChoiceSheet } from '@/components/CloudLink';
+import { GoogleButton } from '@/components/GoogleButton';
 import { FokDayMark } from '@/components/brand/FokDayMark';
 import { Button, Chip, IconButton, Row, T } from '@/components/ui/primitives';
 import { completeOnboarding, isOnboarded, updateProfile, type FeatureKey } from '@/data/settings';
@@ -147,7 +148,7 @@ export default function WelcomeScreen() {
       <Button label="Continuar" size="lg" onPress={next} />
     ) : (
       <View style={{ gap: space.sm }}>
-        <Button label="Continuar con Google" icon="log-in" size="lg" loading={signingIn} onPress={google} />
+        <GoogleButton loading={signingIn} onPress={() => void google()} />
         <Button label="Con email" icon="mail" variant="secondary" onPress={() => router.push('/cuenta/entrar')} />
         <Button label="Ahora no" variant="ghost" size="sm" onPress={next} />
       </View>

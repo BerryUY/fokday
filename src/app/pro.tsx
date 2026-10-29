@@ -13,8 +13,7 @@ import { radius, space } from '@/theme/tokens';
 
 /** What each plan includes; mirrors the server limits (QUOTA_DEFAULTS) and the Play listing. */
 const BENEFITS: { icon: IconName; title: string; free: string; pro: string }[] = [
-  { icon: 'camera', title: 'Foto con IA', free: '2 por día + extras con videos', pro: '20 por día, sin videos' },
-  { icon: 'maximize', title: 'Escáner de códigos de barras', free: '1 por día + hasta 5 con videos', pro: 'Ilimitado' },
+  { icon: 'camera', title: 'Foto con IA', free: '1 por día + 1 más mirando un video', pro: '20 por día, sin videos' },
   { icon: 'message-circle', title: 'Resumen semanal con IA', free: '—', pro: 'Cómo te fue y un consejo, cada semana' },
   { icon: 'trending-up', title: 'Estadísticas avanzadas', free: '7 y 30 días', pro: '90 días, todo el historial y progresión por ejercicio' },
   { icon: 'droplet', title: 'Temas de color', free: '—', pro: '6 colores para la app' },

@@ -15,6 +15,9 @@ export type Palette = {
   proteinSoft: string;
   weight: string;
   weightSoft: string;
+  /** The streak flame (warm orange, like a real fire). */
+  streak: string;
+  streakSoft: string;
   warning: string;
   danger: string;
   dangerSoft: string;
@@ -40,6 +43,8 @@ export const dark: Palette = {
   proteinSoft: 'rgba(124, 200, 255, 0.12)',
   weight: '#F5C46B',
   weightSoft: 'rgba(245, 196, 107, 0.12)',
+  streak: '#FF9632',
+  streakSoft: 'rgba(255, 150, 50, 0.14)',
   warning: '#F5C46B',
   danger: '#FF7A6B',
   dangerSoft: 'rgba(255, 122, 107, 0.12)',
@@ -65,6 +70,8 @@ export const light: Palette = {
   proteinSoft: 'rgba(31, 127, 196, 0.12)',
   weight: '#B7791F',
   weightSoft: 'rgba(183, 121, 31, 0.12)',
+  streak: '#E8740C',
+  streakSoft: 'rgba(232, 116, 12, 0.12)',
   warning: '#B7791F',
   danger: '#D2483A',
   dangerSoft: 'rgba(210, 72, 58, 0.1)',
@@ -106,12 +113,13 @@ export function withAccent(base: Palette, key: AccentKey): Palette {
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 28, xxxl: 40 } as const;
 export const radius = { sm: 10, md: 14, lg: 20, xl: 26, pill: 999 } as const;
 
+/** Stack Sans Headline everywhere (its heaviest cut is 700, so "heavy" is the bold one). */
 export const font = {
-  regular: 'Inter_400Regular',
-  medium: 'Inter_500Medium',
-  semibold: 'Inter_600SemiBold',
-  bold: 'Inter_700Bold',
-  heavy: 'Inter_800ExtraBold',
+  regular: 'StackSansHeadline_400Regular',
+  medium: 'StackSansHeadline_500Medium',
+  semibold: 'StackSansHeadline_600SemiBold',
+  bold: 'StackSansHeadline_700Bold',
+  heavy: 'StackSansHeadline_700Bold',
 } as const;
 
 export const type = {

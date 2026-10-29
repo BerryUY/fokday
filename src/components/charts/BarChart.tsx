@@ -8,23 +8,27 @@ import { font } from '@/theme/tokens';
 export type Bar = { key: string; label: string; value: number | null; goal?: number | null; detail?: string };
 
 /**
- * Bars with an optional per-bar goal tick. `null` values are drawn as a hollow
+ * Bars with an optional per-bar goal tick, or one dashed goal line across the chart
+ * (`goalLine`) with each bar colored by `colorFor`. `null` values are drawn as a hollow
  * dot on the baseline: "no data" is visibly different from a recorded zero.
  */
-export function BarChart({ data, color, height = 160, formatValue, showEveryLabel = 1, emptyLabel = 'Sin datos en este período' }: {
+export function BarChart({ data, color, height = 160, formatValue, showEveryLabel = 1, emptyLabel = 'Sin datos en este período', goalLine, goalLabel, colorFor }: {
   data: Bar[];
   color: string;
   height?: number;
   formatValue: (v: number) => string;
   showEveryLabel?: number;
   emptyLabel?: string;
+  goalLine?: number | null;
+  goalLabel?: string;
+  colorFor?: (bar: Bar & { value: number }) => string;
 }) {
   const c = useColors();
   const [width, setWidth] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const pad = { top: 10, bottom: 20 };
   const hasData = data.some((d) => d.value !== null);
-  const max = Math.max(1, ...data.map((d) => Math.max(d.value ?? 0, d.goal ?? 0))) * 1.08;
+  const max = Math.max(1, goalLine ?? 0, ...data.map((d) => Math.max(d.value ?? 0, goalLine ? 0 : d.goal ?? 0))) * 1.12;
   const h = height - pad.top - pad.bottom;
   const slot = data.length ? width / data.length : 0;
   const barW = Math.max(3, Math.min(28, slot * 0.62));
@@ -54,6 +58,14 @@ export function BarChart({ data, color, height = 160, formatValue, showEveryLabe
           <>
             <Svg width={width} height={height}>
               <Line x1={0} x2={width} y1={pad.top + h} y2={pad.top + h} stroke={c.border} strokeWidth={1} />
+              {goalLine ? (
+                <G>
+                  <Line x1={0} x2={width} y1={y(goalLine)} y2={y(goalLine)} stroke={c.text} strokeOpacity={0.55} strokeWidth={1.2} strokeDasharray="4 4" />
+                  {goalLabel ? (
+                    <SvgText x={width - 2} y={y(goalLine) - 5} fill={c.textMuted} fontSize={10} fontFamily={font.semibold} textAnchor="end">{goalLabel}</SvgText>
+                  ) : null}
+                </G>
+              ) : null}
               {data.map((d, i) => {
                 const cx = slot * i + slot / 2;
                 const active = selected === i;
@@ -68,11 +80,11 @@ export function BarChart({ data, color, height = 160, formatValue, showEveryLabe
                         width={barW}
                         height={Math.max(2, pad.top + h - y(d.value))}
                         rx={Math.min(6, barW / 2)}
-                        fill={color}
+                        fill={colorFor ? colorFor({ ...d, value: d.value }) : color}
                         opacity={selected === null || active ? 1 : 0.4}
                       />
                     )}
-                    {d.goal ? (
+                    {d.goal && !goalLine ? (
                       <Line x1={cx - barW / 2 - 2} x2={cx + barW / 2 + 2} y1={y(d.goal)} y2={y(d.goal)} stroke={c.text} strokeOpacity={0.5} strokeWidth={1.5} />
                     ) : null}
                     {i % showEveryLabel === 0 ? (

@@ -6,6 +6,7 @@ import { saveWeight } from '@/data/weight';
 import {
   backupsToKeep,
   handleRequest,
+  QUOTA_DEFAULTS,
   sha256Hex,
   type ApiRequest,
   type AuthUser,
@@ -364,6 +365,8 @@ describe('accounts, plans and rewarded videos', () => {
       inviteCodeHash: sha256Hex(INVITE), maxProfiles: 5, minUploadIntervalSeconds: 60, now: mem.now,
       analyzeFood: async () => analysis, verifyAuthToken, deleteAuthUser: async (id) => void deleted.push(id),
       verifyAdReward: async (raw) => raw.includes('signature=good'),
+      // The behavior under test, independent of today's production numbers (momentum_config).
+      limits: { photo: { free: 2, bonusMax: 3, videosPerExtra: 2, pro: 20 }, barcode: { free: 1, bonusMax: 5, videosPerExtra: 1, pro: 200 } },
       ...extra,
     };
     return { ...mem, env, deleted, fetchImpl: wire(mem.store, env) };
@@ -486,5 +489,12 @@ describe('accounts, plans and rewarded videos', () => {
     await cloudApi.deleteProfile({ url: URL, token: jwt('ana') }, fetchImpl);
     expect(profiles).toHaveLength(0);
     expect(deleted).toEqual([users.ana.id]);
+  });
+});
+
+describe('default daily limits', () => {
+  it('free: 1 AI photo plus 1 more for one video; barcode free for everyone (no AI behind it)', () => {
+    expect(QUOTA_DEFAULTS.photo).toEqual({ free: 1, bonusMax: 1, videosPerExtra: 1, pro: 20 });
+    expect(QUOTA_DEFAULTS.barcode).toMatchObject({ free: 200, bonusMax: 0, pro: 200 });
   });
 });

@@ -30,7 +30,11 @@ export async function go(page, route) {
   await page.goto(BASE + route, { waitUntil: 'networkidle' });
   // react-native-web gives <input> an intrinsic width that native TextInputs do not have; let flex size them like on Android.
   await page.addStyleTag({ content: 'input{min-width:0!important;width:100%!important}div:has(>input){min-width:0!important}' });
-  await page.waitForTimeout(1500);
+  // Let the launch animation finish.
+  await page.waitForTimeout(+(process.env.WAIT || 4500));
+  // Close the once-a-day streak celebration if it is up.
+  const vamos = page.getByText('¡Vamos!');
+  if (await vamos.count()) { await vamos.first().click(); await page.waitForTimeout(800); }
 }
 
 export async function importDemo(page) {

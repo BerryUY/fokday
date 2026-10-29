@@ -1,14 +1,15 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Redirect } from 'expo-router';
 import { TopTabs, type MaterialTopTabBarProps } from 'expo-router/js-top-tabs';
-import { useState, type ComponentProps } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import type { ComponentProps } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
+import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isOnboarded } from '@/data/settings';
 import { useQuery } from '@/state/db';
 import { haptic } from '@/state/toast';
 import { useColors } from '@/theme/ThemeProvider';
-import { font, radius } from '@/theme/tokens';
+import { font } from '@/theme/tokens';
 
 type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
@@ -17,59 +18,47 @@ const TABS: Record<string, { label: string; icon: IconName; iconActive: IconName
   comidas: { label: 'Comidas', icon: 'silverware-fork-knife', iconActive: 'silverware-fork-knife' },
   entrenar: { label: 'Entrenar', icon: 'dumbbell', iconActive: 'dumbbell' },
   progreso: { label: 'Progreso', icon: 'chart-line-variant', iconActive: 'chart-line-variant' },
-  historial: { label: 'Historial', icon: 'calendar-blank-outline', iconActive: 'calendar-blank' },
 };
 
-const PILL_W = 52;
-const PILL_H = 34;
+const ITEM_H = 52;
+const grow = LinearTransition.duration(240);
 
 /**
- * Floating bar with one pill that slides between tabs. It follows the finger while swiping
- * between sections (the pill is a single view that only moves, so its rounded shape never changes).
+ * Floating bar: the other sections are just icons, the current one is a filled pill with its
+ * name. The pill widens into place, so the bar reads at a glance.
  */
-function TabBar({ state, navigateToTab, position }: MaterialTopTabBarProps) {
+function TabBar({ state, navigateToTab }: MaterialTopTabBarProps) {
   const c = useColors();
   const insets = useSafeAreaInsets();
-  const [itemWidth, setItemWidth] = useState(0);
   const routes = state.routes.filter((r) => TABS[r.name]);
-  const translateX = itemWidth
-    ? position.interpolate({
-        inputRange: routes.map((_, i) => i),
-        outputRange: routes.map((_, i) => i * itemWidth + (itemWidth - PILL_W) / 2),
-        extrapolate: 'clamp',
-      })
-    : 0;
 
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-      <View
-        style={[styles.bar, { backgroundColor: c.scheme === 'dark' ? 'rgba(24,24,27,0.97)' : 'rgba(255,255,255,0.97)', borderColor: c.border }]}
-        onLayout={(e) => setItemWidth((e.nativeEvent.layout.width - 8) / Math.max(1, routes.length))}
-      >
-        {itemWidth ? (
-          <Animated.View pointerEvents="none" style={[styles.pill, { backgroundColor: c.accentSoft, transform: [{ translateX }] }]} />
-        ) : null}
-        {routes.map((route, index) => {
+      <View style={[styles.bar, { backgroundColor: c.scheme === 'dark' ? 'rgba(24,24,27,0.97)' : 'rgba(255,255,255,0.97)', borderColor: c.border }]}>
+        {routes.map((route) => {
           const meta = TABS[route.name];
-          const focused = state.index === index;
+          const focused = state.routes[state.index]?.key === route.key;
           return (
-            <Pressable
-              key={route.key}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: focused }}
-              accessibilityLabel={meta.label}
-              onPress={() => {
-                if (focused) return;
-                haptic('light');
-                navigateToTab(route.key);
-              }}
-              style={styles.item}
-            >
-              <View style={styles.iconSlot}>
-                <MaterialCommunityIcons name={focused ? meta.iconActive : meta.icon} size={22} color={focused ? c.accent : c.textDim} />
-              </View>
-              <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={[styles.label, { color: focused ? c.text : c.textDim }]}>{meta.label}</Text>
-            </Pressable>
+            <Animated.View key={route.key} layout={grow} style={{ flex: focused ? 2.4 : 1 }}>
+              <Pressable
+                accessibilityRole="tab"
+                accessibilityState={{ selected: focused }}
+                accessibilityLabel={meta.label}
+                onPress={() => {
+                  if (focused) return;
+                  haptic('light');
+                  navigateToTab(route.key);
+                }}
+                style={[styles.item, focused && { backgroundColor: c.accent }]}
+              >
+                <MaterialCommunityIcons name={focused ? meta.iconActive : meta.icon} size={24} color={focused ? c.accentText : c.textDim} />
+                {focused ? (
+                  <Animated.Text entering={FadeIn.duration(200).delay(60)} maxFontSizeMultiplier={1.2} numberOfLines={1} style={[styles.label, { color: c.accentText }]}>
+                    {meta.label}
+                  </Animated.Text>
+                ) : null}
+              </Pressable>
+            </Animated.View>
           );
         })}
       </View>
@@ -93,27 +82,24 @@ export default function TabsLayout() {
       <TopTabs.Screen name="comidas" />
       <TopTabs.Screen name="entrenar" />
       <TopTabs.Screen name="progreso" />
-      <TopTabs.Screen name="historial" />
     </TopTabs>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 12 },
+  wrap: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 14 },
   bar: {
     flexDirection: 'row',
-    borderRadius: radius.xl,
+    borderRadius: 30,
     borderWidth: StyleSheet.hairlineWidth,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    padding: 6,
+    gap: 4,
     shadowColor: '#000',
     shadowOpacity: 0.35,
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 10 },
     elevation: 12,
   },
-  pill: { position: 'absolute', top: 8, left: 4, width: PILL_W, height: PILL_H, borderRadius: PILL_H / 2 },
-  item: { flex: 1, alignItems: 'center', gap: 3 },
-  iconSlot: { width: PILL_W, height: PILL_H, alignItems: 'center', justifyContent: 'center' },
-  label: { fontFamily: font.semibold, fontSize: 11 },
+  item: { height: ITEM_H, borderRadius: ITEM_H / 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 12 },
+  label: { fontFamily: font.bold, fontSize: 15, letterSpacing: -0.2, flexShrink: 1 },
 });

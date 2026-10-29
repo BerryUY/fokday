@@ -84,11 +84,12 @@ export function Card({ children, style, onPress, padded = true, tone = 'surface'
   style?: StyleProp<ViewStyle>;
   onPress?: () => void;
   padded?: boolean;
-  tone?: 'surface' | 'alt' | 'accent';
+  /** outline: no fill, just a hairline, for variety without breaking the calm. */
+  tone?: 'surface' | 'alt' | 'accent' | 'outline';
 }) {
   const c = useColors();
-  const bg = tone === 'alt' ? c.surfaceAlt : tone === 'accent' ? c.accentSoft : c.surface;
-  const base = [styles.card, { backgroundColor: bg }, padded && { padding: space.lg }, style];
+  const bg = tone === 'alt' ? c.surfaceAlt : tone === 'accent' ? c.accentSoft : tone === 'outline' ? 'transparent' : c.surface;
+  const base = [styles.card, { backgroundColor: bg }, tone === 'outline' && { borderWidth: 1, borderColor: c.border }, padded && { padding: space.lg }, style];
   if (onPress) {
     return (
       <PressableScale onPress={onPress} style={base} scaleTo={0.985}>

@@ -1,4 +1,3 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -8,9 +7,11 @@ import { ProLock } from '@/components/ProGate';
 import { WeeklySummaryCard } from '@/components/WeeklySummaryCard';
 import { BarChart, type Bar } from '@/components/charts/BarChart';
 import { LineChart } from '@/components/charts/LineChart';
+import { MonthCalendar } from '@/components/calendar';
 import { ListRow, Loading, Screen, TabHeader } from '@/components/ui/layout';
 import { ProgressBar } from '@/components/ui/progress';
 import { Button, Card, Divider, Row, SectionHeader, Segmented, T } from '@/components/ui/primitives';
+import { getMonthMarkers } from '@/data/history';
 import { getProfile } from '@/data/settings';
 import type { DayNutrition } from '@/data/meals';
 import { getGymStats, getNutritionStats, RANGES, rangeStart, type RangeKey } from '@/data/stats';
@@ -61,6 +62,8 @@ export default function ProgressScreen() {
           {GymSection({ data, range })}
         </Animated.View>
       )}
+
+      <CalendarSection today={today} />
     </Screen>
   );
 
@@ -111,6 +114,20 @@ export default function ProgressScreen() {
   function NutritionSection({ data, range, today }: { data: Data; range: RangeKey; today: DateKey }) {
     const n = data.nutrition;
     const bars = nutritionBars(n.days, range, today);
+    // Today's goal draws the line; each day is colored against the goal it had.
+    const lastGoal = n.days[n.days.length - 1];
+    const kcalGoal = lastGoal?.calorieGoal ?? null;
+    const protGoal = lastGoal?.proteinGoal ?? null;
+    const kcalColor = (b: Bar & { value: number }) => {
+      const g = b.goal ?? kcalGoal;
+      if (!g) return c.accent;
+      return b.value > g * 1.1 ? c.warning : b.value >= g * 0.9 ? c.accent : c.textDim;
+    };
+    const protColor = (b: Bar & { value: number }) => {
+      const g = b.goal ?? protGoal;
+      return !g || b.value >= g * 0.95 ? c.protein : c.textDim;
+    };
+    const unit = bars.weekly ? 'Cada barra es el promedio de una semana.' : 'Cada barra es un día.';
     return (
       <View style={{ marginTop: space.xl }}>
         <SectionHeader title="Nutrición" />
@@ -118,12 +135,12 @@ export default function ProgressScreen() {
           <Card style={{ flex: 1 }}>
             <T variant="caption" tone="dim">Promedio diario</T>
             <T variant="number" tone="accent">{n.avgCalories !== null ? formatKcal(n.avgCalories) : '—'}</T>
-            <T variant="caption" tone="dim">kcal</T>
+            <T variant="caption" tone="dim">kcal{kcalGoal ? ` · meta ${formatKcal(kcalGoal)}` : ''}</T>
           </Card>
           <Card style={{ flex: 1 }}>
             <T variant="caption" tone="dim">Promedio diario</T>
             <T variant="number" tone="protein">{n.avgProtein !== null ? formatProtein(n.avgProtein) : '—'}</T>
-            <T variant="caption" tone="dim">g de proteína</T>
+            <T variant="caption" tone="dim">g de proteína{protGoal ? ` · meta ${formatProtein(protGoal)}` : ''}</T>
           </Card>
         </Row>
         <Card style={{ marginTop: space.md }}>
@@ -140,12 +157,39 @@ export default function ProgressScreen() {
           ) : null}
         </Card>
         <Card style={{ marginTop: space.md }}>
-          <T variant="h3" style={{ marginBottom: space.md }}>Calorías {bars.weekly ? 'por semana (promedio)' : 'por día'}</T>
-          <BarChart data={bars.calories} color={c.accent} formatValue={(v) => `${formatKcal(v)} kcal`} showEveryLabel={bars.every} />
+          <T variant="h3">Calorías</T>
+          <T variant="caption" tone="dim" style={{ marginBottom: space.md }}>{unit} La línea punteada es tu meta.</T>
+          <BarChart
+            data={bars.calories}
+            color={c.accent}
+            colorFor={kcalColor}
+            goalLine={kcalGoal}
+            goalLabel={kcalGoal ? `Meta ${formatKcal(kcalGoal)}` : undefined}
+            formatValue={(v) => `${formatKcal(v)} kcal`}
+            showEveryLabel={bars.every}
+          />
+          <Row gap={space.lg} style={{ marginTop: space.md, flexWrap: 'wrap' }}>
+            <Legend color={c.accent} label="En la meta" />
+            <Legend color={c.textDim} label="Te faltó" />
+            <Legend color={c.warning} label="Te pasaste" />
+          </Row>
         </Card>
         <Card style={{ marginTop: space.md }}>
-          <T variant="h3" style={{ marginBottom: space.md }}>Proteína {bars.weekly ? 'por semana (promedio)' : 'por día'}</T>
-          <BarChart data={bars.protein} color={c.protein} formatValue={(v) => `${formatProtein(v)} g`} showEveryLabel={bars.every} />
+          <T variant="h3">Proteína</T>
+          <T variant="caption" tone="dim" style={{ marginBottom: space.md }}>{unit} La línea punteada es tu meta.</T>
+          <BarChart
+            data={bars.protein}
+            color={c.protein}
+            colorFor={protColor}
+            goalLine={protGoal}
+            goalLabel={protGoal ? `Meta ${formatProtein(protGoal)} g` : undefined}
+            formatValue={(v) => `${formatProtein(v)} g`}
+            showEveryLabel={bars.every}
+          />
+          <Row gap={space.lg} style={{ marginTop: space.md }}>
+            <Legend color={c.protein} label="Llegaste" />
+            <Legend color={c.textDim} label="Te faltó" />
+          </Row>
         </Card>
         {n.topMeals.length > 0 ? (
           <Card padded={false} style={{ marginTop: space.md, paddingVertical: space.xs }}>
@@ -177,8 +221,6 @@ export default function ProgressScreen() {
           <Tile label="Por semana" value={g.perWeek !== null ? formatNumber(g.perWeek, 1) : '—'} />
           <Tile label="Por mes" value={g.perMonth !== null ? formatNumber(g.perMonth, 1) : '—'} />
           <Tile label="Constancia" value={g.consistency !== null ? formatPercent(g.consistency) : '—'} />
-          <Tile label="Racha" value={String(g.currentStreak)} icon />
-          <Tile label="Mejor racha" value={String(g.longestStreak)} />
         </View>
         <Card style={{ marginTop: space.md }}>
           <T variant="h3" style={{ marginBottom: space.md }}>Días de gym por semana</T>
@@ -258,20 +300,58 @@ function Frequency({ label, done, total, color }: { label: string; done: number;
   );
 }
 
-function Tile({ label, value, icon }: { label: string; value: string; icon?: boolean }) {
+function Tile({ label, value }: { label: string; value: string }) {
   const c = useColors();
   return (
     <View style={[styles.tile, { backgroundColor: c.surface }]}>
-      <Row gap={4}>
-        {icon ? <MaterialCommunityIcons name="fire" size={16} color={Number(value) > 0 ? c.weight : c.textDim} /> : null}
-        <T variant="number">{value}</T>
-      </Row>
+      <T variant="number">{value}</T>
       <T variant="caption" tone="dim">{label}</T>
+    </View>
+  );
+}
+
+function Legend({ color, label }: { color: string; label: string }) {
+  return (
+    <Row gap={6}>
+      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
+      <T variant="caption" tone="dim">{label}</T>
+    </Row>
+  );
+}
+
+/** Every day at a glance (what used to be the Historial tab): tap a day to open it. */
+function CalendarSection({ today }: { today: DateKey }) {
+  const c = useColors();
+  const [month, setMonth] = useState<DateKey>(today);
+  const { data: markers } = useQuery((db) => getMonthMarkers(db, month), [month]);
+  return (
+    <View style={{ marginTop: space.xl }}>
+      <SectionHeader title="Calendario" />
+      <Card>
+        <MonthCalendar
+          month={month}
+          onChangeMonth={setMonth}
+          selected={today}
+          onSelect={(d) => router.push({ pathname: '/dia/[date]', params: { date: d } })}
+          maxDate={today}
+          marks={(d) => {
+            const m = markers?.[d];
+            if (!m) return undefined;
+            return { dots: [m.meals ? c.accent : null, m.gym ? c.protein : null, m.weight ? c.weight : null].filter(Boolean) as string[] };
+          }}
+        />
+        <Row gap={space.lg} style={{ justifyContent: 'center', marginTop: space.sm }}>
+          <Legend color={c.accent} label="Comidas" />
+          <Legend color={c.protein} label="Gym" />
+          <Legend color={c.weight} label="Peso" />
+        </Row>
+        <T variant="caption" tone="dim" style={{ textAlign: 'center', marginTop: space.sm }}>Tocá un día para ver todo lo que registraste.</T>
+      </Card>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  tile: { width: '31.5%', flexGrow: 1, borderRadius: radius.md, padding: space.md },
+  tile: { width: '47%', flexGrow: 1, borderRadius: radius.md, padding: space.md },
 });

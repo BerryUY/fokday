@@ -5,6 +5,7 @@ import { getAttendance } from '@/data/attendance';
 import { getHabits } from '@/data/habits';
 import { getLogsForDate } from '@/data/meals';
 import { getProfile, isOnboarded } from '@/data/settings';
+import { getStreak } from '@/data/streak';
 import { listTodos } from '@/data/todos';
 import { listWeights } from '@/data/weight';
 import type { Db } from '@/db/types';
@@ -13,6 +14,8 @@ import { todayKey } from '@/lib/dates';
 import { planReminders, type PlannedNotification } from './plan';
 
 const CHANNEL_ID = 'recordatorios';
+const STREAK_CHANNEL_ID = 'racha';
+const FLAME = '#FF9632';
 
 // Show reminders even while the app is open.
 if (Platform.OS !== 'web') {
@@ -27,6 +30,15 @@ async function ensureChannel() {
     name: 'Recordatorios',
     // eslint-disable-next-line import/namespace -- re-exported enum the import plugin can't follow; tsc checks it
     importance: Notifications.AndroidImportance.HIGH,
+  });
+  // Vibration and light are fixed when a channel is first created, so the streak gets its own.
+  await Notifications.setNotificationChannelAsync(STREAK_CHANNEL_ID, {
+    name: 'Tu racha',
+    description: 'Te avisa antes de que se corte tu racha',
+    // eslint-disable-next-line import/namespace -- re-exported enum the import plugin can't follow; tsc checks it
+    importance: Notifications.AndroidImportance.HIGH,
+    vibrationPattern: [0, 120, 80, 120, 80, 260],
+    lightColor: FLAME,
   });
 }
 
@@ -45,13 +57,14 @@ async function ensurePermission(db: Db): Promise<boolean> {
 
 async function currentPlan(db: Db): Promise<PlannedNotification[]> {
   const today = todayKey();
-  const [profile, attendance, logs, habits, todos, weights] = await Promise.all([
+  const [profile, attendance, logs, habits, todos, weights, streak] = await Promise.all([
     getProfile(db),
     getAttendance(db, today),
     getLogsForDate(db, today),
     getHabits(db, today),
     listTodos(db, today),
     listWeights(db),
+    getStreak(db, today),
   ]);
   return planReminders({
     now: new Date(),
@@ -64,6 +77,8 @@ async function currentPlan(db: Db): Promise<PlannedNotification[]> {
     creatineToday: habits.creatine,
     pendingTodosToday: todos.filter((t) => !t.done).length,
     lastWeightDate: latestEntry(weights)?.date ?? null,
+    streak: streak.current,
+    streakDoneToday: streak.doneToday,
   });
 }
 
@@ -81,8 +96,8 @@ export async function applyReminders(db: Db, opts: { force?: boolean } = {}): Pr
   for (const p of planned) {
     await Notifications.scheduleNotificationAsync({
       identifier: p.id,
-      content: { title: p.title, body: p.body },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: p.at, channelId: CHANNEL_ID },
+      content: { title: p.title, body: p.body, ...(p.channel === 'racha' ? { color: FLAME } : {}) },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: p.at, channelId: p.channel === 'racha' ? STREAK_CHANNEL_ID : CHANNEL_ID },
     });
   }
   lastApplied = signature;

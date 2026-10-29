@@ -9,9 +9,9 @@ import { ListRow, Loading, Screen, TabHeader } from '@/components/ui/layout';
 import { Badge, Button, Card, Chip, Divider, IconButton, PressableScale, Row, SectionHeader, T } from '@/components/ui/primitives';
 import { activityLabel, listActivities } from '@/data/activities';
 import { getAttendance, getAttendanceStats, markAttendance, removeAttendance } from '@/data/attendance';
-import { exercisesForWeekday, getRoutine, getRoutineForWeekday, listRoutines, saveRoutine } from '@/data/routines';
+import { exercisesForWeekday, getRoutine, listRoutines, saveRoutine, type RoutineSummary } from '@/data/routines';
 import { getActiveSession, listSessions, listTrainedExercises, startSession } from '@/data/workouts';
-import { DAY_SHORT, formatDuration, formatMinutes, formatShort, todayKey, weekday, WEEK_ORDER } from '@/lib/dates';
+import { DAY_LONG, DAY_SHORT, formatDuration, formatMinutes, formatShort, todayKey, weekday, WEEK_ORDER } from '@/lib/dates';
 import { formatNumber } from '@/lib/format';
 import { useMutation, useQuery } from '@/state/db';
 import { playReward } from '@/lib/sound';
@@ -22,8 +22,9 @@ import { radius, space } from '@/theme/tokens';
 type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
 /**
- * One clear path: today's workout first (one big button), then the quick "it happened"
- * actions, your routines, and everything you did (all of it editable).
+ * Built around the routine: the one you're doing (today's, or the next one if today is a rest day)
+ * is the big card with its exercises and a start button. Then the quick "it happened" actions,
+ * this week and month, your routines, and everything you did.
  */
 export default function TrainScreen() {
   const c = useColors();
@@ -32,20 +33,22 @@ export default function TrainScreen() {
   const [newOpen, setNewOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [pastOpen, setPastOpen] = useState(false);
+  const [pickedId, setPickedId] = useState<string | null>(null);
 
   const { data } = useQuery(async (db) => {
-    const [routines, active, stats, attendance, sessions, trained, todayRoutine, activities] = await Promise.all([
+    const [routines, active, stats, attendance, sessions, trained, activities] = await Promise.all([
       listRoutines(db),
       getActiveSession(db),
       getAttendanceStats(db, today),
       getAttendance(db, today),
       listSessions(db, null, today),
       listTrainedExercises(db),
-      getRoutineForWeekday(db, weekday(today)),
       listActivities(db, undefined, today, 6),
     ]);
-    const full = todayRoutine ? await getRoutine(db, todayRoutine.id) : null;
-    const todayExercises = full ? exercisesForWeekday(full.exercises, weekday(today)) : [];
+    // The main routine: the one you picked, else today's, else the next scheduled one, else the first.
+    const main = featuredRoutine(routines, today, pickedId);
+    const full = main ? await getRoutine(db, main.routine.id) : null;
+    const exercises = full && main ? exercisesForWeekday(full.exercises, main.weekday) : [];
     // Workouts and other activities together, newest first.
     const history = [
       ...sessions.slice(0, 8).map((s) => ({ kind: 'session' as const, date: s.date, key: s.id, item: s })),
@@ -53,13 +56,13 @@ export default function TrainScreen() {
     ]
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
       .slice(0, 6);
-    return { routines, active, stats, attendance, trained: trained.slice(0, 5), todayRoutine, todayExercises, history };
-  }, [today]);
+    return { routines, active, stats, attendance, trained: trained.slice(0, 5), main, exercises, history };
+  }, [today, pickedId]);
 
   if (!data) return <Screen tab><Loading /></Screen>;
 
-  const start = async (routineId: string | null, date = today) => {
-    const id = await run((db) => startSession(db, date, routineId));
+  const start = async (routineId: string | null, date = today, onWeekday: number | null = weekday(date)) => {
+    const id = await run((db) => startSession(db, date, routineId, onWeekday));
     if (id) router.push('/sesion/activa');
   };
   const createRoutine = async () => {
@@ -70,7 +73,9 @@ export default function TrainScreen() {
       router.push({ pathname: '/rutina/[id]', params: { id } });
     }
   };
-  const isTrainingDay = data.stats.scheduledDays.includes(weekday(today));
+  const main = data.main;
+  const others = data.routines.filter((r) => r.id !== main?.routine.id);
+  const weekGoal = data.stats.scheduledDays.length;
 
   return (
     <Screen tab>
@@ -91,53 +96,59 @@ export default function TrainScreen() {
         </Animated.View>
       ) : null}
 
-      {/* 1. Today */}
-      {!data.active ? (
+      {/* 1. The routine */}
+      {main ? (
         <Card style={{ padding: space.xl }}>
           <Row style={{ justifyContent: 'space-between' }}>
-            <T variant="overline" tone="dim">{data.todayRoutine ? 'Te toca' : isTrainingDay ? 'Día de gym' : 'Hoy'}</T>
+            <T variant="overline" tone={main.when === 'today' ? 'accent' : 'dim'}>
+              {main.when === 'today' ? 'Hoy te toca' : main.when === 'next' && main.weekday !== null ? `Próxima · ${DAY_LONG[main.weekday]}` : 'Tu rutina'}
+            </T>
             {data.attendance ? <Badge label="Hoy fuiste ✓" /> : null}
           </Row>
-          {data.todayRoutine && data.todayExercises.length ? (
-            <>
-              <T variant="title" style={{ marginTop: space.sm }}>{data.todayRoutine.name}</T>
-              <T variant="label" tone="muted" style={{ marginTop: 2 }}>
-                {data.todayExercises.length} ejercicios · {data.todayExercises.reduce((n, e) => n + e.sets, 0)} series
-              </T>
-              <View style={styles.preview}>
-                {data.todayExercises.slice(0, 5).map((e) => (
-                  <Row key={e.id} gap={space.sm}>
-                    <View style={[styles.dot, { backgroundColor: c.accent }]} />
-                    <T variant="label" style={{ flex: 1 }} numberOfLines={1}>{e.name}</T>
-                    <T variant="caption" tone="dim">{e.sets}×</T>
-                  </Row>
-                ))}
-                {data.todayExercises.length > 5 ? <T variant="caption" tone="dim">y {data.todayExercises.length - 5} más</T> : null}
-              </View>
-              <Button label="Empezar" icon="play" size="lg" style={{ marginTop: space.lg }} onPress={() => start(data.todayRoutine!.id)} />
-              <Button label="Ver o editar la rutina" variant="ghost" size="sm" onPress={() => router.push({ pathname: '/rutina/[id]', params: { id: data.todayRoutine!.id } })} />
-            </>
-          ) : data.routines.length ? (
-            <>
-              <T variant="title" style={{ marginTop: space.sm }}>{isTrainingDay ? '¿Qué entrenás hoy?' : 'Hoy es descanso'}</T>
-              <T variant="label" tone="muted" style={{ marginTop: 2 }}>
-                {isTrainingDay ? 'Elegí una rutina para empezar.' : 'Si igual vas, elegí una rutina.'}
-              </T>
-              <Row style={{ flexWrap: 'wrap', marginTop: space.md }} gap={6}>
-                {data.routines.map((r) => (
-                  <Chip key={r.id} label={r.name} onPress={() => start(r.id)} />
+          <T variant="display" style={{ marginTop: space.sm }}>{main.routine.name}</T>
+          <T variant="label" tone="muted" style={{ marginTop: 2 }}>
+            {data.exercises.length} ejercicios · {data.exercises.reduce((n, e) => n + e.sets, 0)} series
+          </T>
+          <View style={[styles.list, { borderColor: c.border }]}>
+            {data.exercises.length === 0 ? (
+              <T variant="label" tone="dim" style={{ paddingVertical: space.sm }}>Todavía no tiene ejercicios. Tocá “Ver o editar” para sumarlos.</T>
+            ) : (
+              data.exercises.map((e, i) => (
+                <Row key={e.id} gap={space.md} style={[styles.exercise, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}>
+                  <View style={[styles.num, { backgroundColor: c.surfaceAlt }]}>
+                    <T variant="caption" tone="muted">{i + 1}</T>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <T variant="bodyMedium" numberOfLines={1}>{e.name}</T>
+                    <T variant="caption" tone="dim">{e.muscleGroup}</T>
+                  </View>
+                  <T variant="label" tone="muted">{e.sets} × {e.repsMin && e.repsMax ? `${e.repsMin}–${e.repsMax}` : e.repsMin ?? e.repsMax ?? '—'}</T>
+                </Row>
+              ))
+            )}
+          </View>
+          {!data.active ? (
+            <Button label="Empezar" icon="play" size="lg" style={{ marginTop: space.lg }} onPress={() => start(main.routine.id, today, main.weekday)} />
+          ) : null}
+          <Button label="Ver o editar la rutina" variant="ghost" size="sm" onPress={() => router.push({ pathname: '/rutina/[id]', params: { id: main.routine.id } })} />
+          {others.length ? (
+            <View style={{ marginTop: space.sm }}>
+              <T variant="caption" tone="dim" style={{ marginBottom: 6 }}>¿Hoy hacés otra?</T>
+              <Row style={{ flexWrap: 'wrap' }} gap={6}>
+                {others.map((r) => (
+                  <Chip key={r.id} label={r.name} compact onPress={() => setPickedId(r.id)} />
                 ))}
               </Row>
-            </>
-          ) : (
-            <>
-              <T variant="title" style={{ marginTop: space.sm }}>Armá tu primera rutina</T>
-              <T variant="label" tone="muted" style={{ marginTop: 2 }}>Elegí ejercicios de la guía con fotos y asignalos a tus días de gym.</T>
-              <Button label="Crear rutina" icon="plus" size="lg" style={{ marginTop: space.lg }} onPress={() => setNewOpen(true)} />
-            </>
-          )}
+            </View>
+          ) : null}
         </Card>
-      ) : null}
+      ) : (
+        <Card style={{ padding: space.xl }}>
+          <T variant="title">Armá tu primera rutina</T>
+          <T variant="label" tone="muted" style={{ marginTop: 2 }}>Elegí ejercicios de la guía con fotos y asignalos a tus días de gym.</T>
+          <Button label="Crear rutina" icon="plus" size="lg" style={{ marginTop: space.lg }} onPress={() => setNewOpen(true)} />
+        </Card>
+      )}
 
       {/* 2. Quick: it happened */}
       <View style={styles.tiles}>
@@ -159,14 +170,22 @@ export default function TrainScreen() {
         <Tile icon="walk" label="Caminata o bici" onPress={() => router.push('/actividad/nueva')} />
       </View>
 
-      {/* 3. Streak */}
-      <Card onPress={() => router.push('/asistencia')} style={{ marginTop: space.md }}>
-        <Row style={{ justifyContent: 'space-between' }}>
-          <Stat label="Racha" value={String(data.stats.currentStreak)} icon />
-          <Stat label="Semana" value={data.stats.scheduledDays.length ? `${data.stats.thisWeek}/${data.stats.scheduledDays.length}` : String(data.stats.thisWeek)} />
-          <Stat label="Mes" value={String(data.stats.thisMonth)} />
-          <Stat label="Total" value={String(data.stats.total)} />
-          <MaterialCommunityIcons name="chevron-right" size={18} color={c.textDim} />
+      {/* 3. This week and month */}
+      <Card tone="outline" onPress={() => router.push('/asistencia')} style={{ marginTop: space.md }}>
+        <Row>
+          <View style={{ flex: 1 }}>
+            <T variant="caption" tone="dim">Esta semana</T>
+            <T variant="numberLg">
+              {data.stats.thisWeek}
+              {weekGoal ? <T variant="h2" tone="dim">{` / ${weekGoal}`}</T> : null}
+            </T>
+          </View>
+          <View style={[styles.vr, { backgroundColor: c.border }]} />
+          <View style={{ flex: 1, paddingLeft: space.lg }}>
+            <T variant="caption" tone="dim">Este mes</T>
+            <T variant="numberLg">{data.stats.thisMonth}</T>
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={20} color={c.textDim} />
         </Row>
       </Card>
 
@@ -178,25 +197,36 @@ export default function TrainScreen() {
             <T variant="label" tone="muted">Todavía no tenés rutinas. Tocá “Nueva” para crear una.</T>
           </Card>
         ) : (
-          <View style={{ gap: space.sm }}>
-            {data.routines.map((r) => (
-              <Card key={r.id} onPress={() => router.push({ pathname: '/rutina/[id]', params: { id: r.id } })} style={{ paddingVertical: space.md }}>
-                <Row gap={space.md}>
-                  <View style={{ flex: 1 }}>
-                    <T variant="h3" numberOfLines={1}>{r.name}</T>
-                    <T variant="caption" tone="dim">{r.exerciseCount} ejercicios · {r.totalSets} series</T>
-                    <Row gap={4} style={{ marginTop: 6, flexWrap: 'wrap' }}>
-                      {WEEK_ORDER.map((d) => (
-                        <View key={d} style={[styles.day, { backgroundColor: r.weekdays.includes(d) ? c.accentSoft : 'transparent' }]}>
-                          <T variant="caption" tone={r.weekdays.includes(d) ? 'accent' : 'dim'} style={{ fontSize: 10 }}>{DAY_SHORT[d].slice(0, 2)}</T>
-                        </View>
-                      ))}
-                    </Row>
-                  </View>
-                  {!data.active ? <IconButton icon="play" label={`Empezar ${r.name}`} tone="accent" onPress={() => start(r.id)} /> : null}
-                </Row>
-              </Card>
-            ))}
+          <View style={{ gap: space.md }}>
+            {data.routines.map((r) => {
+              const isToday = r.weekdays.includes(weekday(today));
+              return (
+                <Card key={r.id} onPress={() => router.push({ pathname: '/rutina/[id]', params: { id: r.id } })} style={[styles.routine, { borderColor: isToday ? c.accent : c.border }]}>
+                  <Row gap={space.md}>
+                    <View style={[styles.routineIcon, { backgroundColor: isToday ? c.accentSoft : c.surfaceAlt }]}>
+                      <MaterialCommunityIcons name="dumbbell" size={20} color={isToday ? c.accent : c.textMuted} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Row gap={6}>
+                        <T variant="h3" numberOfLines={1} style={{ flexShrink: 1 }}>{r.name}</T>
+                        {isToday ? <Badge label="Hoy" /> : null}
+                      </Row>
+                      <T variant="caption" tone="dim">{r.exerciseCount} ejercicios · {r.totalSets} series</T>
+                    </View>
+                    {!data.active ? (
+                      <IconButton icon="play" label={`Empezar ${r.name}`} tone="accent" onPress={() => start(r.id, today, isToday ? weekday(today) : r.weekdays[0] ?? null)} />
+                    ) : null}
+                  </Row>
+                  <Row gap={4} style={[styles.days, { borderTopColor: c.border }]}>
+                    {WEEK_ORDER.map((d) => (
+                      <View key={d} style={[styles.day, { backgroundColor: r.weekdays.includes(d) ? c.accentSoft : 'transparent' }]}>
+                        <T variant="caption" tone={r.weekdays.includes(d) ? 'accent' : 'dim'} style={{ fontSize: 11 }}>{DAY_SHORT[d].slice(0, 2)}</T>
+                      </View>
+                    ))}
+                  </Row>
+                </Card>
+              );
+            })}
           </View>
         )}
       </View>
@@ -289,6 +319,25 @@ export default function TrainScreen() {
   );
 }
 
+type Featured = { routine: RoutineSummary; when: 'today' | 'next' | 'any'; weekday: number | null };
+
+/** Which routine leads the screen, and for which weekday its exercises are shown. */
+function featuredRoutine(routines: RoutineSummary[], today: string, pickedId: string | null): Featured | null {
+  const wd = weekday(today);
+  const picked = pickedId ? routines.find((r) => r.id === pickedId) : null;
+  if (picked) {
+    const onToday = picked.weekdays.includes(wd);
+    return { routine: picked, when: onToday ? 'today' : 'any', weekday: onToday ? wd : picked.weekdays[0] ?? null };
+  }
+  const todays = routines.find((r) => r.weekdays.includes(wd));
+  if (todays) return { routine: todays, when: 'today', weekday: wd };
+  for (let d = 1; d <= 7; d++) {
+    const next = routines.find((r) => r.weekdays.includes((wd + d) % 7));
+    if (next) return { routine: next, when: 'next', weekday: (wd + d) % 7 };
+  }
+  return routines[0] ? { routine: routines[0], when: 'any', weekday: null } : null;
+}
+
 /** Log a workout you forgot: pick the day and the routine, then tick the sets. */
 function PastWorkoutSheet({ visible, onClose, routines, onStart }: {
   visible: boolean;
@@ -341,23 +390,16 @@ function Tile({ icon, label, onPress, active, disabled }: { icon: IconName; labe
   );
 }
 
-function Stat({ label, value, icon }: { label: string; value: string; icon?: boolean }) {
-  const c = useColors();
-  return (
-    <View style={{ alignItems: 'center', flex: 1 }}>
-      <Row gap={2}>
-        {icon ? <MaterialCommunityIcons name="fire" size={16} color={Number(value) > 0 ? c.weight : c.textDim} /> : null}
-        <T variant="number">{value}</T>
-      </Row>
-      <T variant="caption" tone="dim">{label}</T>
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
-  preview: { marginTop: space.md, gap: 8 },
-  dot: { width: 6, height: 6, borderRadius: 3 },
+  list: { marginTop: space.lg, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: space.xs },
+  exercise: { paddingVertical: 10 },
+  num: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  vr: { width: StyleSheet.hairlineWidth, alignSelf: 'stretch', marginVertical: 2 },
+  routine: { borderWidth: 1, padding: space.lg },
+  routineIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  days: { marginTop: space.md, paddingTop: space.md, borderTopWidth: StyleSheet.hairlineWidth, justifyContent: 'space-between' },
   tiles: { flexDirection: 'row', gap: space.sm, marginTop: space.md },
   tile: { flex: 1, minHeight: 86, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 6 },
-  day: { width: 24, height: 20, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  day: { flex: 1, height: 24, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
 });

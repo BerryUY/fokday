@@ -94,7 +94,7 @@ Contá calorías con una foto, escaneá productos y anotá tu gym. Todo en una a
 FokDay junta en una sola app el contador de calorías, tu rutina de gimnasio y tus hábitos. Sin pasar de una app a otra.
 
 📸 Calorías con una foto
-Sacale una foto al plato y la IA estima calorías, proteína, carbohidratos y grasas. Si algo no cierra, corregís los valores. Gratis: 2 fotos por día, y más mirando un video corto.
+Sacale una foto al plato y la IA estima calorías, proteína, carbohidratos y grasas. Si algo no cierra, corregís los valores. Gratis: 1 foto por día, y otra más mirando un video corto.
 
 🔎 Escáner de código de barras
 Escaneá el paquete y se cargan los nutrientes del producto. También podés anotar comidas a mano o repetir las que ya comiste.
@@ -111,7 +111,7 @@ Agua, creatina, caminatas y tu lista del día. Los recordatorios te avisan solo 
 🔒 Tus datos son tuyos
 Funciona sin internet. Si querés, entrás con tu cuenta y se respaldan solos en la nube.
 
-FokDay Pro: 20 fotos con IA por día sin videos, más escaneos, resumen semanal con IA, estadísticas de 90 días e historial completo, progreso por ejercicio y temas de color.
+FokDay Pro: 20 fotos con IA por día sin videos, resumen semanal con IA, estadísticas de 90 días e historial completo, progreso por ejercicio y temas de color.
 
 Las calorías que estima la IA son aproximadas y no reemplazan el consejo de un profesional de la salud.
 
