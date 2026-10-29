@@ -122,7 +122,7 @@ function wire(store: BackupStore, env: Env): FetchLike {
   return async (url, init) => {
     const req: ApiRequest = {
       method: init?.method ?? 'GET',
-      headers: { authorization: (init?.headers as Record<string, string>)?.Authorization },
+      headers: { authorization: (init?.headers as Record<string, string>)?.Authorization, 'x-timezone': (init?.headers as Record<string, string>)?.['X-Timezone'] },
       body: init?.body ? JSON.parse(String(init.body)) : undefined,
     };
     const [path, search = ''] = url.split('/api/')[1].split('?');
@@ -440,6 +440,26 @@ describe('accounts, plans and rewarded videos', () => {
     expect((await cloudApi.status(ana, fetchImpl)).barcode).toMatchObject({ limit: 6, bonus: 5, bonusLeft: 0 });
     const pro = wire(store, { ...env, checkPro: async () => true });
     expect((await cloudApi.status(ana, pro)).barcode).toMatchObject({ pro: true, limit: 200 });
+  });
+
+  it('renews at the person\u2019s own midnight, from the time zone the app sends', async () => {
+    // 23:30 UTC = 00:30 in Madrid (a new day there) but 20:30 in Montevideo.
+    let t = new Date('2026-10-29T22:30:00Z'); // 23:30 in Madrid
+    const { fetchImpl: base } = accounts({ now: () => t, limits: { photo: { free: 1, bonusMax: 0, videosPerExtra: 1, pro: 20 } } });
+    const madrid: typeof base = (url, init) => base(url, { ...init, headers: { ...(init?.headers as Record<string, string>), 'X-Timezone': 'Europe/Madrid' } });
+    const cfg = { url: URL, token: jwt('ana') };
+    await cloudApi.analyzeFood(cfg, photo, madrid);
+    await expect(cloudApi.analyzeFood(cfg, photo, madrid)).rejects.toMatchObject({ status: 429 });
+    t = new Date('2026-10-29T23:30:00Z'); // midnight passed in Madrid
+    expect((await cloudApi.analyzeFood(cfg, photo, madrid)).remaining).toBe(0);
+  });
+
+  it('falls back to Uruguay for an unknown time zone', async () => {
+    const t = new Date('2026-10-29T23:30:00Z');
+    const { fetchImpl: base } = accounts({ now: () => t });
+    const bogus: typeof base = (url, init) => base(url, { ...init, headers: { ...(init?.headers as Record<string, string>), 'X-Timezone': 'Mars/Olympus' } });
+    const status = await cloudApi.status({ url: URL, token: jwt('ana') }, bogus);
+    expect(status.ai).toMatchObject({ used: 0 });
   });
 
   it('renews the day at midnight in Uruguay, not at 21:00 (UTC midnight)', async () => {

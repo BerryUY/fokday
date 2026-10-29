@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { PUBLIC_CONFIG } from '@/config';
+import { deviceTimeZone } from '@/lib/dates';
 
 // The AdMob SDK loads on first use, so a problem in it can never stop the app from opening.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -46,7 +47,8 @@ export async function watchRewardedVideo(kind: RewardKind, accountId: string): P
   if (!(await ensureAds())) throw new Error('Sin permiso para mostrar videos. Podés cambiarlo en Ajustes → Privacidad de anuncios.');
   const { AdEventType, RewardedAd, RewardedAdEventType } = ads();
   const ad = RewardedAd.createForAdRequest(unitId(), {
-    serverSideVerificationOptions: { userId: accountId, customData: kind },
+    // The time zone travels with the reward so the server credits it to the person's own day.
+    serverSideVerificationOptions: { userId: accountId, customData: `${kind}|${deviceTimeZone()}` },
   });
   return new Promise<boolean>((resolve, reject) => {
     let earned = false;

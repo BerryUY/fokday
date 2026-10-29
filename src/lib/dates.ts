@@ -1,65 +1,24 @@
 /**
- * Date helpers. Every day-based record is stored as a `YYYY-MM-DD` key in
- * America/Montevideo time, so "today" never drifts with UTC.
+ * Date helpers. Every day-based record is stored as a `YYYY-MM-DD` key in the phone's own
+ * time zone, so "today" turns at the person's midnight wherever they are.
  */
-export const TIME_ZONE = 'America/Montevideo';
-/** Uruguay has observed UTC-3 all year since 2015 (no DST). Used only as a fallback. */
-const FALLBACK_OFFSET_MINUTES = -180;
-
 export type DateKey = string;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
 type Parts = { year: number; month: number; day: number; hour: number; minute: number };
 
-let formatter: Intl.DateTimeFormat | null | undefined;
-
-function getFormatter(): Intl.DateTimeFormat | null {
-  if (formatter !== undefined) return formatter;
+/** The phone's time zone (IANA name), sent to the server so its daily limits use the same day. */
+export function deviceTimeZone(): string {
   try {
-    const f = new Intl.DateTimeFormat('en-US', {
-      timeZone: TIME_ZONE,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-    });
-    // Sanity check: some JS engines silently ignore timeZone.
-    const probe = partsFrom(f, new Date(Date.UTC(2024, 0, 1, 1, 0)));
-    formatter = probe && probe.day === 31 && probe.hour === 22 ? f : null;
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Montevideo';
   } catch {
-    formatter = null;
-  }
-  return formatter;
-}
-
-function partsFrom(f: Intl.DateTimeFormat, date: Date): Parts | null {
-  try {
-    const out: Record<string, number> = {};
-    for (const p of f.formatToParts(date)) {
-      if (p.type !== 'literal') out[p.type] = Number(p.value);
-    }
-    if (!out.year || !out.month || !out.day) return null;
-    return { year: out.year, month: out.month, day: out.day, hour: out.hour % 24, minute: out.minute };
-  } catch {
-    return null;
+    return 'America/Montevideo';
   }
 }
 
 export function zonedParts(date: Date = new Date()): Parts {
-  const f = getFormatter();
-  const parts = f ? partsFrom(f, date) : null;
-  if (parts) return parts;
-  const shifted = new Date(date.getTime() + FALLBACK_OFFSET_MINUTES * 60_000);
-  return {
-    year: shifted.getUTCFullYear(),
-    month: shifted.getUTCMonth() + 1,
-    day: shifted.getUTCDate(),
-    hour: shifted.getUTCHours(),
-    minute: shifted.getUTCMinutes(),
-  };
+  return { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate(), hour: date.getHours(), minute: date.getMinutes() };
 }
 
 export function toDateKey(date: Date = new Date()): DateKey {

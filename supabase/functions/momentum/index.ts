@@ -114,7 +114,7 @@ Deno.serve(async (req) => {
       route,
       {
         method: req.method,
-        headers: { authorization: req.headers.get('authorization') ?? undefined },
+        headers: { authorization: req.headers.get('authorization') ?? undefined, 'x-timezone': req.headers.get('x-timezone') ?? undefined },
         body,
         query: Object.fromEntries(requestUrl.searchParams),
         // AdMob signs the query exactly as sent, so the verifier needs it untouched.

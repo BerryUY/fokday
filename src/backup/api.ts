@@ -1,4 +1,5 @@
 import type { DataTable } from '@/db/schema';
+import { deviceTimeZone } from '@/lib/dates';
 import { BACKUP_FORMAT, type BackupEnvelope, type Snapshot } from './snapshot';
 
 /** Where the backup API lives and the personal token that unlocks this person's backups. Stored in SecureStore. */
@@ -77,7 +78,7 @@ async function request<T>(config: { url: string; token?: string }, path: string,
     res = await fetchImpl(`${normalizeBaseUrl(config.url)}/api/${path}`, {
       ...init,
       signal: controller.signal,
-      headers: { ...(config.token ? { Authorization: `Bearer ${config.token}` } : {}), 'Content-Type': 'application/json', ...(init.headers ?? {}) },
+      headers: { ...(config.token ? { Authorization: `Bearer ${config.token}` } : {}), 'Content-Type': 'application/json', 'X-Timezone': deviceTimeZone(), ...(init.headers ?? {}) },
     });
   } catch {
     throw new ApiError(controller.signal.aborted ? 'El servidor tardó demasiado en responder.' : 'No se pudo conectar con el servidor de respaldo.', null);

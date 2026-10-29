@@ -1,4 +1,7 @@
 /** Pure-logic tests run in Node against a real SQLite engine (node:sqlite). */
+// Dates are the phone's local time; tests pin it to Uruguay so they behave the same anywhere.
+process.env.TZ = 'America/Montevideo';
+
 module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/test'],

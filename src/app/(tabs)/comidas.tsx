@@ -84,7 +84,7 @@ export default function ComidasScreen() {
                 <Animated.View key={cat.key} entering={FadeInDown.delay(40 * i).duration(320)} style={cat.key === 'extra' ? styles.tileWide : styles.tileWrap}>
                   <PressableScale
                     onPress={() => router.push({ pathname: '/comida/categoria/[category]', params: { category: cat.key, date } })}
-                    style={[styles.tile, { backgroundColor: c.surface }]}
+                    style={[styles.tile, { backgroundColor: c.surface, borderColor: bucket.entries ? c.accent : c.border }]}
                     accessibilityRole="button"
                     accessibilityLabel={cat.label}
                   >
@@ -256,7 +256,8 @@ const styles = StyleSheet.create({
   heroIcon: { width: 60, height: 60, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   actions: { flexDirection: 'row', gap: space.sm, marginBottom: space.lg },
   action: { flex: 1, minHeight: 72, borderRadius: radius.lg, paddingHorizontal: space.sm, paddingVertical: space.md, gap: 6, alignItems: 'center', justifyContent: 'center' },
-  tile: { borderRadius: radius.lg, padding: space.lg, minHeight: 128 },
+  // Bordered like the routine cards, lime once that meal has something logged.
+  tile: { borderRadius: radius.lg, padding: space.lg, minHeight: 128, borderWidth: 1 },
   tileIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   fav: { width: 158, borderRadius: radius.lg, padding: space.md, justifyContent: 'space-between' },
 });

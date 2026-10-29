@@ -42,7 +42,7 @@ export interface BackupStore {
   /** Inserts unless the id exists. Returns the stored receivedAt either way. */
   insert(profileId: string, backup: NewBackup): Promise<{ inserted: boolean; receivedAt: string }>;
   remove(profileId: string, ids: string[]): Promise<void>;
-  /** Uses of a limited feature on a UTC day (YYYY-MM-DD), and rewarded videos watched for it. */
+  /** Uses of a limited feature on one of the person's days (YYYY-MM-DD), and rewarded videos watched for it. */
   usage(profileId: string, day: string, kind: QuotaKind): Promise<{ count: number; videos: number }>;
   /** Reserves one use only while count < limit (atomic, so parallel requests cannot pass the limit). */
   tryUse(profileId: string, day: string, kind: QuotaKind, limit: number): Promise<boolean>;
@@ -206,19 +206,39 @@ async function isPro(auth: Authed, env: Env): Promise<boolean> {
 }
 
 /**
- * Daily limits renew at midnight in Uruguay (UTC−3, like Argentina), the same "today" the app
- * uses. A UTC day ended at 21:00 there, so a late-night photo used up the next day's.
+ * Daily limits renew at the person's own midnight: the app sends its time zone (X-Timezone,
+ * an IANA name like "America/Montevideo") and the day is counted there, the same "today" the app
+ * shows. Unknown or missing zones count in Uruguay. Switching zones gains little: a zone further
+ * ahead spends tomorrow's allowance, and one further back only reaches yesterday's if unused.
  */
-const DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Montevideo', year: 'numeric', month: '2-digit', day: '2-digit' });
-const today = (env: Env) => DAY.format((env.now ?? (() => new Date()))());
+export const DEFAULT_TIME_ZONE = 'America/Montevideo';
+const dayFormats = new Map<string, Intl.DateTimeFormat>();
+function dayFormat(zone: string | undefined): Intl.DateTimeFormat {
+  const name = zone && zone.length <= 64 && /^[A-Za-z0-9_+\-/]+$/.test(zone) ? zone : DEFAULT_TIME_ZONE;
+  let f = dayFormats.get(name);
+  if (!f) {
+    try {
+      f = new Intl.DateTimeFormat('en-CA', { timeZone: name, year: 'numeric', month: '2-digit', day: '2-digit' });
+    } catch {
+      return dayFormat(DEFAULT_TIME_ZONE);
+    }
+    if (dayFormats.size < 500) dayFormats.set(name, f);
+  }
+  return f;
+}
+const today = (env: Env, zone?: string) => dayFormat(zone).format((env.now ?? (() => new Date()))());
+const zoneOf = (req: ApiRequest) => {
+  const v = req.headers['x-timezone'];
+  return Array.isArray(v) ? v[0] : v;
+};
 
 /** Today's allowance of one feature. bonus: extras earned; bonusLeft: extras still earnable; videos: watched today. */
 export type Quota = { pro: boolean; used: number; limit: number; bonus: number; bonusLeft: number; videos: number; videosPerExtra: number };
 
 const limitsFor = (env: Env, kind: QuotaKind): LimitSet => ({ ...QUOTA_DEFAULTS[kind], ...env.limits?.[kind] });
 
-async function quota(auth: Authed, store: BackupStore, env: Env, kind: QuotaKind, pro?: boolean): Promise<Quota> {
-  const { count, videos } = await store.usage(auth.profile.id, today(env), kind);
+async function quota(auth: Authed, store: BackupStore, env: Env, kind: QuotaKind, day: string, pro?: boolean): Promise<Quota> {
+  const { count, videos } = await store.usage(auth.profile.id, day, kind);
   const isProNow = pro ?? (await isPro(auth, env));
   const l = limitsFor(env, kind);
   const videosPerExtra = Math.max(1, l.videosPerExtra);
@@ -303,11 +323,12 @@ export async function handleStatus(req: ApiRequest, store: BackupStore, env: Env
   if ('denied' in auth) return auth.denied;
   if (req.method !== 'GET') return { status: 405, json: { error: 'Método no permitido.' } };
   const pro = await isPro(auth, env);
+  const day = today(env, zoneOf(req));
   const [count, latest, ai, barcode] = await Promise.all([
     store.count(auth.profile.id),
     store.list(auth.profile.id, 1),
-    quota(auth, store, env, 'photo', pro),
-    quota(auth, store, env, 'barcode', pro),
+    quota(auth, store, env, 'photo', day, pro),
+    quota(auth, store, env, 'barcode', day, pro),
   ]);
   return { status: 200, json: { ok: true, profile: auth.profile, count, latest: latest[0] ?? null, pro, ai, barcode } };
 }
@@ -413,8 +434,8 @@ export async function handleAnalyzeFood(req: ApiRequest, store: BackupStore, env
   if (typeof image !== 'string' || image.length < 100 || image.length > MAX_IMAGE_BASE64 || !/^[A-Za-z0-9+/=]+$/.test(image)) {
     return { status: 400, json: { error: 'La foto no es válida o es demasiado grande.' } };
   }
-  const day = today(env);
-  const q = await quota(auth, store, env, 'photo');
+  const day = today(env, zoneOf(req));
+  const q = await quota(auth, store, env, 'photo', day);
   if (q.used >= q.limit || !(await store.tryUse(auth.profile.id, day, 'photo', q.limit))) {
     return { status: 429, json: { error: limitMessage(q, 'photo', env), ai: { ...q, used: Math.max(q.used, q.limit) } } };
   }
@@ -522,9 +543,11 @@ export async function handleAdReward(req: ApiRequest, store: BackupStore, env: E
   if (!q.user_id || !UUID.test(q.user_id) || !q.transaction_id || q.transaction_id.length > 200) return { status: 400, json: { error: 'Faltan datos.' } };
   const profile = await store.findProfileByAuthUser(q.user_id);
   if (!profile) return { status: 404, json: { error: 'Cuenta desconocida.' } };
-  // custom_data says which feature the video was for (set by the app when it loads the ad).
-  const kind: QuotaKind = q.custom_data === 'barcode' ? 'barcode' : 'photo';
-  const credited = await store.addVideo(profile.id, today(env), kind, q.transaction_id);
+  // custom_data is "<feature>|<time zone>", set by the app when it loads the ad (AdMob's callback
+  // carries no time zone of its own); the video counts on that day.
+  const [feature, zone] = (q.custom_data ?? '').split('|');
+  const kind: QuotaKind = feature === 'barcode' ? 'barcode' : 'photo';
+  const credited = await store.addVideo(profile.id, today(env, zone), kind, q.transaction_id);
   return { status: 200, json: { ok: true, credited, kind } };
 }
 
@@ -539,8 +562,8 @@ export async function handleBarcode(req: ApiRequest, store: BackupStore, env: En
   const code = req.id ?? '';
   if (!/^\d{8,14}$/.test(code)) return { status: 400, json: { error: 'Ese código de barras no es válido.' } };
   if (!env.lookupBarcode) return { status: 503, json: { error: 'El escáner todavía no está activado en el servidor.' } };
-  const day = today(env);
-  const q = await quota(auth, store, env, 'barcode');
+  const day = today(env, zoneOf(req));
+  const q = await quota(auth, store, env, 'barcode', day);
   if (q.used >= q.limit || !(await store.tryUse(auth.profile.id, day, 'barcode', q.limit))) {
     return { status: 429, json: { error: limitMessage(q, 'barcode', env), barcode: { ...q, used: Math.max(q.used, q.limit) } } };
   }
@@ -563,12 +586,12 @@ export async function handleWeeklySummary(req: ApiRequest, store: BackupStore, e
   const auth = await authenticate(req.headers.authorization, store, env);
   if ('denied' in auth) return auth.denied;
   if (req.method !== 'POST') return { status: 405, json: { error: 'Método no permitido.' } };
-  const q = await quota(auth, store, env, 'summary');
+  const day = today(env, zoneOf(req));
+  const q = await quota(auth, store, env, 'summary', day);
   if (!q.pro) return { status: 402, json: { error: 'El resumen semanal es parte de Pro.' } };
   if (!env.summarizeWeek) return { status: 503, json: { error: 'El análisis con IA todavía no está activado en el servidor.' } };
   const week = (req.body as { week?: unknown } | null)?.week;
   if (!week || typeof week !== 'object' || Array.isArray(week) || JSON.stringify(week).length > 4000) return { status: 400, json: { error: 'Datos de la semana inválidos.' } };
-  const day = today(env);
   if (q.used >= q.limit || !(await store.tryUse(auth.profile.id, day, 'summary', q.limit))) {
     return { status: 429, json: { error: 'Ya armaste los resúmenes de hoy. Probá mañana.' } };
   }
