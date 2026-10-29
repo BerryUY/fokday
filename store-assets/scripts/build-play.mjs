@@ -73,7 +73,6 @@ const brand = (y, ink = false) => `<div class="brandrow" style="left:84px;top:${
   ${copy({ y: 110, lbl: 'Comidas', h: 'Calorías con <span class="lime">una foto.</span>', sub: 'La IA estima calorías y macros. Y si es un paquete, escaneás el código de barras.' })}
   ${p.html}
   ${zoom(S('comidas'), 40, 640, 14, 140, 384, 114, 700)}
-  <div class="sub" style="left:84px;top:1060px;width:320px;font-size:34px;color:var(--text)">1 foto gratis por día, y otra más mirando un video.</div>
 </div>${end}`);
 }
 
