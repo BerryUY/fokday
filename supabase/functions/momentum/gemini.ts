@@ -68,7 +68,7 @@ export type GeminiKey = { apiKey: string; serviceTier?: 'priority' | 'standard' 
 export const GEMINI_BUDGET_MS = 60_000;
 const PER_MODEL_TIMEOUT_MS = 35_000;
 /** A model that hasn't answered by then gets a second one racing it; the first answer wins. */
-const HEDGE_AFTER_MS = 20_000;
+const HEDGE_AFTER_MS = 15_000;
 const MAX_IN_FLIGHT = 2;
 
 const retryable = (status: number) => status === 404 || status === 429 || status >= 500;

@@ -156,7 +156,7 @@ describe('Gemini never giving up early', () => {
       return Promise.resolve(ok);
     };
     const pending = createGeminiAnalyzer('k', fetchFn, ['slow', 'fast'])('x');
-    await jest.advanceTimersByTimeAsync(20_000);
+    await jest.advanceTimersByTimeAsync(15_000);
     expect((await pending).name).toBe('Milanesa con puré');
     expect(calls).toEqual(['slow', 'fast']);
     jest.useRealTimers();
