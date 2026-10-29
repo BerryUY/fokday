@@ -167,13 +167,15 @@ export async function updateSet(db: Db, setId: string, patch: { reps?: number | 
   if (patch.reps !== undefined && patch.reps !== null && !(patch.reps >= 0 && patch.reps <= 1000)) throw new Error('Repeticiones inválidas.');
   if (patch.weight !== undefined && patch.weight !== null && !(patch.weight >= 0 && patch.weight <= 1000)) throw new Error('Peso inválido.');
   const now = nowIso();
-  const current = await db.getFirstAsync<{ reps: number | null; weight: number | null; isCompleted: number; weId: string }>(
-    'SELECT reps, weight_kg AS weight, is_completed AS isCompleted, workout_exercise_id AS weId FROM workout_sets WHERE id = ?',
-    [setId],
-  );
-  if (!current) return;
-  const completed = patch.isCompleted ?? !!current.isCompleted;
+  // Read inside the transaction: a quick kg-then-tick sequence sees the kg just saved
+  // instead of writing the old value back over it.
   await db.withTransactionAsync(async () => {
+    const current = await db.getFirstAsync<{ reps: number | null; weight: number | null; isCompleted: number; weId: string }>(
+      'SELECT reps, weight_kg AS weight, is_completed AS isCompleted, workout_exercise_id AS weId FROM workout_sets WHERE id = ?',
+      [setId],
+    );
+    if (!current) return;
+    const completed = patch.isCompleted ?? !!current.isCompleted;
     await db.runAsync(
       'UPDATE workout_sets SET reps = ?, weight_kg = ?, is_completed = ?, completed_at = ?, updated_at = ? WHERE id = ?',
       [
