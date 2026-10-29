@@ -84,24 +84,36 @@ npx eas-cli@latest submit -p android --profile production
 
 ## 4. Ficha de la tienda
 
-**Nombre:** FokDay
+**Nombre (máx. 30, el que se busca en Play):** FokDay: Calorías y Gimnasio
 
 **Descripción breve (máx. 80):**
-Hábitos, comidas y gym con foco. Escaneá, sacá foto y avanzá cada día.
+Contá calorías con una foto, escaneá productos y anotá tu gym. Todo en una app.
 
 **Descripción completa:**
 
-FokDay te ayuda a sostener tus hábitos de comida y entrenamiento, sin complicarte.
+FokDay junta en una sola app el contador de calorías, tu rutina de gimnasio y tus hábitos. Sin pasar de una app a otra.
 
-• Comidas: registrá lo que comés con un toque, escaneá el código de barras del paquete o sacale una foto al plato y la IA estima calorías y proteína. Siempre podés corregir los valores.
-• Entrenamientos: armá rutinas por día, seguí tus series y pesos, y mirá tu progreso. Más de 800 ejercicios con fotos e instrucciones en español.
-• Otras actividades: caminatas, bici o correr también suman a tu racha.
-• Peso: seguí tu camino hacia tu meta, subir, bajar o mantenerte, con hitos intermedios.
-• Hábitos y tareas: agua, creatina y tu lista del día.
-• Recordatorios automáticos: solo lo que te falta, en un buen horario.
-• Tus datos son tuyos: funciona sin internet, con respaldo en la nube si entrás con tu cuenta.
+📸 Calorías con una foto
+Sacale una foto al plato y la IA estima calorías, proteína, carbohidratos y grasas. Si algo no cierra, corregís los valores. Gratis: 2 fotos por día, y más mirando un video corto.
 
-FokDay Pro: más fotos con IA, escáner ilimitado, resumen semanal con IA, estadísticas avanzadas y temas de color.
+🔎 Escáner de código de barras
+Escaneá el paquete y se cargan los nutrientes del producto. También podés anotar comidas a mano o repetir las que ya comiste.
+
+🏋️ Rutinas de gimnasio
+Armá tus rutinas por día, anotá series, repeticiones y pesos, y mirá cómo progresás. Más de 800 ejercicios con instrucciones en español. Cuando terminás, deslizás y listo.
+
+⚖️ Peso y metas
+Bajar, subir o mantenerte: seguí tu peso con metas intermedias y tu objetivo de calorías y proteína del día.
+
+✅ Hábitos y tareas
+Agua, creatina, caminatas y tu lista del día. Los recordatorios te avisan solo de lo que te falta.
+
+🔒 Tus datos son tuyos
+Funciona sin internet. Si querés, entrás con tu cuenta y se respaldan solos en la nube.
+
+FokDay Pro: 20 fotos con IA por día sin videos, más escaneos, resumen semanal con IA, estadísticas de 90 días e historial completo, progreso por ejercicio y temas de color.
+
+Las calorías que estima la IA son aproximadas y no reemplazan el consejo de un profesional de la salud.
 
 **Categoría:** Salud y bienestar
 **Imágenes:** ícono 512×512 (sale de `assets/icon.png`), gráfico destacado de 1024×500 y de 2 a 8 capturas. Se arman con la skill `creativo-ig`.
