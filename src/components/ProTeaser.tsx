@@ -17,7 +17,7 @@ export function ProTeaser() {
         </View>
         <View style={{ flex: 1 }}>
           <T variant="h3">Pasate a Pro</T>
-          <T variant="caption" tone="muted">20 fotos con IA por día, resumen semanal, escáner ilimitado y sin videos</T>
+          <T variant="caption" tone="muted">20 fotos con IA por día, resumen semanal, escáner ilimitado y sin publicidad</T>
         </View>
       </Row>
       <Row style={{ justifyContent: 'space-between' }}>

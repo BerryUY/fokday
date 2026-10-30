@@ -14,7 +14,7 @@ Todo lo que dice "vos" son claves o cuentas que solo vos podés crear. Ninguna c
 3. **Cuenta de comerciante** (Configuración → Perfil de pagos): necesaria para cobrar Pro. Uruguay está habilitado y Google paga en USD.
 4. **Suscripciones** (Monetizar → Productos → Suscripciones): crear `fokday_pro` con dos planes base:
    - `mensual`: US$3,99 por mes;
-   - `anual`: US$24,99 por año.
+   - `anual`: US$35,99 por año (12 meses al precio de 9).
    - Opcional: una prueba gratis de 7 días en el anual.
    - Google convierte los precios a pesos uruguayos solo.
 
@@ -111,7 +111,7 @@ Agua, creatina, caminatas y tu lista del día. Los recordatorios te avisan solo 
 🔒 Tus datos son tuyos
 Funciona sin internet. Si querés, entrás con tu cuenta y se respaldan solos en la nube.
 
-FokDay Pro: 20 fotos con IA por día sin videos, escáner de códigos ilimitado, resumen semanal con IA, estadísticas de 90 días e historial completo, progreso por ejercicio y temas de color.
+FokDay Pro: 20 fotos con IA por día, sin publicidad, escáner de códigos ilimitado, resumen semanal con IA, estadísticas de 90 días e historial completo, progreso por ejercicio y temas de color.
 
 Las calorías que estima la IA son aproximadas y no reemplazan el consejo de un profesional de la salud.
 

@@ -79,7 +79,7 @@ export function ProfileHeader({ name }: { name: string }) {
             </View>
             <View style={{ flex: 1 }}>
               <T variant="h3">FokDay Pro</T>
-              <T variant="caption" tone="muted">20 fotos con IA por día, escáner ilimitado, resumen semanal y sin videos</T>
+              <T variant="caption" tone="muted">20 fotos con IA por día, escáner ilimitado, resumen semanal y sin publicidad</T>
             </View>
           </Row>
           <Row style={{ justifyContent: 'space-between' }}>

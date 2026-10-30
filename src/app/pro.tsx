@@ -18,7 +18,7 @@ const BENEFITS: { icon: IconName; title: string; free: string; pro: string }[] =
   { icon: 'message-circle', title: 'Resumen semanal con IA', free: '—', pro: 'Tu semana, tu progreso y un plan concreto' },
   { icon: 'trending-up', title: 'Estadísticas avanzadas', free: '7 y 30 días', pro: '90 días, todo el historial y progresión por ejercicio' },
   { icon: 'droplet', title: 'Temas de color', free: '—', pro: '6 colores para la app' },
-  { icon: 'slash', title: 'Sin videos', free: 'Videos opcionales para ganar extras', pro: 'Nunca' },
+  { icon: 'slash', title: 'Sin publicidad', free: 'Videos opcionales para ganar extras', pro: 'Ningún anuncio' },
 ];
 
 /** The plans with list prices, until the store's local prices load. */
@@ -111,7 +111,7 @@ export default function ProScreen() {
                   <View style={{ flex: 1, gap: 2 }}>
                     <Row gap={space.sm}>
                       <T variant="h3">{o.kind === 'annual' ? 'Anual' : 'Mensual'}</T>
-                      {o.kind === 'annual' ? <Badge label="Ahorrás casi la mitad" /> : null}
+                      {o.kind === 'annual' ? <Badge label="3 meses gratis" /> : null}
                     </Row>
                     <T variant="caption" tone="dim">{o.kind === 'annual' ? `${o.perMonth ? `${o.perMonth} por mes · ` : ''}se cobra una vez al año` : 'Cancelás cuando quieras'}</T>
                   </View>
