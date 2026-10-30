@@ -70,7 +70,7 @@ export function planReminders(s: ReminderState): PlannedNotification[] {
       add(
         `streak-${k}`,
         today && s.streak > 0 ? `🔥 Tu racha de ${days(s.streak)} está en juego` : today ? '🔥 Arrancá tu racha hoy' : '🔥 Mantené tu racha viva',
-        'Registrá una comida, tu peso o tu entreno para sumar el día.',
+        'Registrá una comida o tu entreno para sumar el día.',
         at(s.now, d, 20),
         'racha',
       );

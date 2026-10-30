@@ -102,6 +102,12 @@ export function setQuota(kind: 'ai' | 'barcode', quota: Quota): void {
   set({ [kind]: quota } as Partial<PlanState>);
 }
 
+/**
+ * List prices, shown until the store's own (local currency) prices load or while the store isn't
+ * live yet. Keep in sync with the fokday_pro subscriptions in Play Console.
+ */
+export const PRO_LIST_PRICES = { monthly: 'US$3,99', annual: 'US$24,99', annualPerMonth: 'US$2,08' } as const;
+
 export type PlanOption = { id: string; kind: 'monthly' | 'annual'; price: string; perMonth: string | null; pkg: PurchasesPackage };
 
 /** Monthly and annual options with the store's local prices. */

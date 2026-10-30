@@ -70,7 +70,7 @@ export default function ComidasScreen() {
           <View style={styles.actions}>
             <QuickAction icon="maximize" label="Escanear" onPress={() => router.push({ pathname: '/comida/escanear', params: { date } })} />
             <QuickAction icon="zap" label="Rápido" onPress={() => setQuickOpen(true)} />
-            <QuickAction icon="globe" label="Biblioteca" onPress={() => router.push({ pathname: '/comida/biblioteca', params: { date } })} />
+            <QuickAction icon="globe" label="Comunidad" onPress={() => router.push({ pathname: '/comida/biblioteca', params: { date } })} />
           </View>
 
           <Card style={{ padding: space.xl }}>

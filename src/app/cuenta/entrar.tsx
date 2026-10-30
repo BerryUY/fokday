@@ -57,7 +57,7 @@ export default function SignInScreen() {
             <Card tone="alt" style={{ gap: space.sm }}>
               <T variant="h3">Guardá tu progreso</T>
               <T variant="label" tone="muted">
-                Con una cuenta tus datos se respaldan solos y los recuperás en otro teléfono. También activa la foto con IA, el escáner de códigos y la biblioteca compartida.
+                Con una cuenta tus datos se respaldan solos y los recuperás en otro teléfono. También activa la foto con IA, el escáner de códigos y las comidas de la Comunidad.
               </T>
             </Card>
             <GoogleButton loading={busy === 'google'} onPress={() => run('google', async () => { await signInWithGoogle(); await done(); })} />

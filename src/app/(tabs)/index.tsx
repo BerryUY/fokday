@@ -10,6 +10,7 @@ import { HabitsCard } from '@/components/HabitsCard';
 import { StreakBanner, StreakChip } from '@/components/streak';
 import { TodoCard } from '@/components/TodoCard';
 import { TourCard } from '@/components/TourCard';
+import { ProTeaser } from '@/components/ProTeaser';
 import { WeeklySummaryCard } from '@/components/WeeklySummaryCard';
 import { usePlan, usePro } from '@/billing/pro';
 import { left } from '@/components/QuotaCard';
@@ -179,11 +180,9 @@ export default function HomeScreen() {
         </Card>
       </Animated.View>
 
-      {pro ? (
-        <Animated.View entering={enter(6)} style={{ marginTop: space.lg }}>
-          <WeeklySummaryCard />
-        </Animated.View>
-      ) : null}
+      <Animated.View entering={enter(6)} style={{ marginTop: space.lg }}>
+        {pro ? <WeeklySummaryCard /> : <ProTeaser />}
+      </Animated.View>
 
       <Row gap={space.sm} style={{ marginTop: space.lg }}>
         <QuickLink icon="scale-bathroom" label="Registrar peso" onPress={() => router.push('/peso/registrar')} />

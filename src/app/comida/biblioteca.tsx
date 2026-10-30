@@ -51,7 +51,7 @@ export default function PublicLibraryScreen() {
 
   if (!loading && !config) {
     return (
-      <Screen title="Biblioteca pública">
+      <Screen title="Comunidad">
         <Card style={{ padding: space.xl, gap: space.md }}>
           <Feather name="globe" size={28} color={c.accent} />
           <T variant="h2">Entrá con tu cuenta</T>
@@ -63,7 +63,7 @@ export default function PublicLibraryScreen() {
   }
 
   return (
-    <Screen title="Biblioteca pública" subtitle="Comidas que compartió la comunidad">
+    <Screen title="Comunidad" subtitle="Comidas que compartió la comunidad">
       <Field value={query} onChangeText={setQuery} placeholder="Buscar (ej.: alfajor, guiso, yogur)" returnKeyType="search" />
       <View style={{ marginTop: space.lg, gap: space.sm }}>
         {foods === null ? (
@@ -72,7 +72,7 @@ export default function PublicLibraryScreen() {
           <EmptyState
             icon="search"
             title={query ? 'Sin resultados' : 'Todavía no hay comidas compartidas'}
-            message="Cuando crees una comida, podés compartirla acá activando “Compartir en la biblioteca pública”."
+            message="Cuando crees una comida, podés compartirla acá activando “Compartir en Comunidad”."
           />
         ) : (
           foods.map((f, i) => (
@@ -135,11 +135,11 @@ function PublicFoodSheet({ food, date, onClose, onRemoved }: { food: PublicFood 
 
   const remove = async () => {
     if (!f || !config) return;
-    if (!(await confirm('Quitar de la biblioteca', 'Deja de verse para los demás. Tus registros no cambian.', 'Quitar', true))) return;
+    if (!(await confirm('Quitar de Comunidad', 'Deja de verse para los demás. Tus registros no cambian.', 'Quitar', true))) return;
     setBusy(true);
     try {
       await cloudApi.deletePublicFood(config, f.id);
-      toast.show('Quitada de la biblioteca');
+      toast.show('Quitada de Comunidad');
       onRemoved();
     } catch (e) {
       toast.show(e instanceof Error ? e.message : 'No se pudo quitar.', 'error');
@@ -160,7 +160,7 @@ function PublicFoodSheet({ food, date, onClose, onRemoved }: { food: PublicFood 
           <MomentPicker value={moment} onChange={setMoment} />
           <Button label="Registrar" icon="check" onPress={register} />
           <Button label="Guardar en mis comidas" icon="bookmark" variant="secondary" onPress={keep} />
-          {f.mine ? <Button label="Quitar de la biblioteca" icon="trash-2" variant="danger" loading={busy} onPress={remove} /> : null}
+          {f.mine ? <Button label="Quitar de Comunidad" icon="trash-2" variant="danger" loading={busy} onPress={remove} /> : null}
         </View>
       ) : null}
     </Sheet>

@@ -520,11 +520,11 @@ describe('accounts, plans and rewarded videos', () => {
   });
 
   it('writes the weekly summary only for Pro', async () => {
-    const { fetchImpl, env, store } = accounts({ summarizeWeek: async (w) => ({ title: 'Semana sólida', wins: ['Gym ' + String(w.gymDays)], improve: [], tip: 'Seguí así.', focus: 'Constancia' }) });
+    const { fetchImpl, env, store } = accounts({ summarizeWeek: async (w) => ({ title: 'Semana sólida', wins: ['Gym ' + String(w.gymDays)], improve: [], plan: ['Entrená 4 días'], tip: 'Seguí así.', focus: 'Constancia' }) });
     const ana = { url: URL, token: jwt('ana') };
     await expect(cloudApi.weeklySummary(ana, { gymDays: 3 }, fetchImpl)).rejects.toMatchObject({ status: 402 });
     const pro = wire(store, { ...env, checkPro: async () => true });
-    expect(await cloudApi.weeklySummary(ana, { gymDays: 3 }, pro)).toEqual({ summary: { title: 'Semana sólida', wins: ['Gym 3'], improve: [], tip: 'Seguí así.', focus: 'Constancia' }, text: 'Semana sólida. Gym 3 Seguí así.' });
+    expect(await cloudApi.weeklySummary(ana, { gymDays: 3 }, pro)).toEqual({ summary: { title: 'Semana sólida', wins: ['Gym 3'], improve: [], plan: ['Entrená 4 días'], tip: 'Seguí así.', focus: 'Constancia' }, text: 'Semana sólida. Gym 3 Seguí así.' });
     await cloudApi.weeklySummary(ana, { gymDays: 3 }, pro);
     await cloudApi.weeklySummary(ana, { gymDays: 3 }, pro);
     await expect(cloudApi.weeklySummary(ana, { gymDays: 3 }, pro)).rejects.toMatchObject({ status: 429 }); // 3 a day

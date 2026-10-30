@@ -26,7 +26,8 @@ export const Field = forwardRef<ComponentRef<typeof TextInput>, TextInputProps &
             style={[
               styles.input,
               { color: c.text },
-              large && { fontFamily: font.heavy, fontSize: 34, letterSpacing: -1 },
+              // The big number gets the full field height and its own line height, so its top isn't clipped.
+              large && { fontFamily: font.heavy, fontSize: 34, lineHeight: 42, height: 72, paddingVertical: 0, letterSpacing: -1, includeFontPadding: false, textAlignVertical: 'center' },
               rest.multiline && { height: undefined, minHeight: 88, textAlignVertical: 'top', paddingTop: 14 },
               style,
             ]}

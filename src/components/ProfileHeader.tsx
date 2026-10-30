@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { finishSignIn, signInWithGoogle, useAccount, type LinkChoice } from '@/auth/account';
-import { usePro } from '@/billing/pro';
+import { PRO_LIST_PRICES, usePro } from '@/billing/pro';
 import { getSetting } from '@/data/settings';
 import { AVATAR_KEY, pickAvatar } from '@/lib/avatar';
 import { useDb, useMutation, useQuery } from '@/state/db';
@@ -72,14 +72,22 @@ export function ProfileHeader({ name }: { name: string }) {
       </Card>
 
       {!pro ? (
-        <Card tone="accent" onPress={() => router.push('/pro')} style={{ marginBottom: space.xl }}>
+        <Card tone="accent" onPress={() => router.push('/pro')} style={{ marginBottom: space.xl, gap: space.md }}>
           <Row gap={space.md}>
-            <Feather name="zap" size={20} color={c.accent} />
-            <View style={{ flex: 1 }}>
-              <T variant="bodyMedium">Probá FokDay Pro</T>
-              <T variant="caption" tone="muted">20 fotos con IA por día, escáner ilimitado y más</T>
+            <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center' }}>
+              <Feather name="zap" size={22} color={c.accentText} />
             </View>
-            <Feather name="chevron-right" size={18} color={c.textDim} />
+            <View style={{ flex: 1 }}>
+              <T variant="h3">FokDay Pro</T>
+              <T variant="caption" tone="muted">20 fotos con IA por día, escáner ilimitado, resumen semanal y sin videos</T>
+            </View>
+          </Row>
+          <Row style={{ justifyContent: 'space-between' }}>
+            <T variant="bodyMedium" tone="accent">Desde {PRO_LIST_PRICES.annualPerMonth} por mes</T>
+            <Row gap={4}>
+              <T variant="bodyMedium">Ver planes</T>
+              <Feather name="chevron-right" size={18} color={c.text} />
+            </Row>
           </Row>
         </Card>
       ) : (

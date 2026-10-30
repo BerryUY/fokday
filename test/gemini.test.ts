@@ -120,6 +120,7 @@ describe('Gemini weekly summary', () => {
       title: 'Semana firme',
       wins: ['Subiste 5 kg en sentadilla', 'Proteína 5 de 7 días'],
       improve: ['Agua: 1,4 L de 2 L'],
+      plan: [],
       tip: 'Sumá un huevo al desayuno.',
       focus: 'Proteína temprano',
     });

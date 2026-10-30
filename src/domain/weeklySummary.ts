@@ -91,8 +91,8 @@ export function buildWeekInput(w: WeekNumbers): WeekInput {
   return out;
 }
 
-/** What the AI writes back: a title, wins, what to improve, one tip and the focus for next week. */
-export type WeekSummary = { title: string; wins: string[]; improve: string[]; tip: string; focus: string };
+/** What the AI writes back: a title, wins, what to improve, a 3-step plan, one tip and the focus for next week. */
+export type WeekSummary = { title: string; wins: string[]; improve: string[]; plan: string[]; tip: string; focus: string };
 
 const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const list = (v: unknown, n: number) => (Array.isArray(v) ? v.map((x) => str(x, 240)).filter(Boolean).slice(0, n) : []);
@@ -101,7 +101,7 @@ const list = (v: unknown, n: number) => (Array.isArray(v) ? v.map((x) => str(x, 
 export function parseWeekSummary(value: unknown): WeekSummary | null {
   const v = (typeof value === 'string' ? safeJson(value) : value) as Record<string, unknown> | null;
   if (!v || typeof v !== 'object') return null;
-  const s = { title: str(v.title, 80), wins: list(v.wins, 3), improve: list(v.improve, 2), tip: str(v.tip, 320), focus: str(v.focus, 120) };
+  const s = { title: str(v.title, 80), wins: list(v.wins, 3), improve: list(v.improve, 2), plan: list(v.plan, 3), tip: str(v.tip, 320), focus: str(v.focus, 120) };
   return s.title && (s.wins.length || s.tip) ? s : null;
 }
 

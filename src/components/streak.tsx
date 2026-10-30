@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Modal, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, ZoomIn } from 'react-native-reanimated';
 import { getMeta, setMeta } from '@/backup/snapshot';
 import { getStreak } from '@/data/streak';
 import { milestoneAt, type Streak } from '@/domain/streak';
@@ -12,6 +12,7 @@ import { useDb, useQuery } from '@/state/db';
 import { haptic } from '@/state/toast';
 import { useColors } from '@/theme/ThemeProvider';
 import { radius, space } from '@/theme/tokens';
+import { Flame } from './Flame';
 import { Button, PressableScale, Row, T } from './ui/primitives';
 
 const days = (n: number) => `${n} ${n === 1 ? 'día' : 'días'}`;
@@ -28,7 +29,7 @@ export function StreakChip({ streak }: { streak: Streak }) {
       accessibilityLabel={`Racha de ${days(streak.current)}${lit ? '' : ', todavía no sumaste hoy'}`}
       style={[styles.chip, { backgroundColor: lit ? c.streakSoft : c.surface, borderColor: lit ? 'transparent' : c.border }]}
     >
-      <MaterialCommunityIcons name="fire" size={22} color={lit ? c.streak : c.textDim} />
+      <Flame size={24} lit={lit} />
       <T variant="h3" color={lit ? c.streak : c.textMuted} style={{ fontVariant: ['tabular-nums'] }}>{streak.current}</T>
     </PressableScale>
   );
@@ -41,10 +42,10 @@ export function StreakBanner({ streak }: { streak: Streak }) {
   const atRisk = streak.current > 0;
   return (
     <PressableScale onPress={() => router.push('/racha')} style={[styles.banner, { backgroundColor: c.streakSoft }]} accessibilityRole="button">
-      <MaterialCommunityIcons name="fire" size={26} color={c.streak} />
+      <Flame size={32} />
       <View style={{ flex: 1 }}>
         <T variant="bodyMedium" color={c.streak}>{atRisk ? `No pierdas tu racha de ${days(streak.current)}` : 'Arrancá tu racha hoy'}</T>
-        <T variant="caption" tone="muted">Registrá una comida, tu peso o un entrenamiento.</T>
+        <T variant="caption" tone="muted">Registrá una comida o un entrenamiento.</T>
       </View>
       <MaterialCommunityIcons name="chevron-right" size={20} color={c.streak} />
     </PressableScale>
@@ -111,8 +112,8 @@ export function StreakCelebration({ enabled }: { enabled: boolean }) {
     <Modal transparent animationType="fade" visible onRequestClose={close} statusBarTranslucent>
       <View style={[styles.overlay, { backgroundColor: c.overlay }]}>
         <Animated.View entering={FadeIn.duration(220)} style={[styles.card, { backgroundColor: c.surface }]}>
-          <Animated.View entering={ZoomIn.springify().damping(11).delay(80)} style={[styles.flame, { backgroundColor: c.streakSoft }]}>
-            <MaterialCommunityIcons name="fire" size={84} color={c.streak} />
+          <Animated.View entering={ZoomIn.duration(420).delay(80).easing(Easing.out(Easing.cubic))} style={[styles.flame, { backgroundColor: c.streakSoft }]}>
+            <Flame size={96} embers />
           </Animated.View>
           <T variant="hero" color={c.streak} style={{ fontSize: 64, lineHeight: 70, textAlign: 'center' }}>{n}</T>
           <T variant="title" style={{ textAlign: 'center' }}>{n === 1 ? '¡Empezaste tu racha!' : milestone ? `¡${days(n)} seguidos!` : `¡Racha de ${days(n)}!`}</T>

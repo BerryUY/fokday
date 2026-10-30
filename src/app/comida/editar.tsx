@@ -100,7 +100,7 @@ export default function EditMealScreen() {
           extras: textsToExtras(extraTexts, features),
           ingredients: ingredients.split('\n').map((l) => l.trim()).filter(Boolean),
         });
-        toast.show('Guardada y compartida en la biblioteca');
+        toast.show('Guardada y compartida en Comunidad');
       } catch (e) {
         toast.show(`Se guardó, pero no se pudo compartir: ${e instanceof Error ? e.message : 'error'}`, 'error');
       }
@@ -159,7 +159,7 @@ export default function EditMealScreen() {
         {config ? (
           <Row style={{ justifyContent: 'space-between' }}>
             <View style={{ flex: 1 }}>
-              <T variant="bodyMedium">Compartir en la biblioteca pública</T>
+              <T variant="bodyMedium">Compartir en Comunidad</T>
               <T variant="caption" tone="dim">Otras personas van a poder usarla. No se muestra tu nombre.</T>
             </View>
             <Switch value={share} onValueChange={setShare} trackColor={{ true: c.accent, false: c.track }} thumbColor="#FFFFFF" />

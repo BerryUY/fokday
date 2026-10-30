@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState, type ComponentProps } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, { FadeInRight, ZoomIn } from 'react-native-reanimated';
+import Animated, { Easing, FadeInRight, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { setMeta } from '@/backup/snapshot';
 import { Button, Row, T } from '@/components/ui/primitives';
@@ -76,7 +76,7 @@ export default function TourScreen() {
       </Row>
 
       <Animated.View key={i} entering={FadeInRight.duration(260)} style={styles.body}>
-        <Animated.View entering={ZoomIn.springify().damping(13)} style={[styles.icon, { backgroundColor: c.accentSoft }]}>
+        <Animated.View entering={ZoomIn.duration(380).easing(Easing.out(Easing.cubic))} style={[styles.icon, { backgroundColor: c.accentSoft }]}>
           <MaterialCommunityIcons name={step.icon} size={64} color={step.icon === 'fire' ? c.streak : c.accent} />
         </Animated.View>
         <T variant="display" style={{ textAlign: 'center' }}>{step.title}</T>

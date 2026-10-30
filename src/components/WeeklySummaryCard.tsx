@@ -1,13 +1,14 @@
 import { Feather } from '@expo/vector-icons';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { usePro } from '@/billing/pro';
 import { ProLock } from '@/components/ProGate';
 import { Button, Card, Row, T } from '@/components/ui/primitives';
 import { getSetting } from '@/data/settings';
 import { parseWeekSummary, weekKey, type WeekSummary } from '@/domain/weeklySummary';
 import { todayKey } from '@/lib/dates';
+import { formatDecimal } from '@/lib/format';
 import { useCloudConfig } from '@/state/cloud';
 import { useDb, useQuery } from '@/state/db';
 import { startWeeklySummary, useSummaryJob } from '@/state/summaryJob';
@@ -17,8 +18,9 @@ import { radius, space } from '@/theme/tokens';
 
 /**
  * Pro: an AI read of the last 7 days (comida, gym y progreso por ejercicio, actividad, peso,
- * hábitos, tareas, racha) with wins, what to improve, one tip and next week's focus. Made on
- * request in the background and kept for the week, so it never runs on its own.
+ * hábitos, tareas, racha): the week's key numbers, wins, what to improve, a 3-step plan, one tip
+ * and next week's focus. Folds like an accordion once made. Made on request in the background and
+ * kept for the week, so it never runs on its own.
  */
 export function WeeklySummaryCard({ showLock = false }: { showLock?: boolean }) {
   const c = useColors();
@@ -27,12 +29,13 @@ export function WeeklySummaryCard({ showLock = false }: { showLock?: boolean }) 
   const pro = usePro();
   const job = useSummaryJob();
   const { config } = useCloudConfig();
+  const [open, setOpen] = useState(false);
   const week = weekKey(todayKey());
   const { data } = useQuery(async (d) => {
-    const [savedWeek, json, text] = await Promise.all([getSetting(d, 'summary.week'), getSetting(d, 'summary.json'), getSetting(d, 'summary.text')]);
-    if (savedWeek !== week) return { summary: null };
-    const old: WeekSummary | null = text ? { title: 'Tu semana', wins: [], improve: [], tip: text, focus: '' } : null;
-    return { summary: parseWeekSummary(json) ?? old };
+    const [savedWeek, json, text, input] = await Promise.all(['summary.week', 'summary.json', 'summary.text', 'summary.input'].map((k) => getSetting(d, k)));
+    if (savedWeek !== week) return { summary: null, stats: [] };
+    const old: WeekSummary | null = text ? { title: 'Tu semana', wins: [], improve: [], plan: [], tip: text, focus: '' } : null;
+    return { summary: parseWeekSummary(json) ?? old, stats: weekStats(input) };
   }, [week]);
 
   if (!pro) {
@@ -67,7 +70,27 @@ export function WeeklySummaryCard({ showLock = false }: { showLock?: boolean }) 
         <Making attempt={job.attempt} />
       ) : summary ? (
         <Animated.View entering={FadeIn.duration(300)} style={{ gap: space.md }}>
-          <SummaryBody summary={summary} />
+          <Pressable onPress={() => setOpen((o) => !o)} accessibilityRole="button" accessibilityState={{ expanded: open }} style={{ gap: space.md }}>
+            <Row gap={space.sm} align="flex-start">
+              <T variant="h2" style={{ flex: 1 }}>{summary.title}</T>
+              <Chevron open={open} />
+            </Row>
+            {data?.stats.length ? (
+              <Row gap={6} style={{ flexWrap: 'wrap' }}>
+                {data.stats.map((st) => (
+                  <View key={st} style={[styles.stat, { backgroundColor: c.surfaceAlt }]}>
+                    <T variant="caption">{st}</T>
+                  </View>
+                ))}
+              </Row>
+            ) : null}
+            {!open ? <T variant="caption" tone="accent">Ver lo bueno, qué mejorar y tu plan</T> : null}
+          </Pressable>
+          {open ? (
+            <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(150)} style={{ gap: space.md }}>
+              <SummaryBody summary={summary} />
+            </Animated.View>
+          ) : null}
         </Animated.View>
       ) : (
         <>
@@ -85,13 +108,27 @@ function SummaryBody({ summary }: { summary: WeekSummary }) {
   const c = useColors();
   return (
     <>
-      {summary.title !== 'Tu semana' && <T variant="h2">{summary.title}</T>}
+      {summary.wins.length ? <T variant="overline" tone="dim">Lo bueno</T> : null}
       {summary.wins.map((w) => (
         <Line key={w} icon="check-circle" color={c.accent} text={w} />
       ))}
+      {summary.improve.length ? <T variant="overline" tone="dim">Para mejorar</T> : null}
       {summary.improve.map((w) => (
         <Line key={w} icon="trending-up" color={c.weight} text={w} />
       ))}
+      {summary.plan.length ? (
+        <View style={[styles.plan, { borderColor: c.border }]}>
+          <T variant="overline" tone="dim">Tu plan para esta semana</T>
+          {summary.plan.map((step, i) => (
+            <Row key={step} gap={space.sm} align="flex-start">
+              <View style={[styles.step, { backgroundColor: c.accent }]}>
+                <T variant="caption" color={c.accentText}>{i + 1}</T>
+              </View>
+              <T variant="body" style={{ flex: 1 }}>{step}</T>
+            </Row>
+          ))}
+        </View>
+      ) : null}
       {!!summary.tip && (
         <View style={[styles.tip, { backgroundColor: c.accentSoft }]}>
           <T variant="overline" color={c.accent}>Consejo</T>
@@ -108,6 +145,42 @@ function SummaryBody({ summary }: { summary: WeekSummary }) {
       )}
     </>
   );
+}
+
+/** The chevron turns smoothly when the card opens or closes. */
+function Chevron({ open }: { open: boolean }) {
+  const c = useColors();
+  const turn = useSharedValue(open ? 1 : 0);
+  useEffect(() => {
+    turn.set(withTiming(open ? 1 : 0, { duration: 220, easing: Easing.out(Easing.cubic) }));
+  }, [open, turn]);
+  const style = useAnimatedStyle(() => ({ transform: [{ rotate: `${turn.get() * 180}deg` }] }));
+  return (
+    <Animated.View style={[{ marginTop: 4 }, style]}>
+      <Feather name="chevron-down" size={22} color={c.textMuted} />
+    </Animated.View>
+  );
+}
+
+/** The week's key numbers, from what the phone sent (no AI): kcal, protein, gym, weight, tasks. */
+export function weekStats(input: string | null): string[] {
+  let w: Record<string, unknown>;
+  try {
+    w = JSON.parse(input ?? '') as Record<string, unknown>;
+  } catch {
+    return [];
+  }
+  const n = (k: string) => (typeof w[k] === 'number' ? (w[k] as number) : null);
+  const out: string[] = [];
+  const kcal = n('kcal_promedio');
+  if (kcal !== null && n('meta_kcal')) out.push(`${formatDecimal(kcal, 0)} / ${formatDecimal(n('meta_kcal')!, 0)} kcal`);
+  if (n('dias_que_llego_a_la_proteina') !== null) out.push(`Proteína ${n('dias_que_llego_a_la_proteina')}/7 días`);
+  if (n('dias_de_gym') !== null) out.push(`Gym ${n('dias_de_gym')}${n('dias_de_gym_planeados') ? `/${n('dias_de_gym_planeados')}` : ''} días`);
+  const kg = n('peso_cambio_kg');
+  if (kg !== null) out.push(`Peso ${kg > 0 ? '+' : ''}${formatDecimal(kg, 1)} kg`);
+  const todos = w.tareas as { hechas?: number; total?: number } | undefined;
+  if (todos?.total) out.push(`Tareas ${todos.hechas ?? 0}/${todos.total}`);
+  return out;
 }
 
 function Line({ icon, color, text }: { icon: 'check-circle' | 'trending-up'; color: string; text: string }) {
@@ -151,6 +224,9 @@ function Dot({ delay }: { delay: number }) {
 
 const styles = StyleSheet.create({
   tip: { borderRadius: radius.md, padding: space.md, gap: space.xs },
+  stat: { borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 },
+  plan: { borderRadius: radius.md, borderWidth: 1, padding: space.md, gap: space.sm },
+  step: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
   making: { borderRadius: radius.md, borderWidth: 1, padding: space.md, gap: space.sm },
   dot: { width: 8, height: 8, borderRadius: 4 },
 });

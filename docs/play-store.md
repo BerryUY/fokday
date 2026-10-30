@@ -13,8 +13,8 @@ Todo lo que dice "vos" son claves o cuentas que solo vos podés crear. Ninguna c
 2. Crear la app: nombre **FokDay**, idioma **Español (Latinoamérica)**, **App**, **Gratis** (las suscripciones van dentro de una app gratis).
 3. **Cuenta de comerciante** (Configuración → Perfil de pagos): necesaria para cobrar Pro. Uruguay está habilitado y Google paga en USD.
 4. **Suscripciones** (Monetizar → Productos → Suscripciones): crear `fokday_pro` con dos planes base:
-   - `mensual`: US$2,99 por mes;
-   - `anual`: US$19,99 por año.
+   - `mensual`: US$3,99 por mes;
+   - `anual`: US$24,99 por año.
    - Opcional: una prueba gratis de 7 días en el anual.
    - Google convierte los precios a pesos uruguayos solo.
 

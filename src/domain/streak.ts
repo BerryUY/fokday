@@ -1,8 +1,8 @@
 import { addDays, startOfWeek, type DateKey } from '@/lib/dates';
 
 /**
- * The app streak (like Duolingo's): consecutive days on which the person logged anything (a meal,
- * a workout or activity, or their weight). It stays alive through today while today is still
+ * The app streak (like Duolingo's): consecutive days on which the person logged a meal or trained
+ * (a workout or an activity). It stays alive through today while today is still
  * open, so it only breaks once a whole day passes with nothing.
  */
 export type Streak = {

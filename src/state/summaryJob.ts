@@ -56,9 +56,11 @@ export async function startWeeklySummary(db: Db, config: CloudConfig, delays = R
     for (let attempt = 1; ; attempt++) {
       try {
         const res = await cloudApi.weeklySummary(config, input);
-        const summary = parseWeekSummary(res.summary) ?? { title: 'Tu semana', wins: [], improve: [], tip: res.text, focus: '' };
+        const summary = parseWeekSummary(res.summary) ?? { title: 'Tu semana', wins: [], improve: [], plan: [], tip: res.text, focus: '' };
         await setSetting(db, 'summary.week', weekKey(today));
         await setSetting(db, 'summary.json', JSON.stringify(summary));
+        // The week's numbers too, so the card can show them next to the AI's read.
+        await setSetting(db, 'summary.input', JSON.stringify(input));
         notifyDataChanged();
         set({ status: 'done', at: Date.now() });
         return;

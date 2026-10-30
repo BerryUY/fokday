@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { MealCard } from '@/components/nutrition';
+import { Field } from '@/components/ui/form';
 import { EmptyState, Loading, Screen } from '@/components/ui/layout';
 import { Button, Card, IconBubble, IconButton, Row, T } from '@/components/ui/primitives';
 import { CATEGORY_GUIDANCE, LIGHT_DINNER_GUIDE, PLAN_FOOTNOTE } from '@/data/catalog';
@@ -14,6 +15,9 @@ import { formatKcal, formatProtein } from '@/lib/format';
 import { useParams } from '@/lib/params';
 import { useMutation, useQuery } from '@/state/db';
 import { space } from '@/theme/tokens';
+
+/** Lowercase without accents, so "empanada" finds "Empanadas de carne" and "cafe" finds "Café". */
+const fold = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 export default function CategoryScreen() {
   const params = useParams();
@@ -29,6 +33,10 @@ export default function CategoryScreen() {
 
   const guidance = CATEGORY_GUIDANCE[category];
   const [showOthers, setShowOthers] = useState(false);
+  const [query, setQuery] = useState('');
+  const q = fold(query.trim());
+  // While searching, every saved meal counts (this moment's first), not only this moment's.
+  const found = data && q ? [...data.meals, ...data.others].filter((m) => fold(m.name).includes(q)) : null;
 
   return (
     <Screen
@@ -55,7 +63,38 @@ export default function CategoryScreen() {
             </Card>
           ) : null}
 
-          {guidance ? (
+          {data.meals.length + data.others.length > 0 ? (
+            <View style={{ marginBottom: space.lg }}>
+              <Field value={query} onChangeText={setQuery} placeholder="Buscar en tus comidas" returnKeyType="search" autoCorrect={false} clearButtonMode="while-editing" />
+            </View>
+          ) : null}
+
+          {found ? (
+            found.length === 0 ? (
+              <EmptyState
+                icon="search"
+                title="No encontramos esa comida"
+                message="Creala para registrarla con un toque, o cargala a mano."
+                action={<Button label="Crear comida" icon="plus" onPress={() => router.push({ pathname: '/comida/editar', params: { category } })} />}
+              />
+            ) : (
+              <View style={{ gap: space.md }}>
+                {found.map((meal) => (
+                  <MealCard
+                    key={meal.id}
+                    meal={meal}
+                    calorieTarget={data.goal.calories}
+                    onPress={() => router.push({ pathname: '/comida/[id]', params: { id: meal.id, date, category } })}
+                    onQuickLog={() =>
+                      run((db) => logMeal(db, { date, category, meal }), { success: `${meal.name} · ${formatKcal(meal.calories)} kcal registrado` })
+                    }
+                  />
+                ))}
+              </View>
+            )
+          ) : null}
+
+          {!found && guidance ? (
             <Card style={{ marginBottom: space.lg }}>
               <Row align="flex-start" gap={space.md}>
                 <IconBubble icon="info" tone="weight" size={32} />
@@ -64,7 +103,7 @@ export default function CategoryScreen() {
             </Card>
           ) : null}
 
-          {data.meals.length === 0 ? (
+          {found ? null : data.meals.length === 0 ? (
             <EmptyState
               icon="book-open"
               title="No hay comidas en esta categoría"
@@ -88,7 +127,7 @@ export default function CategoryScreen() {
             </View>
           )}
 
-          {data.others.length > 0 ? (
+          {!found && data.others.length > 0 ? (
             <View style={{ marginTop: space.lg, gap: space.md }}>
               <Button
                 label={showOthers ? 'Ocultar comidas de otros momentos' : `Comidas de otros momentos (${data.others.length})`}

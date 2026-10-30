@@ -8,7 +8,7 @@ import { useColors } from '@/theme/ThemeProvider';
 import { radius, space } from '@/theme/tokens';
 import { IconBubble, IconButton, T, type IconName } from './primitives';
 
-export const TAB_BAR_SPACE = 96;
+export const TAB_BAR_SPACE = 90;
 
 /**
  * Scrollable screen. `tab` screens leave room for the floating tab bar;

@@ -167,7 +167,7 @@ export default function TrainScreen() {
           }}
         />
         <Tile icon="lightning-bolt-outline" label="Entreno libre" onPress={() => start(null)} disabled={!!data.active} />
-        <Tile icon="walk" label="Caminata o bici" onPress={() => router.push('/actividad/nueva')} />
+        <Tile icon="walk" label="Aeróbico" onPress={() => router.push('/actividad/nueva')} />
       </View>
 
       {/* 3. This week and month */}

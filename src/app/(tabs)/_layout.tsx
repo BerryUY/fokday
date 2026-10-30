@@ -21,8 +21,8 @@ const TABS: Record<string, TabMeta> = {
   progreso: { label: 'Progreso', icon: 'chart-line-variant', iconActive: 'chart-line-variant' },
 };
 
-const ITEM_H = 52;
-const PAD = 6;
+const ITEM_H = 48;
+const PAD = 5;
 const GAP = 4;
 /** The open tab is this many times wider than a closed one. */
 const GROW = 2.4;
@@ -113,10 +113,12 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 14 },
+  wrap: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 28, alignItems: 'center' },
   bar: {
     flexDirection: 'row',
-    borderRadius: 30,
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 29,
     borderWidth: StyleSheet.hairlineWidth,
     padding: PAD,
     gap: GAP,

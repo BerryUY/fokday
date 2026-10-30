@@ -45,11 +45,13 @@ describe('computeStreak', () => {
 });
 
 describe('getStreak', () => {
-  it('joins meals, gym days and weigh-ins', async () => {
+  it('joins meals and training days; a weigh-in alone does not count', async () => {
     const db = await createTestDb();
     await logMeal(db, { date: '2026-10-27', category: 'almuerzo', manual: { name: 'Pollo', calories: 500, protein: 40 } });
     await markAttendance(db, '2026-10-28');
     await saveWeight(db, today, 70.2);
+    expect(await getStreak(db, today)).toMatchObject({ current: 2, doneToday: false });
+    await markAttendance(db, today);
     expect(await getStreak(db, today)).toMatchObject({ current: 3, doneToday: true });
   });
 });

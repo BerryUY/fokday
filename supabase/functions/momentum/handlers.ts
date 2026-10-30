@@ -91,8 +91,8 @@ export type AuthUser = { id: string; email: string | null; name: string | null }
 
 /** Compact numbers of one week, built on the phone, for the Pro weekly summary. */
 export type WeekInput = Record<string, unknown>;
-/** The Pro weekly summary: a title, wins, what to improve, one tip and next week's focus. */
-export type WeekSummary = { title: string; wins: string[]; improve: string[]; tip: string; focus: string };
+/** The Pro weekly summary: a title, wins, what to improve, a 3-step plan, one tip and next week's focus. */
+export type WeekSummary = { title: string; wins: string[]; improve: string[]; plan: string[]; tip: string; focus: string };
 
 export type Env = {
   /** sha256 (hex) of the owner's invite code (legacy sign-up without an account). */

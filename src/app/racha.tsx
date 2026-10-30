@@ -1,7 +1,7 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { View } from 'react-native';
-import Animated, { ZoomIn } from 'react-native-reanimated';
+import Animated, { Easing, ZoomIn } from 'react-native-reanimated';
+import { Flame } from '@/components/Flame';
 import { StreakWeek } from '@/components/streak';
 import { Loading, Screen } from '@/components/ui/layout';
 import { Button, Card, Row, T } from '@/components/ui/primitives';
@@ -21,8 +21,8 @@ export default function StreakScreen() {
   return (
     <Screen title="Tu racha">
       <View style={{ alignItems: 'center', paddingVertical: space.xl }}>
-        <Animated.View entering={ZoomIn.springify().damping(12)} style={{ width: 148, height: 148, borderRadius: 74, alignItems: 'center', justifyContent: 'center', backgroundColor: lit ? c.streakSoft : c.surface }}>
-          <MaterialCommunityIcons name="fire" size={96} color={lit ? c.streak : c.textDim} />
+        <Animated.View entering={ZoomIn.duration(420).easing(Easing.out(Easing.cubic))} style={{ width: 148, height: 148, borderRadius: 74, alignItems: 'center', justifyContent: 'center', backgroundColor: lit ? c.streakSoft : c.surface }}>
+          <Flame size={112} lit={lit} embers />
         </Animated.View>
         <T variant="hero" color={lit ? c.streak : c.text} style={{ fontSize: 72, lineHeight: 78, marginTop: space.md }}>{s.current}</T>
         <T variant="title">{s.current === 1 ? 'día de racha' : 'días de racha'}</T>
@@ -53,13 +53,13 @@ export default function StreakScreen() {
 
       <Card tone="alt" style={{ marginTop: space.xl, gap: space.sm }}>
         <T variant="h3">¿Cómo suma un día?</T>
-        <T variant="label" tone="muted">Alcanza con registrar una comida, tu peso, un entrenamiento o una caminata. Si pasa un día entero sin nada, la racha vuelve a cero.</T>
+        <T variant="label" tone="muted">Alcanza con registrar una comida o un entrenamiento (gym o aeróbico). Si pasa un día entero sin nada, la racha vuelve a cero.</T>
       </Card>
 
       {!lit ? (
         <View style={{ gap: space.sm, marginTop: space.xl }}>
           <Button label="Foto con IA" icon="camera" size="lg" onPress={() => router.push('/comida/foto')} />
-          <Button label="Registrar mi peso" icon="trending-down" variant="secondary" onPress={() => router.push('/peso/registrar')} />
+          <Button label="Entrenar" icon="activity" variant="secondary" onPress={() => router.push('/entrenar')} />
         </View>
       ) : null}
     </Screen>

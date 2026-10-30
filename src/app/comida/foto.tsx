@@ -90,7 +90,7 @@ export default function FoodPhotoScreen() {
       setTimeout(() => haptic('success'), 140);
       void playReward();
       setBurst((n) => n + 1);
-      pop.set(withSequence(withTiming(0.94, { duration: 90 }), withTiming(1.05, { duration: 170, easing: Easing.out(Easing.back(3)) }), withTiming(1, { duration: 160 })));
+      pop.set(withSequence(withTiming(0.94, { duration: 90 }), withTiming(1.02, { duration: 200, easing: Easing.out(Easing.cubic) }), withTiming(1, { duration: 160 })));
       glow.set(withSequence(withTiming(1, { duration: 180 }), withTiming(0.35, { duration: 900 })));
     } catch (e) {
       if (e instanceof ApiError && e.status === 429) void refreshPlan();
