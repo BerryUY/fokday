@@ -38,7 +38,7 @@ export function ProfileHeader({ name }: { name: string }) {
       toast.show('¡Listo! Tu progreso se guarda en tu cuenta');
       if (pending) setChoice(pending);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'No pudimos entrar.';
+      const msg = e instanceof Error ? e.message : 'No pudimos iniciar sesión.';
       if (msg !== 'cancelled') toast.show(msg, 'error');
     } finally {
       setBusy(false);

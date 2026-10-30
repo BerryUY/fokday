@@ -146,7 +146,7 @@ export default function WelcomeScreen() {
       if (pending) setChoice(pending);
       else next();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'No pudimos entrar.';
+      const msg = e instanceof Error ? e.message : 'No pudimos iniciar sesión.';
       if (msg !== 'cancelled') toast.show(msg, 'error');
     } finally {
       setSigningIn(false);

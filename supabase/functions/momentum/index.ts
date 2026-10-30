@@ -114,10 +114,18 @@ async function loadEnv(): Promise<Env> {
   return env;
 }
 
-const headers = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' };
+// CORS lets the web version of the app call the API too. Credentials travel in the Authorization
+// header (never cookies), so allowing any origin doesn't let other sites act as the person.
+const cors = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, content-type, x-timezone',
+  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+};
+const headers = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...cors };
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers });
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
   try {
     const requestUrl = new URL(req.url);
     const route = requestUrl.pathname.match(/\/api\/(.*)$/)?.[1] ?? '';

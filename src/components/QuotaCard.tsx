@@ -98,7 +98,7 @@ export function QuotaCard({ kind }: { kind: RewardKind }) {
           <Button label="Mirar un video" icon="play" loading={busy} onPress={watch} />
         </>
       ) : (
-        <T variant="label" tone="muted">{q.bonusLeft > 0 && !account ? 'Entrá con tu cuenta para ganar más mirando videos.' : 'Mañana se renuevan.'}</T>
+        <T variant="label" tone="muted">{q.bonusLeft > 0 && !account ? 'Iniciá sesión para ganar más mirando videos.' : 'Mañana se renuevan.'}</T>
       )}
       <Button label="Pasate a Pro" icon="zap" variant="secondary" size="sm" onPress={() => router.push('/pro')} />
     </Card>

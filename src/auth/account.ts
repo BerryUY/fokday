@@ -51,11 +51,14 @@ export async function currentAccount(): Promise<Account | null> {
   return toAccount(data.session);
 }
 
+/** Supabase's answer when the email or the password is wrong (it doesn't say which). */
+export const WRONG_CREDENTIALS = 'El email o la contraseña no coinciden.';
+
 /** Supabase's English errors, in the app's words. */
 function friendly(e: unknown): Error {
   const msg = e instanceof Error ? e.message : String(e);
-  if (/invalid login credentials/i.test(msg)) return new Error('El email o la contraseña no coinciden.');
-  if (/already registered|already exists/i.test(msg)) return new Error('Ya hay una cuenta con ese email. Entrá con tu contraseña.');
+  if (/invalid login credentials/i.test(msg)) return new Error(WRONG_CREDENTIALS);
+  if (/already registered|already exists/i.test(msg)) return new Error('Ya hay una cuenta con ese email. Iniciá sesión con tu contraseña.');
   if (/password should be at least|weak password/i.test(msg)) return new Error('La contraseña tiene que tener al menos 8 caracteres.');
   if (/rate limit|too many/i.test(msg)) return new Error('Demasiados intentos. Esperá unos minutos y probá de nuevo.');
   if (/token has expired|invalid.*otp|otp.*invalid/i.test(msg)) return new Error('El código no es válido o venció. Pedí uno nuevo.');
@@ -74,8 +77,8 @@ const googleWebClientId = (): string => PUBLIC_CONFIG.googleWebClientId;
 
 export async function signInWithGoogle(): Promise<void> {
   ensureConfigured();
-  if (Platform.OS === 'web') throw new Error('Entrar con Google funciona desde el teléfono.');
-  if (!googleWebClientId()) throw new Error('Entrar con Google todavía no está activado. Usá tu email por ahora.');
+  if (Platform.OS === 'web') throw new Error('Iniciar sesión con Google funciona desde el teléfono.');
+  if (!googleWebClientId()) throw new Error('Iniciar sesión con Google todavía no está activado. Usá tu email por ahora.');
   const { GoogleSignin, isErrorWithCode, isSuccessResponse, statusCodes } = google();
   GoogleSignin.configure({ webClientId: googleWebClientId() });
   try {
@@ -89,7 +92,7 @@ export async function signInWithGoogle(): Promise<void> {
   } catch (e) {
     if (e instanceof Error && e.message === 'cancelled') throw e;
     if (isErrorWithCode(e) && e.code === statusCodes.SIGN_IN_CANCELLED) throw new Error('cancelled');
-    if (isErrorWithCode(e) && e.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) throw new Error('Este teléfono no tiene Google Play Services. Entrá con tu email.');
+    if (isErrorWithCode(e) && e.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) throw new Error('Este teléfono no tiene Google Play Services. Iniciá sesión con tu email.');
     throw friendly(e);
   }
 }

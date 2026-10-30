@@ -97,7 +97,7 @@ async function request<T>(config: { url: string; token?: string }, path: string,
   if (!res.ok) {
     const serverMsg = (body as { error?: string } | null)?.error;
     const msg =
-      res.status === 401 ? serverMsg ?? 'Tu sesión venció. Volvé a entrar con tu cuenta.'
+      res.status === 401 ? serverMsg ?? 'Tu sesión venció. Volvé a iniciar sesión.'
       : res.status === 413 ? 'El respaldo es más grande de lo que acepta el servidor.'
       : serverMsg ?? `El servidor respondió con un error (${res.status}).`;
     throw new ApiError(msg, res.status);
@@ -122,6 +122,11 @@ export const cloudApi = {
 
   list(config: CloudConfig, fetchImpl?: FetchLike) {
     return request<{ backups: CloudBackupMeta[] }>(config, 'backups', {}, fetchImpl);
+  },
+
+  /** After a failed sign-in: whether the email has no account, a password, or only Google. */
+  accountKind(url: string, email: string, fetchImpl?: FetchLike) {
+    return request<{ kind: 'none' | 'password' | 'google' }>({ url }, 'auth/account-kind', { method: 'POST', body: JSON.stringify({ email }) }, fetchImpl);
   },
 
   /** Sends a food photo (JPEG, base64) for the AI to estimate; needs a cloud profile. */

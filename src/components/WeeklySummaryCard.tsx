@@ -46,7 +46,7 @@ export function WeeklySummaryCard({ showLock = false }: { showLock?: boolean }) 
 
   const make = () => {
     if (!config) {
-      toast.show('Entrá con tu cuenta para armar el resumen.', 'info');
+      toast.show('Iniciá sesión para armar el resumen.', 'info');
       return;
     }
     void startWeeklySummary(db, config);

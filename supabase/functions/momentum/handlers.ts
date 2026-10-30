@@ -56,7 +56,11 @@ export interface BackupStore {
   createPublicFood(profileId: string, food: PublicFoodInput): Promise<PublicFood>;
   /** Only the author can delete; false when nothing was deleted. */
   deletePublicFood(profileId: string, id: string): Promise<boolean>;
+  /** How an email signs in: no account, email and password, or Google only. */
+  accountKind(email: string): Promise<AccountKind>;
 }
+
+export type AccountKind = 'none' | 'password' | 'google';
 
 /** What the AI reads from a food photo (all values for the whole visible portion). */
 export type FoodAnalysis = {
@@ -175,7 +179,7 @@ export async function authenticate(header: string | string[] | undefined, store:
   if (given.length < 32) return { denied: denied401 };
   if (isJwt(given)) {
     const user = env?.verifyAuthToken ? await env.verifyAuthToken(given) : null;
-    if (!user) return { denied: { status: 401, json: { error: 'Tu sesión venció. Volvé a entrar.' } } };
+    if (!user) return { denied: { status: 401, json: { error: 'Tu sesión venció. Volvé a iniciar sesión.' } } };
     const existing = await store.findProfileByAuthUser(user.id);
     if (existing) return { profile: existing, authUser: user };
     if (env && (await store.countProfiles()) >= env.maxProfiles) {
@@ -410,6 +414,7 @@ export async function handleRequest(path: string, req: ApiRequest, store: Backup
   if (clean === 'profiles/me') return handleMe(req, store, env, 'delete');
   if (clean === 'profiles/me/token') return handleMe(req, store, env, 'rotate');
   if (clean === 'profiles/link') return handleLink(req, store, env);
+  if (clean === 'auth/account-kind') return handleAccountKind(req, store);
   if (clean === 'ads/reward') return handleAdReward(req, store, env);
   if (clean === 'ai/weekly-summary') return handleWeeklySummary(req, store, env);
   if (clean === 'status') return handleStatus(req, store, env);
@@ -508,6 +513,20 @@ export async function handleDeletePublicFood(req: ApiRequest, store: BackupStore
 // ---------- Accounts, rewarded videos and the Pro weekly summary ----------
 
 /**
+ * POST auth/account-kind { email } → { kind }: after a failed sign-in, tells the person whether
+ * that email has no account yet or signs in with Google, instead of a vague "wrong password".
+ * It reveals whether an email is registered (like most apps' sign-in screens do); nothing else.
+ */
+export async function handleAccountKind(req: ApiRequest, store: BackupStore): Promise<ApiResponse> {
+  if (req.method !== 'POST') return { status: 405, json: { error: 'Método no permitido.' } };
+  const email = (req.body as { email?: unknown } | null)?.email;
+  if (typeof email !== 'string' || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    return { status: 400, json: { error: 'Email inválido.' } };
+  }
+  return { status: 200, json: { kind: await store.accountKind(email.trim().toLowerCase()) } };
+}
+
+/**
  * POST profiles/link { token }: with a Supabase session, adopts the profile of an older install
  * (its mom_ token) so its backups follow the account. An empty profile the account made on
  * first use is dropped; one that already has backups is never overwritten.
@@ -516,7 +535,7 @@ export async function handleLink(req: ApiRequest, store: BackupStore, env: Env):
   if (req.method !== 'POST') return { status: 405, json: { error: 'Método no permitido.' } };
   const jwt = bearer(req.headers.authorization);
   const user = isJwt(jwt) && env.verifyAuthToken ? await env.verifyAuthToken(jwt) : null;
-  if (!user) return { status: 401, json: { error: 'Tu sesión venció. Volvé a entrar.' } };
+  if (!user) return { status: 401, json: { error: 'Tu sesión venció. Volvé a iniciar sesión.' } };
   const token = (req.body as { token?: unknown } | null)?.token;
   const legacy = typeof token === 'string' && token.length >= 32 ? await store.findProfileByTokenHash(sha256Hex(token)) : null;
   if (!legacy) return { status: 404, json: { error: 'No encontramos el perfil anterior de este teléfono.' } };
@@ -524,7 +543,7 @@ export async function handleLink(req: ApiRequest, store: BackupStore, env: Env):
   if (current && current.id === legacy.id) return { status: 200, json: { profile: legacy, linked: true } };
   if (current) {
     if ((await store.count(current.id)) > 0) {
-      return { status: 409, json: { error: 'Esta cuenta ya tiene respaldos. Entrá con otra cuenta para conservar los de este teléfono.' } };
+      return { status: 409, json: { error: 'Esta cuenta ya tiene respaldos. Iniciá sesión con otra cuenta para conservar los de este teléfono.' } };
     }
     await store.deleteProfile(current.id);
   }

@@ -108,6 +108,9 @@ function memoryStore() {
       const { profileId: _p, ...pub } = food;
       return pub;
     },
+    async accountKind(email) {
+      return email === 'ana@test.com' ? 'password' : email === 'beto@test.com' ? 'google' : 'none';
+    },
     async deletePublicFood(profileId, id) {
       const i = foods.findIndex((f) => f.id === id && f.profileId === profileId);
       if (i < 0) return false;
@@ -517,6 +520,14 @@ describe('accounts, plans and rewarded videos', () => {
     const ana = { url: URL, token: jwt('ana') };
     await expect(cloudApi.analyzeFood(ana, photo, fetchImpl)).rejects.toMatchObject({ status: 503 });
     expect((await cloudApi.status(ana, fetchImpl)).ai.used).toBe(0);
+  });
+
+  it('says whether an email has an account, and how it signs in', async () => {
+    const { fetchImpl } = accounts();
+    expect(await cloudApi.accountKind(URL, 'nadie@test.com', fetchImpl)).toEqual({ kind: 'none' });
+    expect(await cloudApi.accountKind(URL, ' Ana@Test.com ', fetchImpl)).toEqual({ kind: 'password' });
+    expect(await cloudApi.accountKind(URL, 'beto@test.com', fetchImpl)).toEqual({ kind: 'google' });
+    await expect(cloudApi.accountKind(URL, 'no es un email', fetchImpl)).rejects.toMatchObject({ status: 400 });
   });
 
   it('writes the weekly summary only for Pro', async () => {

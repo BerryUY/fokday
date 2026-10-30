@@ -24,7 +24,7 @@ export default function AccountScreen() {
           icon="user"
           title="No entraste con ninguna cuenta"
           message="Todo funciona en este teléfono. Con una cuenta tus datos se respaldan solos y se activan la foto con IA y el escáner."
-          action={<Button label="Entrar o crear cuenta" icon="log-in" onPress={() => router.push('/cuenta/entrar')} />}
+          action={<Button label="Iniciar sesión o crear cuenta" icon="log-in" onPress={() => router.push('/cuenta/entrar')} />}
         />
       </Screen>
     );
@@ -60,7 +60,7 @@ export default function AccountScreen() {
           variant="secondary"
           loading={busy === 'out'}
           onPress={async () => {
-            if (!(await confirm('Cerrar sesión', 'Tus datos siguen en este teléfono. Los respaldos automáticos se pausan hasta que vuelvas a entrar.', 'Cerrar sesión'))) return;
+            if (!(await confirm('Cerrar sesión', 'Tus datos siguen en este teléfono. Los respaldos automáticos se pausan hasta que vuelvas a iniciar sesión.', 'Cerrar sesión'))) return;
             await run('out', async () => {
               await signOut(db);
               toast.show('Sesión cerrada');

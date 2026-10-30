@@ -203,6 +203,11 @@ export function createSupabaseStore(url: string, secretKey: string): BackupStore
       const { profileId: _p, ...food } = data as PublicFood & { profileId: string };
       return { ...food, createdAt: iso(food.createdAt) };
     },
+    async accountKind(email) {
+      const { data, error } = await db.rpc('momentum_account_kind', { p_email: email });
+      if (error) fail('accountKind', error);
+      return data === 'password' || data === 'google' ? data : 'none';
+    },
     async deletePublicFood(profileId, id) {
       const { data, error } = await db.from('momentum_public_foods').delete().eq('id', id).eq('profile_id', profileId).select('id');
       if (error) fail('deletePublicFood', error);

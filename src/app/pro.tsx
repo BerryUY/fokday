@@ -71,7 +71,7 @@ export default function ProScreen() {
   const footer = plan.pro ? (
     <Button label="Administrar suscripción" icon="settings" variant="secondary" onPress={manageSubscription} />
   ) : !account ? (
-    <Button label="Entrá con tu cuenta para suscribirte" icon="log-in" size="lg" onPress={() => router.push('/cuenta/entrar')} />
+    <Button label="Iniciá sesión para suscribirte" icon="log-in" size="lg" onPress={() => router.push('/cuenta/entrar')} />
   ) : canBuy ? (
     <Button label={`Suscribirme · ${choice.price}`} icon="zap" size="lg" loading={busy === 'buy'} onPress={purchase} />
   ) : (

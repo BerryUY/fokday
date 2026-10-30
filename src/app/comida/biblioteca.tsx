@@ -54,9 +54,9 @@ export default function PublicLibraryScreen() {
       <Screen title="Comunidad">
         <Card style={{ padding: space.xl, gap: space.md }}>
           <Feather name="globe" size={28} color={c.accent} />
-          <T variant="h2">Entrá con tu cuenta</T>
+          <T variant="h2">Iniciá sesión</T>
           <T variant="body" tone="muted">Con una cuenta (Google o email) podés buscar las comidas que compartió la comunidad y compartir las tuyas.</T>
-          <Button label="Entrar o crear cuenta" icon="log-in" onPress={() => router.push('/cuenta/entrar')} />
+          <Button label="Iniciar sesión o crear cuenta" icon="log-in" onPress={() => router.push('/cuenta/entrar')} />
         </Card>
       </Screen>
     );

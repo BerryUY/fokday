@@ -80,7 +80,7 @@ export default function BackupScreen() {
         <T variant="caption" tone="dim" style={{ marginTop: 2, marginBottom: space.md }}>Todo vive en este teléfono. Estas copias te cuidan si lo perdés o desinstalás la app.</T>
         <ProtectionRow on title="Copia de Android en Google Drive" detail="Automática cada noche, si tu teléfono tiene activada la copia de seguridad (Ajustes → Sistema → Copia de seguridad). Al reinstalar desde Play Store se restaura sola." />
         <ProtectionRow on={!!folder.folderUri} title="Copia semanal en una carpeta" detail={folder.folderUri ? 'Activada' : 'Desactivada: activala más abajo'} />
-        <ProtectionRow on={sync.configured} title="Nube de FokDay" detail={sync.configured ? 'Activada' : 'Entrá con tu cuenta para activarla'} last />
+        <ProtectionRow on={sync.configured} title="Nube de FokDay" detail={sync.configured ? 'Activada' : 'Iniciá sesión para activarla'} last />
       </Card>
 
       <SectionHeader title="Respaldo en la nube" />
@@ -104,17 +104,17 @@ export default function BackupScreen() {
               <T variant="caption" tone="dim">Se respalda solo cuando hay internet y hubo cambios. Tus datos nunca se borran del teléfono por un error de subida.</T>
             )}
             {!account ? (
-              <T variant="label" tone="weight">Este teléfono usa el perfil anterior (con código de invitación). Entrá con una cuenta para conservarlo: tus respaldos pasan a la cuenta.</T>
+              <T variant="label" tone="weight">Este teléfono usa el perfil anterior (con código de invitación). Iniciá sesión con una cuenta para conservarlo: tus respaldos pasan a la cuenta.</T>
             ) : null}
           </View>
         ) : (
           <T variant="label" tone="muted" style={{ marginTop: space.md }}>
-            Entrá con Google o con tu email y tus datos se copian solos a la nube, para recuperarlos si cambiás de teléfono.
+            Iniciá sesión con Google o con tu email y tus datos se copian solos a la nube, para recuperarlos si cambiás de teléfono.
           </T>
         )}
         <View style={{ gap: space.sm, marginTop: space.lg }}>
           {!account ? (
-            <Button label={sync.configured ? 'Pasar mi perfil a una cuenta' : 'Entrar o crear cuenta'} icon="log-in" onPress={() => router.push('/cuenta/entrar')} />
+            <Button label={sync.configured ? 'Pasar mi perfil a una cuenta' : 'Iniciar sesión o crear cuenta'} icon="log-in" onPress={() => router.push('/cuenta/entrar')} />
           ) : null}
           {sync.configured && !sync.info?.linked ? (
             <Button label="Revisar respaldos de la nube" icon="cloud" loading={busy === 'link'} onPress={resumeLink} />
