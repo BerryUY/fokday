@@ -8,10 +8,11 @@ import { Screen } from '@/components/ui/layout';
 import { Button, Card, Chip, Row, T } from '@/components/ui/primitives';
 import { LIGHT_DINNER_GUIDE } from '@/data/catalog';
 import { logMeal, saveMeal } from '@/data/meals';
+import { getProfile } from '@/data/settings';
 import { guessCategory, MEAL_CATEGORIES, type MealCategory } from '@/domain/nutrition';
 import { formatKcal, parseNonNegative } from '@/lib/format';
 import { useParams } from '@/lib/params';
-import { useMutation } from '@/state/db';
+import { useMutation, useQuery } from '@/state/db';
 import { useFeatures } from '@/state/features';
 import { useColors } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
@@ -30,6 +31,11 @@ export default function ManualMealScreen() {
   const [saveToCatalog, setSaveToCatalog] = useState(false);
   const [saving, setSaving] = useState(false);
   const { features } = useFeatures();
+  // The light-dinner tip only matters when the goal is to gain weight.
+  const { data: gaining } = useQuery(async (db) => {
+    const p = await getProfile(db);
+    return p.targetWeight > p.startWeight + 0.2;
+  }, []);
   const [extraTexts, setExtraTexts] = useState<ExtraTexts>({});
 
   const calories = parseNonNegative(kcal);
@@ -56,7 +62,7 @@ export default function ManualMealScreen() {
   return (
     <Screen title="Comida distinta" footer={<Button label="Registrar comida" icon="check" size="lg" onPress={save} disabled={!valid} loading={saving} />}>
       <View style={{ gap: space.lg }}>
-        {category === 'cena' ? (
+        {category === 'cena' && gaining ? (
           <Card tone="alt">
             <T variant="label" tone="muted">{LIGHT_DINNER_GUIDE.description}</T>
             <T variant="label" tone="weight" style={{ marginTop: 6 }}>{LIGHT_DINNER_GUIDE.tip}</T>

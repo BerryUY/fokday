@@ -5,7 +5,7 @@ import { DateChip } from '@/components/DatePicker';
 import { PortionPicker } from '@/components/PortionPicker';
 import { Field, confirm } from '@/components/ui/form';
 import { EmptyState, Loading, Screen } from '@/components/ui/layout';
-import { Button, Card, Chip, Row, SectionHeader, T } from '@/components/ui/primitives';
+import { Button, Card, Chip, Row, T } from '@/components/ui/primitives';
 import { deleteMealLog, getMealLog, repeatMealLog, updateMealLog, type MealLog } from '@/data/meals';
 import { MEAL_CATEGORIES, scaleNutrition } from '@/domain/nutrition';
 import { formatTime } from '@/lib/dates';
@@ -88,7 +88,6 @@ export default function EditLogScreen() {
       <View style={{ gap: space.lg }}>
         <Field label="Nombre" value={draft.name} onChangeText={(name) => setDraft({ ...draft, name })} />
         <Card>
-          <SectionHeader title="Porción" />
           <PortionPicker value={draft.portion} onChange={setPortion} />
           <T variant="caption" tone="dim" style={{ marginTop: space.sm }}>
             Al cambiar la porción se recalculan los valores a partir de 1× = {formatKcal(draft.baseCalories)} kcal.

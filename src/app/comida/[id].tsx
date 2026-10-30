@@ -97,7 +97,6 @@ export default function MealDetailScreen() {
         </Row>
 
         <Card style={{ marginTop: space.lg }}>
-          <SectionHeader title="Porción" />
           <PortionPicker value={portion} onChange={setPortion} />
           {portion !== 1 ? (
             <T variant="caption" tone="dim" style={{ marginTop: space.sm }}>

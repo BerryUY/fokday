@@ -5,10 +5,10 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { MealCard } from '@/components/nutrition';
 import { Field } from '@/components/ui/form';
 import { EmptyState, Loading, Screen } from '@/components/ui/layout';
-import { Button, Card, IconBubble, IconButton, Row, T } from '@/components/ui/primitives';
-import { CATEGORY_GUIDANCE, LIGHT_DINNER_GUIDE, PLAN_FOOTNOTE } from '@/data/catalog';
+import { Button, Card, IconButton, Row, T } from '@/components/ui/primitives';
+import { LIGHT_DINNER_GUIDE, PLAN_FOOTNOTE } from '@/data/catalog';
 import { getLogsForDate, listMeals, logMeal } from '@/data/meals';
-import { getGoalForDate } from '@/data/settings';
+import { getGoalForDate, getProfile } from '@/data/settings';
 import { categoryLabel, sumDailyTotals } from '@/domain/nutrition';
 import { formatRelative } from '@/lib/dates';
 import { formatKcal, formatProtein } from '@/lib/format';
@@ -26,12 +26,12 @@ export default function CategoryScreen() {
   const run = useMutation();
 
   const { data } = useQuery(async (db) => {
-    const [all, logs, goal] = await Promise.all([listMeals(db), getLogsForDate(db, date), getGoalForDate(db, date)]);
+    const [all, logs, goal, profile] = await Promise.all([listMeals(db), getLogsForDate(db, date), getGoalForDate(db, date), getProfile(db)]);
     const meals = all.filter((m) => m.category === category);
-    return { meals, others: all.filter((m) => m.category !== category), goal, bucket: sumDailyTotals(logs).byCategory[category] };
+    const gaining = profile.targetWeight > profile.startWeight + 0.2;
+    return { meals, others: all.filter((m) => m.category !== category), goal, gaining, bucket: sumDailyTotals(logs).byCategory[category] };
   }, [category, date]);
 
-  const guidance = CATEGORY_GUIDANCE[category];
   const [showOthers, setShowOthers] = useState(false);
   const [query, setQuery] = useState('');
   const q = fold(query.trim());
@@ -94,15 +94,6 @@ export default function CategoryScreen() {
             )
           ) : null}
 
-          {!found && guidance ? (
-            <Card style={{ marginBottom: space.lg }}>
-              <Row align="flex-start" gap={space.md}>
-                <IconBubble icon="info" tone="weight" size={32} />
-                <T variant="label" tone="muted" style={{ flex: 1 }}>{guidance}</T>
-              </Row>
-            </Card>
-          ) : null}
-
           {found ? null : data.meals.length === 0 ? (
             <EmptyState
               icon="book-open"
@@ -152,7 +143,7 @@ export default function CategoryScreen() {
             </View>
           ) : null}
 
-          {category === 'cena' ? (
+          {category === 'cena' && data.gaining ? (
             <Card style={{ marginTop: space.lg }}>
               <T variant="h3">{LIGHT_DINNER_GUIDE.title}</T>
               <T variant="label" tone="muted" style={{ marginTop: 4 }}>{LIGHT_DINNER_GUIDE.description}</T>

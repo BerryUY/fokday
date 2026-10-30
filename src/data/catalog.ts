@@ -125,15 +125,11 @@ export const CATALOG: CatalogMeal[] = [
 ];
 
 /** Guidance shown with each category, from the same plan. */
-export const CATEGORY_GUIDANCE: Partial<Record<MealCategory, string>> = {
-  cena:
-    'No podés elegir la cena: la estrategia es cargar bien el resto del día. Si podés repetir alguna opción del almuerzo, mejor. Si la cena es liviana, completá post-cena con un snack rápido.',
-};
-
+/** Shown at dinner only to people whose goal is to gain weight, where a light dinner leaves the day short. */
 export const LIGHT_DINNER_GUIDE = {
-  title: 'Cena liviana → compensar',
-  description: 'Sopa, ensalada o verduras solas: menos de 400 kcal y menos de 20 g de proteína.',
-  tip: 'Post-cena: 2 huevos + pan, sándwich de jamón y queso, o batido de avena reducido. No irse a dormir con el día corto.',
+  title: '¿Cena liviana?',
+  description: 'Una sopa, una ensalada o verduras solas suelen quedar por debajo de 400 kcal y 20 g de proteína.',
+  tip: 'Si querés subir de peso, sumá un snack con proteína antes de dormir: huevos, un sándwich o un batido.',
 };
 
 export const PLAN_FOOTNOTE = 'Valores aproximados del plan de comidas. Son guías, no mediciones exactas.';
