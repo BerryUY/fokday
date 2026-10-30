@@ -132,7 +132,8 @@ export function confirm(title: string, message: string, confirmLabel = 'Confirma
 
 const styles = StyleSheet.create({
   field: { flexDirection: 'row', alignItems: 'center', minHeight: 52, borderRadius: radius.md, paddingHorizontal: space.lg, borderWidth: 1 },
-  input: { flex: 1, height: 52, fontFamily: font.medium, fontSize: 16 },
+  // minWidth 0 lets the input shrink to the row on web (browsers give inputs a wide intrinsic size).
+  input: { flex: 1, minWidth: 0, height: 52, fontFamily: font.medium, fontSize: 16 },
   stepper: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, padding: 4 },
   stepBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   sheetWrap: { flex: 1, justifyContent: 'flex-end' },
