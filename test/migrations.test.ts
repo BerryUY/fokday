@@ -52,12 +52,12 @@ describe('catalog seed', () => {
     const db = await createTestDb();
     const meals = await listMeals(db);
     expect(meals).toHaveLength(CATALOG.length);
-    const batido = meals.find((m) => m.name === 'Batido de avena')!;
-    expect(batido).toMatchObject({ calories: 720, protein: 22, category: 'desayuno', prepMinutes: 5 });
-    expect(batido.ingredients).toContain('250 ml leche entera');
+    const batido = meals.find((m) => m.name === 'Avena con leche y banana')!;
+    expect(batido).toMatchObject({ calories: 420, protein: 16, category: 'desayuno', prepMinutes: 5 });
+    expect(batido.ingredients).toContain('250 ml leche');
 
     const profile = await getProfile(db);
-    expect(profile).toMatchObject({ startWeight: 57, targetWeight: 65, trainingDays: [] });
+    expect(profile).toMatchObject({ startWeight: 70, targetWeight: 70, trainingDays: [] });
     for (const t of ['meal_logs', 'weight_entries', 'workout_sessions', 'gym_attendance', 'exercises', 'workout_routines']) {
       const row = await db.getFirstAsync<{ n: number }>(`SELECT count(*) AS n FROM ${t}`, []);
       expect(row?.n).toBe(0);

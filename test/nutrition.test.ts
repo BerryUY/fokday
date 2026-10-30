@@ -23,29 +23,29 @@ async function catalogMeal(db: Awaited<ReturnType<typeof createTestDb>>, seedKey
 describe('daily nutrition totals', () => {
   it('adds up calories and protein per day and per category', async () => {
     const db = await createTestDb();
-    await logMeal(db, { date: DAY, category: 'desayuno', meal: await catalogMeal(db, 'desayuno-a') }); // 720 / 22
-    await logMeal(db, { date: DAY, category: 'almuerzo', meal: await catalogMeal(db, 'almuerzo-1') }); // 700 / 45
-    await logMeal(db, { date: DAY, category: 'merienda', meal: await catalogMeal(db, 'merienda-m3') }); // 250 / 15
+    await logMeal(db, { date: DAY, category: 'desayuno', meal: await catalogMeal(db, 'desayuno-a') }); // 420 / 16
+    await logMeal(db, { date: DAY, category: 'almuerzo', meal: await catalogMeal(db, 'almuerzo-1') }); // 600 / 40
+    await logMeal(db, { date: DAY, category: 'merienda', meal: await catalogMeal(db, 'merienda-m3') }); // 220 / 15
     await logMeal(db, { date: '2026-03-11', category: 'cena', meal: await catalogMeal(db, 'cena-c1') });
 
     const totals = await getDailyTotals(db, DAY);
-    expect(totals.calories).toBe(1670);
-    expect(totals.protein).toBe(82);
+    expect(totals.calories).toBe(1240);
+    expect(totals.protein).toBe(71);
     expect(totals.entries).toBe(3);
-    expect(totals.byCategory.desayuno).toEqual({ calories: 720, protein: 22, entries: 1 });
+    expect(totals.byCategory.desayuno).toEqual({ calories: 420, protein: 16, entries: 1 });
     expect(totals.byCategory.cena.entries).toBe(0);
   });
 
   it('supports several meals in one category and repeating the same meal', async () => {
     const db = await createTestDb();
-    const m4 = await catalogMeal(db, 'merienda-m4');
+    const m4 = await catalogMeal(db, 'merienda-m2');
     await logMeal(db, { date: DAY, category: 'merienda', meal: m4 });
     await logMeal(db, { date: DAY, category: 'merienda', meal: m4 });
     await logMeal(db, { date: DAY, category: 'extra', manual: { name: 'Banana', calories: 105, protein: 1.3 } });
     const totals = await getDailyTotals(db, DAY);
-    expect(totals.byCategory.merienda).toEqual({ calories: 800, protein: 40, entries: 2 });
-    expect(totals.calories).toBe(905);
-    expect(totals.protein).toBe(41.3);
+    expect(totals.byCategory.merienda).toEqual({ calories: 700, protein: 36, entries: 2 });
+    expect(totals.calories).toBe(805);
+    expect(totals.protein).toBe(37.3);
   });
 
   it('reports remaining and excess against the target without clamping', () => {
@@ -72,9 +72,9 @@ describe('portions', () => {
   it('logs portions and rescales when the portion is corrected', async () => {
     const db = await createTestDb();
     const log = await logMeal(db, { date: DAY, category: 'desayuno', meal: await catalogMeal(db, 'desayuno-a'), portion: 1.5 });
-    expect(log).toMatchObject({ calories: 1080, protein: 33, baseCalories: 720 });
+    expect(log).toMatchObject({ calories: 630, protein: 24, baseCalories: 420 });
     const corrected = await updateMealLog(db, log.id, { portion: 0.5 });
-    expect(corrected).toMatchObject({ portion: 0.5, calories: 360, protein: 11 });
+    expect(corrected).toMatchObject({ portion: 0.5, calories: 210, protein: 8 });
   });
 
   it('lets calories and protein of a single entry be edited by hand', async () => {
@@ -101,7 +101,7 @@ describe('historical meal snapshots', () => {
     await saveMeal(db, { ...batido, name: 'Batido XL', calories: 1000, protein: 40 }, batido.id);
 
     const [logged] = await getLogsForDate(db, DAY);
-    expect(logged).toMatchObject({ name: 'Batido de avena', calories: 720, protein: 22 });
+    expect(logged).toMatchObject({ name: 'Avena con leche y banana', calories: 420, protein: 16 });
 
     const later = await logMeal(db, { date: '2026-03-12', category: 'desayuno', meal: await catalogMeal(db, 'desayuno-a') });
     expect(later).toMatchObject({ name: 'Batido XL', calories: 1000 });
@@ -113,7 +113,7 @@ describe('historical meal snapshots', () => {
     const a = await logMeal(db, { date: DAY, category: 'almuerzo', meal });
     await logMeal(db, { date: DAY, category: 'almuerzo', meal });
     await deleteMealLog(db, a.id);
-    expect((await getDailyTotals(db, DAY)).calories).toBe(750);
+    expect((await getDailyTotals(db, DAY)).calories).toBe(650);
   });
 
   it('duplicates yesterday into today as independent entries', async () => {
@@ -122,7 +122,7 @@ describe('historical meal snapshots', () => {
     await logMeal(db, { date: '2026-03-09', category: 'cena', manual: { name: 'Sopa', calories: 300, protein: 12 } });
     expect(await duplicateDay(db, '2026-03-09', DAY)).toBe(2);
     const copies = await getLogsForDate(db, DAY);
-    expect(copies.map((c) => c.calories).sort()).toEqual([1340, 300].sort());
+    expect(copies.map((c) => c.calories).sort()).toEqual([800, 300].sort());
     await deleteMealLog(db, copies[0].id);
     expect(await getLogsForDate(db, '2026-03-09')).toHaveLength(2);
   });
@@ -138,11 +138,11 @@ describe('historical meal snapshots', () => {
 });
 
 describe('nutrition goals', () => {
-  it('starts at 2750 kcal / 115 g and keeps old targets for past days', async () => {
+  it('starts at 2000 kcal / 100 g and keeps old targets for past days', async () => {
     const db = await createTestDb();
-    expect(await getGoalForDate(db, '2026-01-01')).toMatchObject({ calories: 2750, protein: 115 });
+    expect(await getGoalForDate(db, '2026-01-01')).toMatchObject({ calories: 2000, protein: 100 });
     await setGoalsFrom(db, '2026-04-01', 3000, 130);
-    expect(await getGoalForDate(db, '2026-03-31')).toMatchObject({ calories: 2750, protein: 115 });
+    expect(await getGoalForDate(db, '2026-03-31')).toMatchObject({ calories: 2000, protein: 100 });
     expect(await getGoalForDate(db, '2026-04-02')).toMatchObject({ calories: 3000, protein: 130 });
   });
 });

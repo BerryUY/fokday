@@ -86,7 +86,7 @@ describe('local snapshot backup and restore', () => {
 
     const again = await createSnapshot(target, 'device-a');
     for (const t of DATA_TABLES) expect(again.tables[t]).toEqual(env.snapshot.tables[t]);
-    expect((await getDailyTotals(target, '2026-03-10')).calories).toBe(1080);
+    expect((await getDailyTotals(target, '2026-03-10')).calories).toBe(630);
   });
 
   it('rejects tampered, foreign, incomplete or newer backups', async () => {
@@ -115,7 +115,7 @@ describe('local snapshot backup and restore', () => {
     broken.tables.meal_logs = [{ ...broken.tables.meal_logs[0], id: 'bad', portion: -5 }]; // violates CHECK
     await expect(restoreSnapshot(db, broken)).rejects.toThrow();
     expect(await listWeights(db)).toHaveLength(1);
-    expect((await getDailyTotals(db, '2026-03-10')).calories).toBe(1080);
+    expect((await getDailyTotals(db, '2026-03-10')).calories).toBe(630);
   });
 });
 
@@ -201,7 +201,7 @@ describe('cloud backups', () => {
     expect(check.localHasUnsavedChanges).toBe(false);
     await applyRestore(reinstalled, check.envelope, check.meta.id);
 
-    expect((await getDailyTotals(reinstalled, '2026-03-10')).calories).toBe(1080);
+    expect((await getDailyTotals(reinstalled, '2026-03-10')).calories).toBe(630);
     const info = await getSyncInfo(reinstalled);
     expect(info.pendingChanges).toBe(false); // nothing to re-upload
   });

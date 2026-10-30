@@ -271,7 +271,7 @@ describe('backup API', () => {
     const newPhone = await createTestDb();
     const check = await prepareCloudRestore(deps(newPhone, fetchImpl, token));
     await applyRestore(newPhone, check.envelope, check.meta.id);
-    expect((await getDailyTotals(newPhone, '2026-03-06')).calories).toBe(700);
+    expect((await getDailyTotals(newPhone, '2026-03-06')).calories).toBe(600);
   });
 
   it('keeps every profile\'s backups private from the others', async () => {
