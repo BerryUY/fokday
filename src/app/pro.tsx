@@ -90,7 +90,7 @@ export default function ProScreen() {
             {plan.pro ? 'Gracias por bancar FokDay. Todo lo de abajo está activado.' : 'Todo lo básico es gratis para siempre. Pro suma lo que te ahorra tiempo y te hace avanzar más rápido.'}
           </T>
           {!plan.pro ? (
-            <T variant="h2" tone="accent" style={{ marginTop: space.xs }}>Desde {PRO_LIST_PRICES.annualPerMonth} por mes</T>
+            <T variant="h2" tone="accent" style={{ marginTop: space.xs }}>{PRO_LIST_PRICES.monthly} por mes</T>
           ) : null}
         </Card>
       </Animated.View>

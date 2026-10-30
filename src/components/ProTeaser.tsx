@@ -21,7 +21,7 @@ export function ProTeaser() {
         </View>
       </Row>
       <Row style={{ justifyContent: 'space-between' }}>
-        <T variant="bodyMedium" tone="accent">Desde {PRO_LIST_PRICES.annualPerMonth} por mes</T>
+        <T variant="bodyMedium" tone="accent">{PRO_LIST_PRICES.monthly} por mes</T>
         <Feather name="arrow-right" size={18} color={c.accent} />
       </Row>
     </Card>

@@ -83,7 +83,7 @@ export function ProfileHeader({ name }: { name: string }) {
             </View>
           </Row>
           <Row style={{ justifyContent: 'space-between' }}>
-            <T variant="bodyMedium" tone="accent">Desde {PRO_LIST_PRICES.annualPerMonth} por mes</T>
+            <T variant="bodyMedium" tone="accent">{PRO_LIST_PRICES.monthly} por mes</T>
             <Row gap={4}>
               <T variant="bodyMedium">Ver planes</T>
               <Feather name="chevron-right" size={18} color={c.text} />
