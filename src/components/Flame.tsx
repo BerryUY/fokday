@@ -40,7 +40,8 @@ export function Flame({ size = 24, lit = true, embers = false, style }: { size?:
   const reduced = useReducedMotion();
   const moving = lit && !reduced;
   const id = useId().replace(/[^a-zA-Z0-9]/g, '');
-  const w = size * 0.8;
+  // A little wider than the drawing (64×80) so the flame reads fuller.
+  const w = size * 0.95;
   const h = size;
 
   const sway = useLoop(-2.5, 2.5, 1500, 0, moving);
@@ -57,7 +58,7 @@ export function Flame({ size = 24, lit = true, embers = false, style }: { size?:
 
   const g = (name: string) => `${name}${id}`;
   const layer = (d: string, fill: string) => (
-    <Svg width={w} height={h} viewBox="0 0 64 80">
+    <Svg width={w} height={h} viewBox="0 0 64 80" preserveAspectRatio="none">
       <Defs>
         <LinearGradient id={g('o')} x1="0" y1="1" x2="0" y2="0">
           <Stop offset="0" stopColor={lit ? '#F2441B' : '#5C5C63'} />

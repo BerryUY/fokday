@@ -65,7 +65,7 @@ export default function CategoryScreen() {
 
           {data.meals.length + data.others.length > 0 ? (
             <View style={{ marginBottom: space.lg }}>
-              <Field value={query} onChangeText={setQuery} placeholder="Buscar en tus comidas" returnKeyType="search" autoCorrect={false} clearButtonMode="while-editing" />
+              <Field icon="search" value={query} onChangeText={setQuery} placeholder="Buscar en tus comidas" returnKeyType="search" autoCorrect={false} clearButtonMode="while-editing" />
             </View>
           ) : null}
 

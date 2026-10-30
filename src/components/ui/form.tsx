@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons';
-import { forwardRef, type ComponentRef, type ReactNode } from 'react';
+import { forwardRef, useState, type ComponentProps, type ComponentRef, type ReactNode } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,19 +10,26 @@ import { useBackToClose, usePresence } from './motion';
 import { Portal } from './portal';
 import { PressableScale, T } from './primitives';
 
-export const Field = forwardRef<ComponentRef<typeof TextInput>, TextInputProps & { label?: string; suffix?: string; hint?: string; large?: boolean; error?: string | null }>(
-  function Field({ label, suffix, hint, large, error, style, ...rest }, ref) {
+/**
+ * Text field. icon: a small icon on the left (a magnifier for search). Password fields
+ * (secureTextEntry) get an eye to show or hide what's being typed.
+ */
+export const Field = forwardRef<ComponentRef<typeof TextInput>, TextInputProps & { label?: string; suffix?: string; hint?: string; large?: boolean; error?: string | null; icon?: ComponentProps<typeof Feather>['name'] }>(
+  function Field({ label, suffix, hint, large, error, icon, style, secureTextEntry, ...rest }, ref) {
     const c = useColors();
+    const [hidden, setHidden] = useState(true);
     return (
       <View style={{ gap: 6 }}>
         {label ? <T variant="label" tone="muted">{label}</T> : null}
         <View style={[styles.field, { backgroundColor: c.surfaceAlt, borderColor: error ? c.danger : 'transparent' }, large && { height: 72 }]}>
+          {icon ? <Feather name={icon} size={18} color={c.textDim} style={{ marginRight: space.sm }} /> : null}
           <TextInput
             ref={ref}
             placeholderTextColor={c.textDim}
             selectionColor={c.accent}
             cursorColor={c.accent}
             {...rest}
+            secureTextEntry={secureTextEntry && hidden}
             style={[
               styles.input,
               { color: c.text },
@@ -33,6 +40,16 @@ export const Field = forwardRef<ComponentRef<typeof TextInput>, TextInputProps &
             ]}
           />
           {suffix ? <T variant={large ? 'h2' : 'label'} tone="dim">{suffix}</T> : null}
+          {secureTextEntry ? (
+            <Pressable
+              onPress={() => setHidden((h) => !h)}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={hidden ? 'Mostrar la contraseña' : 'Ocultar la contraseña'}
+            >
+              <Feather name={hidden ? 'eye' : 'eye-off'} size={20} color={c.textMuted} />
+            </Pressable>
+          ) : null}
         </View>
         {error ? <T variant="caption" tone="danger">{error}</T> : hint ? <T variant="caption" tone="dim">{hint}</T> : null}
       </View>
