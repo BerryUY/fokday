@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { goBack } from '@/lib/nav';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { deleteAccount, signOut, useAccount } from '@/auth/account';
@@ -64,7 +65,7 @@ export default function AccountScreen() {
             await run('out', async () => {
               await signOut(db);
               toast.show('Sesión cerrada');
-              router.back();
+              goBack();
             });
           }}
         />
@@ -83,7 +84,7 @@ export default function AccountScreen() {
             await run('delete', async () => {
               await deleteAccount(db);
               toast.show('Cuenta eliminada');
-              router.back();
+              goBack();
             });
           }}
         />

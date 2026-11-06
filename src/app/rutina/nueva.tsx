@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { goBack } from '@/lib/nav';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { Foki } from '@/components/mascot/Foki';
@@ -23,7 +24,7 @@ export default function NewRoutineScreen() {
     const id = await run((db) => createFromTemplate(db, template, profile.trainingDays, profile.defaultRestSeconds), { success: '¡Listo! Ya podés ajustarla a tu gusto' });
     if (!id) return;
     if (template.days.length === 1) router.replace({ pathname: '/rutina/[id]', params: { id } });
-    else router.back();
+    else goBack();
   };
 
   const blank = async () => {

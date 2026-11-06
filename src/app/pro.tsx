@@ -1,5 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { goBack } from '@/lib/nav';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -59,7 +60,7 @@ export default function ProScreen() {
     try {
       if (await buy(choice.option)) {
         toast.show('¡Bienvenido a FokDay Pro!');
-        router.back();
+        goBack();
       }
     } catch (e) {
       toast.show(e instanceof Error ? e.message : 'No se pudo completar la compra.', 'error');
