@@ -117,8 +117,9 @@ export function Button({ label, onPress, variant = 'primary', icon, loading, dis
   full?: boolean;
 }) {
   const c = useColors();
-  const bg = variant === 'primary' ? c.accent : variant === 'secondary' ? c.surfaceAlt : variant === 'danger' ? c.dangerSoft : variant === 'dangerSolid' ? c.danger : 'transparent';
-  const fg = variant === 'primary' ? c.accentText : variant === 'danger' ? c.danger : variant === 'dangerSolid' ? '#FFFFFF' : variant === 'ghost' ? c.textMuted : c.text;
+  const off = disabled && variant === 'primary';
+  const bg = off ? c.surfaceAlt : variant === 'primary' ? c.accent : variant === 'secondary' ? c.surfaceAlt : variant === 'danger' ? c.dangerSoft : variant === 'dangerSolid' ? c.danger : 'transparent';
+  const fg = off ? c.textDim : variant === 'primary' ? c.accentText : variant === 'danger' ? c.danger : variant === 'dangerSolid' ? '#FFFFFF' : variant === 'ghost' ? c.textMuted : c.text;
   const height = size === 'lg' ? 54 : size === 'sm' ? 36 : 46;
   const inactive = disabled || loading;
   return (
@@ -130,7 +131,7 @@ export function Button({ label, onPress, variant = 'primary', icon, loading, dis
       hapticFeedback={variant === 'primary'}
       style={[
         styles.button,
-        { backgroundColor: bg, height, paddingHorizontal: size === 'sm' ? 14 : 20, opacity: disabled ? 0.45 : 1 },
+        { backgroundColor: bg, height, paddingHorizontal: size === 'sm' ? 14 : 20, opacity: disabled && !off ? 0.45 : 1 },
         full && { alignSelf: 'stretch' },
         style,
       ]}

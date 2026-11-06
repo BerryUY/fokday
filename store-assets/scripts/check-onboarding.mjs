@@ -19,6 +19,8 @@ await page.locator('input').first().fill('92');
 await page.locator('input').first().blur();
 await tap('Continuar');
 await tap('Hombre');
+await page.locator('input').nth(0).fill('30');
+await page.locator('input').nth(1).fill('178');
 await shot('cuerpo');
 await tap('Continuar');
 await tap('Activo');

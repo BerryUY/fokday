@@ -232,7 +232,7 @@ export default function BackupScreen() {
                 icon="archive"
                 title={copy.name.replace('.json', '')}
                 subtitle={`${Math.max(1, Math.round(copy.size / 1024))} KB`}
-                right={<Button label="Compartir" size="sm" variant="ghost" onPress={() => void shareSafetyCopy(copy.uri)} />}
+                action={<Button label="Compartir" size="sm" variant="ghost" onPress={() => void shareSafetyCopy(copy.uri)} />}
                 onPress={() =>
                   withBusy('safety', async () => {
                     const env = await readSafetyCopy(copy.uri);

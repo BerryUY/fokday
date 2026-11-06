@@ -128,7 +128,7 @@ function Today({ data, today, onStart, onPick }: {
     <View style={{ gap: space.md }}>
       <Reveal>
         {active ? (
-          <Card tone="accent" onPress={() => router.push('/sesion/activa')} style={{ padding: space.xl }}>
+          <Card tone="accent" style={{ padding: space.xl }}>
             <Row gap={space.lg}>
               <Foki mood="strong" size={64} />
               <View style={{ flex: 1 }}>
@@ -226,12 +226,9 @@ function Routines({ routines, active, today, onStart }: { routines: RoutineSumma
               <ListRow
                 title={r.name}
                 subtitle={`${r.exerciseCount} ejercicios · ${r.weekdays.length ? daysLabel(r.weekdays) : 'sin día fijo'}`}
-                right={
-                  <Row gap={space.sm}>
-                    {r.weekdays.includes(weekday(today)) ? <Badge label="Hoy" /> : null}
-                    {!active ? <IconButton icon="play" label={`Empezar ${r.name}`} tone="accent" size={36} onPress={() => onStart(r)} /> : null}
-                  </Row>
-                }
+                right={r.weekdays.includes(weekday(today)) ? <Badge label="Hoy" /> : undefined}
+                action={!active ? <IconButton icon="play" label={`Empezar ${r.name}`} tone="accent" size={36} onPress={() => onStart(r)} /> : undefined}
+                chevron={active}
                 onPress={() => router.push({ pathname: '/rutina/[id]', params: { id: r.id } })}
               />
             </View>

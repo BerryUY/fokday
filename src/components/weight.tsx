@@ -20,7 +20,7 @@ export function WeightGoalCard({ progress, lastDate, onPress, onLog, tone }: {
   // Kilos moved in the goal's direction (losing 2 kg toward a lower target shows as +2).
   const towardGoal = (gained ?? 0) * (progress.direction === 'lose' ? -1 : 1);
   return (
-    <Card onPress={onPress} tone={tone} style={{ padding: space.xl }}>
+    <Card onPress={current === null && onLog ? undefined : onPress} tone={tone} style={{ padding: space.xl }}>
       <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <View>
           <T variant="overline" tone="dim">Peso actual</T>

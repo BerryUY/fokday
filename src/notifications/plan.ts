@@ -8,17 +8,19 @@ import type { ChannelKey } from './channels';
  * so it arrives without internet and keeps arriving when the app isn't opened: the first days get the
  * full ladder, then come the "I miss you" messages, and after a month Foki stops insisting.
  * The plan is rebuilt whenever data changes, so logging a meal cancels what no longer applies.
+ * The day is covered from morning to night: when there are more messages than the limit, they're
+ * picked so that every part of the day keeps some.
  */
 
 export type Intensity = 'suave' | 'normal' | 'insistente';
 
 /** How many messages a day, at most. */
-export const DAILY_LIMIT: Record<Intensity, number> = { suave: 2, normal: 5, insistente: 8 };
+export const DAILY_LIMIT: Record<Intensity, number> = { suave: 3, normal: 6, insistente: 9 };
 
 export const INTENSITIES: { key: Intensity; label: string; hint: string }[] = [
-  { key: 'suave', label: 'Suave', hint: 'Hasta 2 por día: la racha y el entrenamiento' },
-  { key: 'normal', label: 'Normal', hint: 'Hasta 5 por día' },
-  { key: 'insistente', label: 'Insistente', hint: 'Hasta 8 por día, nada se te pasa' },
+  { key: 'suave', label: 'Suave', hint: 'Hasta 3 por día, sobre todo por tu racha' },
+  { key: 'normal', label: 'Normal', hint: 'Hasta 6 por día, repartidas de la mañana a la noche' },
+  { key: 'insistente', label: 'Insistente', hint: 'Hasta 9 por día: no se te pasa nada' },
 ];
 
 export type UsualHours = { breakfast: number; lunch: number; dinner: number };
@@ -142,9 +144,49 @@ const copy = {
     c('¿Todo bien?', 'Tu progreso sigue guardado, te espera cuando quieras.'),
   ],
   goodbye: (n: string): Copy => c('Parece que estos avisos no funcionan 😔', `Voy a dejar de insistir${n}. Acá voy a estar cuando vuelvas.`),
-  meals: (): Copy[] => [c('¿Anotaste lo que comiste?', 'Te lleva un minuto, o una foto.'), c('Falta la cena 🌙', 'Registrala y cerrás el día.')],
+  morning: (n: string): Copy[] => [
+    c(`¿Cómo viene tu día${n}?`, 'Tus misiones de hoy te esperan.'),
+    c('Foki reportándose 🫡', 'Ya tengo tu día armado. Entrá y vemos qué falta.'),
+    c(`Hoy puede ser un día perfecto${n} ✨`, 'Empezá por lo más fácil: una comida.'),
+    c('Pequeño recordatorio 👀', 'Un minuto ahora y el resto del día es más fácil.'),
+  ],
+  afternoon: (n: string): Copy[] => [
+    c(`Vas por la mitad del día${n}`, 'Entrá y mirá cuánto te falta para el día perfecto.'),
+    c('¿Cómo vamos? 📊', 'Todavía hay tiempo de cerrar todas tus misiones.'),
+    c('Te guardé un lugar 🟢', 'Tus misiones siguen ahí. Vení a tacharlas.'),
+  ],
+  snack: (): Copy[] => [
+    c('Hora de la merienda ☕', '¿Qué comiste? Con una foto alcanza.'),
+    c('¿Un snack? 🍌', 'Anotalo antes de que te olvides.'),
+    c('Merienda a la vista 🥪', 'Registrala y sumá a tu día.'),
+  ],
+  dinner: (n: string): Copy[] => [
+    c(`¿Qué hay de cena${n}? 🌙`, 'Registrala y cerrás el día.'),
+    c('Última comida del día 🍽️', 'Sacale una foto y queda anotada.'),
+    c('Cerremos el día', 'Falta la cena para terminar tus registros.'),
+  ],
   weight: (): Copy[] => [c('Día de pesarte ⚖️', 'Una medición por semana alcanza para ver tu progreso.')],
 };
+
+const partOfDay = (n: PlannedNotification) => {
+  const h = n.at.getHours();
+  return h < 12 ? 0 : h < 16 ? 1 : h < 19 ? 2 : 3;
+};
+
+/** Keeps the streak's messages, then fills up taking from the part of the day that has the fewest. */
+function spreadOverDay(list: PlannedNotification[], limit: number): PlannedNotification[] {
+  const sorted = [...list].sort((a, b) => a.priority - b.priority);
+  const picked = sorted.filter((n) => n.priority <= 1).slice(0, limit);
+  const rest = sorted.filter((n) => n.priority > 1);
+  while (picked.length < limit && rest.length) {
+    const count = [0, 0, 0, 0];
+    for (const n of picked) count[partOfDay(n)] += 1;
+    const best = rest.reduce((a, b) => (count[partOfDay(b)] < count[partOfDay(a)] ? b : a));
+    picked.push(best);
+    rest.splice(rest.indexOf(best), 1);
+  }
+  return picked;
+}
 
 export function planReminders(s: ReminderState): PlannedNotification[] {
   const hi = s.name ? `, ${s.name}` : '';
@@ -174,10 +216,11 @@ export function planReminders(s: ReminderState): PlannedNotification[] {
 
     if (!dayDone) {
       if (s.streak > 0 && alive) {
-        add(`streak-${k}`, copy.streakRisk(s.streak, hi), at(s.now, d, Math.max(s.usualHours.dinner, 20)), { channel: 'streak', mood: 'worried', url: '/', priority: 0 });
+        add(`streak-noon-${k}`, copy.streakRisk(s.streak, hi), at(s.now, d, 15), { channel: 'streak', mood: 'worried', url: '/', priority: 1 });
+        add(`streak-${k}`, copy.streakRisk(s.streak, hi), at(s.now, d, 19.5), { channel: 'streak', mood: 'worried', url: '/', priority: 0 });
         if (s.streak >= 2) add(`streak-last-${k}`, copy.streakLast(s.streak, hi), at(s.now, d, 22.5), { channel: 'streak', mood: 'worried', url: '/', priority: 1 });
       } else if (today) {
-        add(`streak-${k}`, copy.streakStart(hi), at(s.now, d, Math.max(s.usualHours.dinner, 20)), { channel: 'streak', mood: 'happy', url: '/', priority: 0 });
+        add(`streak-${k}`, copy.streakStart(hi), at(s.now, d, 19.5), { channel: 'streak', mood: 'happy', url: '/', priority: 0 });
       } else if (inactive) {
         add(`miss-${k}`, copy.miss(hi), at(s.now, d, 19), { channel: 'streak', mood: 'sad', url: '/', priority: 0 });
       }
@@ -191,18 +234,23 @@ export function planReminders(s: ReminderState): PlannedNotification[] {
       if (!(today && s.mealsLoggedToday >= 2)) {
         add(`lunch-${k}`, copy.lunch(hi), at(s.now, d, s.usualHours.lunch + 0.25), { channel: 'meals', mood: 'hungry', url: '/comida/foto', category: 'meal', priority: 3 });
       }
-      if (today && s.streakDoneToday && s.mealsLoggedToday < 3) {
-        add(`meals-${k}`, copy.meals(), at(s.now, d, 21), { channel: 'meals', mood: 'happy', url: '/comida/foto', category: 'meal', priority: 4 });
+      if (!(today && s.mealsLoggedToday >= 3)) {
+        add(`snack-${k}`, copy.snack(), at(s.now, d, 16.75), { channel: 'meals', mood: 'hungry', url: '/comida/foto', category: 'meal', priority: 4 });
+        add(`dinner-${k}`, copy.dinner(hi), at(s.now, d, s.usualHours.dinner + 0.25), { channel: 'meals', mood: 'hungry', url: '/comida/foto', category: 'meal', priority: 3 });
+      }
+      add(`morning-${k}`, copy.morning(hi), at(s.now, d, 10.75), { channel: 'other', mood: 'happy', url: '/', priority: 5 });
+      if (dayDone || !(s.streak > 0 && alive)) {
+        add(`afternoon-${k}`, copy.afternoon(hi), at(s.now, d, 15), { channel: 'other', mood: 'proud', url: '/', priority: 5 });
       }
       if (today && s.proteinLeft >= 20 && s.mealsLoggedToday >= 1) {
-        add(`protein-${k}`, copy.protein(Math.round(s.proteinLeft)), at(s.now, d, 17), { channel: 'meals', mood: 'strong', url: '/comida/foto', priority: 5 });
+        add(`protein-${k}`, copy.protein(Math.round(s.proteinLeft)), at(s.now, d, 17.25), { channel: 'meals', mood: 'strong', url: '/comida/foto', priority: 5 });
       }
       if (s.trainingDays.includes(day.getDay()) && !(today && s.attendedToday)) {
         add(`gym-${k}`, copy.gym(s.routines[day.getDay()] ?? null, hi), at(s.now, d, 18), { channel: 'workout', mood: 'strong', url: '/entrenar', priority: 2 });
       }
       if (has('water')) {
         const goal = s.waterGoalMl || 2500;
-        if (!(today && s.waterMlToday >= goal * 0.4)) add(`water-am-${k}`, copy.water(hi), at(s.now, d, 11), { channel: 'water', mood: 'thirsty', url: '/', category: 'water', priority: 6 });
+        if (!(today && s.waterMlToday >= goal * 0.4)) add(`water-am-${k}`, copy.water(hi), at(s.now, d, 11.5), { channel: 'water', mood: 'thirsty', url: '/', category: 'water', priority: 6 });
         if (!(today && s.waterMlToday >= goal * 0.7)) add(`water-pm-${k}`, copy.water(hi), at(s.now, d, 16), { channel: 'water', mood: 'thirsty', url: '/', category: 'water', priority: 6 });
       }
       if (has('creatine') && !(today && s.creatineToday)) {
@@ -214,7 +262,7 @@ export function planReminders(s: ReminderState): PlannedNotification[] {
       }
     }
 
-    out.push(...list.filter((n) => !s.off.includes(n.channel)).sort((a, b) => a.priority - b.priority).slice(0, limit));
+    out.push(...spreadOverDay(list.filter((n) => !s.off.includes(n.channel)), limit));
   }
 
   // Weigh-in: next Monday morning, only if the last one is a week old or missing.

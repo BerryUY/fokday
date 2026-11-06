@@ -105,13 +105,3 @@ export async function applyReminders(db: Db, opts: { force?: boolean } = {}): Pr
     applied.set(p.id, stamp(p));
   }
 }
-
-/** Shows one right now, from Ajustes, to see how they look. */
-export async function sendTestNotification(p: PlannedNotification): Promise<void> {
-  if (Platform.OS === 'web') return;
-  await ensureChannels();
-  await Notifications.scheduleNotificationAsync({
-    content: content(p),
-    trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 2, channelId: CHANNELS[p.channel] },
-  });
-}

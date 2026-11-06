@@ -88,18 +88,21 @@ export function EmptyState({ icon, title, message, action }: { icon: IconName; t
   );
 }
 
-export function ListRow({ icon, iconTone = 'muted', title, subtitle, right, onPress, chevron = !!onPress, style }: {
+export function ListRow({ icon, iconTone = 'muted', title, subtitle, right, action, onPress, chevron = !!onPress, style }: {
   icon?: IconName;
   iconTone?: 'accent' | 'protein' | 'weight' | 'muted' | 'danger';
   title: string;
   subtitle?: string;
+  /** Something to read at the end of the row. Inside the pressable part, so never a button. */
   right?: ReactNode;
+  /** A button at the end of the row, beside the pressable part. */
+  action?: ReactNode;
   onPress?: () => void;
   chevron?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
   const c = useColors();
-  return (
+  const row = (
     <Pressable
       onPress={onPress}
       disabled={!onPress}
@@ -114,6 +117,13 @@ export function ListRow({ icon, iconTone = 'muted', title, subtitle, right, onPr
       {right}
       {chevron && <Feather name="chevron-right" size={18} color={c.textDim} />}
     </Pressable>
+  );
+  if (!action) return row;
+  return (
+    <View style={styles.withAction}>
+      <View style={{ flex: 1 }}>{row}</View>
+      {action}
+    </View>
   );
 }
 
@@ -139,6 +149,7 @@ const styles = StyleSheet.create({
   stackHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.md, paddingBottom: space.sm },
   tabHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: space.xl, gap: space.md },
   footer: { paddingHorizontal: space.lg, paddingTop: space.md, borderTopWidth: StyleSheet.hairlineWidth },
+  withAction: { flexDirection: 'row', alignItems: 'center', paddingRight: space.lg },
   empty: { alignItems: 'center', paddingVertical: space.xxl, paddingHorizontal: space.lg },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 50, paddingVertical: 10, paddingHorizontal: space.lg, borderRadius: radius.md },
 });

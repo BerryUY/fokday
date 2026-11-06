@@ -76,7 +76,18 @@ describe('planReminders', () => {
       expect(today.length).toBeLessThanOrEqual(DAILY_LIMIT[intensity]);
       expect(today.map((n) => n.id)).toContain('streak-2026-10-27');
     }
-    expect(onDay({ ...busy, intensity: 'suave' }, '2026-10-27').map((n) => n.id).sort()).toEqual(['streak-2026-10-27', 'streak-last-2026-10-27']);
+    expect(onDay({ ...busy, intensity: 'suave' }, '2026-10-27').map((n) => n.id).sort()).toEqual(['streak-2026-10-27', 'streak-last-2026-10-27', 'streak-noon-2026-10-27']);
+  });
+
+  it('covers the whole day, not only the evening', () => {
+    const partsOf = (list: { at: Date }[]) => new Set(list.map((n) => { const h = n.at.getHours(); return h < 12 ? 'mañana' : h < 16 ? 'mediodía' : h < 19 ? 'tarde' : 'noche'; }));
+    const early = new Date(2026, 9, 27, 7, 0);
+    // Someone with no extras, on a day that doesn't count yet and on one that already does.
+    expect(partsOf(onDay({ now: early, intensity: 'normal', streakDoneToday: false }, '2026-10-27')).size).toBe(4);
+    expect(partsOf(onDay({ now: early, intensity: 'normal', streakDoneToday: true }, '2026-10-27')).size).toBe(4);
+    // And tomorrow, without having opened the app.
+    expect(partsOf(onDay({ now: early, intensity: 'normal', streakDoneToday: true }, '2026-10-28')).size).toBe(4);
+    expect(onDay({ now: early, intensity: 'normal', streakDoneToday: true }, '2026-10-28').length).toBeGreaterThanOrEqual(5);
   });
 
   it('leaves out the kinds turned off in Ajustes', () => {

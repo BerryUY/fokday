@@ -2,7 +2,7 @@ import { Foki } from '@/components/mascot/Foki';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
-import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Platform, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeInRight, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { finishSignIn, signInWithGoogle, useAccount, type LinkChoice } from '@/auth/account';
@@ -20,7 +20,7 @@ import { formatKg, formatNumber, parsePositive } from '@/lib/format';
 import { useDb, useMutation, useQuery } from '@/state/db';
 import { haptic, useToast } from '@/state/toast';
 import { useColors } from '@/theme/ThemeProvider';
-import { radius, space } from '@/theme/tokens';
+import { font, radius, space } from '@/theme/tokens';
 
 type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 type StepKey = 'hola' | 'nombre' | 'objetivo' | 'peso' | 'cuerpo' | 'actividad' | 'meta' | 'nutricion' | 'gym' | 'extras' | 'nube' | 'listo';
@@ -78,16 +78,17 @@ export default function WelcomeScreen() {
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
   const [goal, setGoal] = useState<Goal | null>(null);
-  const [weight, setWeight] = useState(70);
-  const [target, setTarget] = useState(75);
+  const [weight, setWeight] = useState<number | null>(null);
+  const [target, setTarget] = useState<number | null>(null);
   const [targetTouched, setTargetTouched] = useState(false);
   const [calories, setCalories] = useState(2500);
   const [protein, setProtein] = useState(120);
   const [targetsTouched, setTargetsTouched] = useState(false);
-  const [days, setDays] = useState<number[]>([1, 3, 5]);
+  const [days, setDaysState] = useState<number[]>([]);
+  const [daysChosen, setDaysChosen] = useState(false);
   const [sex, setSex] = useState<Sex | null>(null);
-  const [age, setAge] = useState(28);
-  const [height, setHeight] = useState(170);
+  const [age, setAge] = useState<number | null>(null);
+  const [height, setHeight] = useState<number | null>(null);
   const [activity, setActivity] = useState<ActivityLevel | null>(null);
   const [features, setFeatures] = useState<FeatureKey[]>([]);
   const [saving, setSaving] = useState(false);
@@ -101,14 +102,35 @@ export default function WelcomeScreen() {
   const key = steps[Math.min(step, steps.length - 1)];
   const progress = step / (steps.length - 1);
 
+  const setDays = (next: number[]) => {
+    setDaysState(next);
+    setDaysChosen(true);
+  };
+
+  // The steps before guarantee these by the time they're used; the fallback only keeps the math defined.
+  const kg = weight ?? START_KG;
   // Suggestions follow earlier answers until the person edits them.
-  const effectiveTarget = goal === 'maintain' ? weight : targetTouched ? target : suggestTarget(weight, goal ?? 'gain');
+  const chosenTarget = targetTouched ? target : suggestTarget(kg, goal ?? 'gain');
+  const effectiveTarget = goal === 'maintain' ? kg : chosenTarget ?? kg;
   // Calculated from body and activity (Mifflin-St Jeor); the simple per-kg guess only as a fallback.
-  const calc = sex && activity ? dailyTargets({ weightKg: weight, heightCm: height, age, sex, activity }, goal ?? 'maintain', effectiveTarget) : null;
-  const suggested = calc ?? suggestTargets(weight, goal ?? 'maintain');
+  const calc = sex && activity && age && height ? dailyTargets({ weightKg: kg, heightCm: height, age, sex, activity }, goal ?? 'maintain', effectiveTarget) : null;
+  const suggested = calc ?? suggestTargets(kg, goal ?? 'maintain');
   const effCalories = targetsTouched ? calories : suggested.calories;
   const effProtein = targetsTouched ? protein : suggested.protein;
-  const targetOk = !goal || targetMatchesGoal(weight, effectiveTarget, goal);
+  const targetOk = !goal || (chosenTarget !== null && targetMatchesGoal(kg, effectiveTarget, goal));
+
+  /** What the current step still needs, in words, so a disabled button never leaves anyone guessing. */
+  const missing: Partial<Record<StepKey, string[]>> = {
+    nombre: name.trim() ? [] : ['tu nombre'],
+    objetivo: goal ? [] : ['elegir tu objetivo'],
+    peso: weight === null ? ['tu peso'] : [],
+    cuerpo: [...(sex ? [] : ['tu sexo']), ...(age === null ? ['tu edad'] : []), ...(height === null ? ['tu altura'] : [])],
+    actividad: activity ? [] : ['elegir cuánto te movés'],
+    meta: chosenTarget === null ? ['tu peso meta'] : [],
+    gym: daysChosen ? [] : ['elegir tus días, o tocá “Todavía no”'],
+  };
+  const pending = missing[key] ?? [];
+  const blocked = pending.length > 0 || (key === 'meta' && !targetOk);
 
   const next = () => {
     haptic('light');
@@ -122,11 +144,11 @@ export default function WelcomeScreen() {
     const ok = await run(async (d) => {
       await completeOnboarding(
         d,
-        { name, currentWeight: weight, targetWeight: effectiveTarget, calories: effCalories, protein: effProtein, trainingDays: days },
+        { name, currentWeight: kg, targetWeight: effectiveTarget, calories: effCalories, protein: effProtein, trainingDays: days },
         todayKey(),
       );
       await updateProfile(d, { features });
-      if (sex && activity) await saveBody(d, { sex, heightCm: height, birthYear: new Date().getFullYear() - age, activity });
+      if (sex && activity && age && height) await saveBody(d, { sex, heightCm: height, birthYear: new Date().getFullYear() - age, activity });
     });
     if (ok === undefined) {
       finishing.current = false;
@@ -160,14 +182,14 @@ export default function WelcomeScreen() {
         <Button label="Ya tengo una cuenta" icon="log-in" variant="ghost" size="sm" onPress={() => router.push(authConfigured ? '/cuenta/entrar' : '/ajustes/respaldo')} />
       </View>
     ),
-    nombre: <Button label="Continuar" size="lg" onPress={next} disabled={!name.trim()} />,
-    objetivo: <Button label="Continuar" size="lg" onPress={next} disabled={!goal} />,
-    peso: <Button label="Continuar" size="lg" onPress={next} />,
-    cuerpo: <Button label="Continuar" size="lg" onPress={next} disabled={!sex} />,
-    actividad: <Button label="Continuar" size="lg" onPress={next} disabled={!activity} />,
-    meta: <Button label="Continuar" size="lg" onPress={next} disabled={!targetOk} />,
+    nombre: <Button label="Continuar" size="lg" onPress={next} disabled={blocked} />,
+    objetivo: <Button label="Continuar" size="lg" onPress={next} disabled={blocked} />,
+    peso: <Button label="Continuar" size="lg" onPress={next} disabled={blocked} />,
+    cuerpo: <Button label="Continuar" size="lg" onPress={next} disabled={blocked} />,
+    actividad: <Button label="Continuar" size="lg" onPress={next} disabled={blocked} />,
+    meta: <Button label="Continuar" size="lg" onPress={next} disabled={blocked} />,
     nutricion: <Button label="Continuar" size="lg" onPress={next} />,
-    gym: <Button label="Continuar" size="lg" onPress={next} />,
+    gym: <Button label="Continuar" size="lg" onPress={next} disabled={blocked} />,
     extras: <Button label={features.length ? 'Continuar' : 'Por ahora nada más'} size="lg" variant={features.length ? 'primary' : 'secondary'} onPress={next} />,
     nube: account ? (
       <Button label="Continuar" size="lg" onPress={next} />
@@ -268,11 +290,11 @@ export default function WelcomeScreen() {
               </View>
               <View style={{ gap: space.sm }}>
                 <T variant="label" tone="muted">Edad</T>
-                <NumberPicker value={age} onChange={setAge} min={AGE_RANGE.min} max={AGE_RANGE.max} step={1} unit="años" label="Edad" />
+                <NumberPicker value={age} onChange={setAge} min={AGE_RANGE.min} max={AGE_RANGE.max} start={START_AGE} step={1} unit="años" label="Edad" />
               </View>
               <View style={{ gap: space.sm }}>
                 <T variant="label" tone="muted">Altura</T>
-                <NumberPicker value={height} onChange={setHeight} min={HEIGHT_RANGE.min} max={HEIGHT_RANGE.max} step={1} unit="cm" label="Altura" />
+                <NumberPicker value={height} onChange={setHeight} min={HEIGHT_RANGE.min} max={HEIGHT_RANGE.max} start={START_CM} step={1} unit="cm" label="Altura" />
               </View>
             </>
           ) : null}
@@ -302,17 +324,17 @@ export default function WelcomeScreen() {
             <>
               <Question title="¿A qué peso querés llegar?" subtitle="Una meta realista. Después podés sumar hitos intermedios." />
               <WeightPicker
-                value={effectiveTarget}
+                value={chosenTarget}
                 onChange={(v) => {
                   setTargetTouched(true);
                   setTarget(v);
                 }}
               />
               <View style={{ alignItems: 'center' }}>
-                {targetOk ? (
+                {chosenTarget === null ? null : targetOk ? (
                   <View style={[styles.delta, { backgroundColor: c.accentSoft }]}>
                     <T variant="bodyMedium" tone="accent">
-                      {effectiveTarget > weight ? '+' : '−'}{formatKg(Math.abs(effectiveTarget - weight))} kg desde hoy
+                      {effectiveTarget > kg ? '+' : '−'}{formatKg(Math.abs(effectiveTarget - kg))} kg desde hoy
                     </T>
                   </View>
                 ) : (
@@ -403,7 +425,7 @@ export default function WelcomeScreen() {
               </View>
               <Row style={{ flexWrap: 'wrap', justifyContent: 'center' }} gap={6}>
                 {DAY_PRESETS.map((p) => (
-                  <Chip key={p.label} label={p.label} compact selected={p.days.join() === [...days].sort().join()} onPress={() => setDays(p.days)} />
+                  <Chip key={p.label} label={p.label} compact selected={daysChosen && p.days.join() === [...days].sort().join()} onPress={() => setDays(p.days)} />
                 ))}
               </Row>
             </>
@@ -461,7 +483,7 @@ export default function WelcomeScreen() {
               <T variant="hero" style={{ textAlign: 'center' }}>¡Listo{name.trim() ? `, ${name.trim()}` : ''}!</T>
               <T variant="body" tone="muted" style={{ textAlign: 'center', maxWidth: 320 }}>Tu plan está armado. Todo se puede cambiar después en Ajustes.</T>
               <View style={[styles.summary, { backgroundColor: c.surface, borderColor: c.border }]}>
-                <SummaryRow icon="flag-checkered" label="Meta" value={goal === 'maintain' ? `Mantener ${formatKg(weight)} kg` : `${formatKg(weight)} → ${formatKg(effectiveTarget)} kg`} />
+                <SummaryRow icon="flag-checkered" label="Meta" value={goal === 'maintain' ? `Mantener ${formatKg(kg)} kg` : `${formatKg(kg)} → ${formatKg(effectiveTarget)} kg`} />
                 <SummaryRow icon="fire" label="Cada día" value={`${formatNumber(effCalories)} kcal · ${formatNumber(effProtein)} g de proteína`} />
                 <SummaryRow icon="dumbbell" label="Gym" value={days.length ? WEEK_ORDER.filter((d) => days.includes(d)).map((d) => DAY_SHORT[d]).join(' · ') : 'Sin días fijos'} />
                 {features.length ? <SummaryRow icon="plus-circle-outline" label="Extras" value={EXTRAS.filter((x) => features.includes(x.key)).map((x) => x.title).join(', ')} /> : null}
@@ -471,7 +493,14 @@ export default function WelcomeScreen() {
         </Animated.View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + space.md }]}>{footer[key]}</View>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + space.md }]}>
+        {pending.length ? (
+          <T variant="label" tone="muted" style={{ textAlign: 'center', marginBottom: space.md }}>
+            {pending.length > 1 ? 'Faltan' : 'Falta'} {listOf(pending)}
+          </T>
+        ) : null}
+        {footer[key]}
+      </View>
       <LinkChoiceSheet
         choice={choice}
         onClose={() => {
@@ -551,17 +580,26 @@ function Tile({ icon, title, selected, onPress }: { icon: IconName; title: strin
   );
 }
 
+const START_KG = 70;
+const START_AGE = 28;
+const START_CM = 170;
+
+/** "tu sexo, tu edad y tu altura". */
+const listOf = (items: string[]) => (items.length > 1 ? `${items.slice(0, -1).join(', ')} y ${items[items.length - 1]}` : items[0]);
+
 /** Big number with −/+ (0,5 kg steps) that can also be typed. */
-function WeightPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  return <NumberPicker value={value} onChange={onChange} min={WEIGHT_RANGE.min} max={WEIGHT_RANGE.max} step={0.5} unit="kg" label="Peso en kilos" big />;
+function WeightPicker({ value, onChange }: { value: number | null; onChange: (v: number | null) => void }) {
+  return <NumberPicker value={value} onChange={onChange} min={WEIGHT_RANGE.min} max={WEIGHT_RANGE.max} start={START_KG} step={0.5} unit="kg" label="Peso en kilos" big />;
 }
 
-/** Number with −/+ that can also be typed; clamped to [min, max] and rounded to the step. */
-function NumberPicker({ value, onChange, min, max, step, unit, label, big }: {
-  value: number;
-  onChange: (v: number) => void;
+/** Number with −/+ that can also be typed; null until there's a valid answer. */
+function NumberPicker({ value, onChange, min, max, start, step, unit, label, big }: {
+  value: number | null;
+  onChange: (v: number | null) => void;
   min: number;
   max: number;
+  /** Where − and + begin when nothing has been entered. */
+  start: number;
   step: number;
   unit: string;
   label: string;
@@ -570,38 +608,45 @@ function NumberPicker({ value, onChange, min, max, step, unit, label, big }: {
   const c = useColors();
   // While typing, the field shows the draft; otherwise it always reflects the current value.
   const [draft, setDraft] = useState<string | null>(null);
-  const shown = step < 1 ? formatKg(value) : String(value);
+  const shown = value === null ? '' : step < 1 ? formatKg(value) : String(value);
   const fit = (v: number) => Math.min(max, Math.max(min, Math.round(v / step) * step));
-  const set = (v: number) => {
+  const bump = (delta: number) => {
     haptic('light');
-    onChange(fit(v));
+    setDraft(null);
+    onChange(fit(value === null ? start : value + delta));
   };
   // Saved as it's typed: tapping Continuar with the keyboard open moves on without the field ever
-  // ending its edit, and a value kept for that moment would be lost. Half-typed numbers out of range wait.
+  // ending its edit. A number out of range counts as no answer, so it can't slip through.
   const type = (text: string) => {
     setDraft(text);
     const v = parsePositive(text);
-    if (v !== null && v >= min && v <= max) onChange(fit(v));
+    onChange(v !== null && v >= min && v <= max ? fit(v) : null);
   };
+  const outOfRange = !!draft?.trim() && value === null;
   return (
-    <Row style={{ justifyContent: 'center', gap: space.lg }}>
-      <RoundButton icon="minus" label={`Restar ${label.toLowerCase()}`} onPress={() => set(value - step)} />
-      <View style={{ alignItems: 'center', minWidth: big ? 140 : 110 }}>
-        <TextInput
-          value={draft ?? shown}
-          onChangeText={type}
-          onFocus={() => setDraft(shown)}
-          onBlur={() => setDraft(null)}
-          keyboardType={step < 1 ? 'decimal-pad' : 'number-pad'}
-          selectTextOnFocus
-          maxFontSizeMultiplier={1.2}
-          style={[styles.weightInput, { color: c.text }, !big && { fontSize: 44 }]}
-          accessibilityLabel={label}
-        />
-        <T variant="label" tone="dim">{unit}</T>
-      </View>
-      <RoundButton icon="plus" label={`Sumar ${label.toLowerCase()}`} onPress={() => set(value + step)} />
-    </Row>
+    <View style={{ alignItems: 'center', gap: space.xs }}>
+      <Row style={{ justifyContent: 'center', gap: space.lg }}>
+        <RoundButton icon="minus" label={`Restar ${label.toLowerCase()}`} onPress={() => bump(-step)} />
+        <View style={{ alignItems: 'center', width: big ? 170 : 120 }}>
+          <TextInput
+            value={draft ?? shown}
+            onChangeText={type}
+            onFocus={() => setDraft(shown)}
+            onBlur={() => setDraft(null)}
+            keyboardType={step < 1 ? 'decimal-pad' : 'number-pad'}
+            selectTextOnFocus
+            placeholder="—"
+            placeholderTextColor={c.textDim}
+            maxFontSizeMultiplier={1.2}
+            style={[styles.weightInput, { color: c.text }, !big && { fontSize: 44 }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]}
+            accessibilityLabel={label}
+          />
+          <T variant="label" tone="dim">{unit}</T>
+        </View>
+        <RoundButton icon="plus" label={`Sumar ${label.toLowerCase()}`} onPress={() => bump(step)} />
+      </Row>
+      {outOfRange ? <T variant="caption" tone="danger">Tiene que estar entre {min} y {max} {unit}</T> : null}
+    </View>
   );
 }
 
@@ -650,11 +695,12 @@ const styles = StyleSheet.create({
   trackFill: { height: '100%', borderRadius: 5 },
   body: { paddingHorizontal: space.xl, paddingBottom: space.xxl },
   footer: { paddingHorizontal: space.xl, paddingTop: space.md },
-  bigInput: { height: 72, borderRadius: radius.lg, borderWidth: 2, paddingHorizontal: space.xl, fontSize: 28, fontWeight: '700' },
+  bigInput: { height: 72, borderRadius: radius.lg, borderWidth: 2, paddingHorizontal: space.xl, fontFamily: font.bold, fontSize: 28 },
   option: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, borderRadius: radius.lg, borderWidth: 2 },
   optionIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   radio: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  weightInput: { fontSize: 64, fontWeight: '800', letterSpacing: -2, textAlign: 'center', minWidth: 140, padding: 0 },
+  // A set width: left to itself a text field takes all the room it can and pushes the − and + away.
+  weightInput: { fontFamily: font.bold, fontSize: 58, letterSpacing: -1.5, textAlign: 'center', width: '100%', minWidth: 0, padding: 0, outlineWidth: 0 },
   round: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
   delta: { paddingHorizontal: space.lg, paddingVertical: space.sm, borderRadius: radius.pill },
   targetRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, borderRadius: radius.lg, borderWidth: 1 },
