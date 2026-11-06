@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons';
-import { useKeepAwake } from 'expo-keep-awake';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, TextInput, Vibration, View } from 'react-native';
@@ -44,6 +44,18 @@ const WEIGHT_STEP = 2.5;
 // The rest keeps running if you leave the screen to check something and come back.
 let liveRest: Rest | null = null;
 
+/**
+ * The screen stays on during a workout. Only on the phone: in a browser the lock arrives late and
+ * leaving the screen before that throws. If the system refuses, the workout goes on all the same.
+ */
+function useScreenStaysOn() {
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    void activateKeepAwakeAsync('workout').catch(() => {});
+    return () => void deactivateKeepAwake('workout').catch(() => {});
+  }, []);
+}
+
 const draftOf = (set: WorkoutSet): Draft => ({ id: set.id, weight: toInput(set.weight, 2), reps: set.reps !== null ? String(set.reps) : '' });
 const parsed = (d: Draft) => {
   const reps = d.reps.trim() ? parseNonNegative(d.reps) : null;
@@ -58,7 +70,7 @@ const setLabel = (s: { weight: number | null; reps: number | null }) =>
  * are a single tap. Every tap is saved right away; closing the app never loses anything.
  */
 export default function ActiveSessionScreen() {
-  useKeepAwake();
+  useScreenStaysOn();
   const run = useMutation();
   const [now, setNow] = useState(Date.now());
   const [rest, setRestState] = useState<Rest | null>(liveRest);

@@ -64,13 +64,15 @@ function Water({ date, ml, goal }: { date: string; ml: number; goal: number }) {
           </Animated.View>
         ) : null}
       </Row>
-      {/* Explicit rows instead of flexWrap: the height never depends on how the row happens to wrap. */}
+      {/* Looks like a wrap, but with explicit rows: the height never depends on how a row happens to wrap. */}
       <View style={{ gap: 6 }}>
         {glassRows(glasses).map((row) => (
           <View key={row[0]} style={styles.glasses}>
             {row.map((i) => (
               <Glass key={i} full={i < filled} onPress={() => tap(i)} />
             ))}
+            {/* The last row keeps the width of the others. */}
+            {glasses > PER_ROW ? Array.from({ length: PER_ROW - row.length }, (_, i) => <View key={i} style={styles.spacer} />) : null}
           </View>
         ))}
       </View>
@@ -79,13 +81,11 @@ function Water({ date, ml, goal }: { date: string; ml: number; goal: number }) {
   );
 }
 
-const MAX_PER_ROW = 6;
+const PER_ROW = 8;
 
-/** Splits the glasses into rows of the same length, with at most six in each. */
+/** Rows of eight glasses that fill the width; the last one has whatever is left. */
 function glassRows(total: number): number[][] {
-  const rows = Math.ceil(total / MAX_PER_ROW);
-  const perRow = Math.ceil(total / rows);
-  return Array.from({ length: rows }, (_, r) => Array.from({ length: Math.min(perRow, total - r * perRow) }, (_, i) => r * perRow + i));
+  return Array.from({ length: Math.ceil(total / PER_ROW) }, (_, r) => Array.from({ length: Math.min(PER_ROW, total - r * PER_ROW) }, (_, i) => r * PER_ROW + i));
 }
 
 function Glass({ full, onPress }: { full: boolean; onPress: () => void }) {
@@ -144,7 +144,9 @@ function Creatine({ date, taken, streak }: { date: string; taken: boolean; strea
 
 const styles = StyleSheet.create({
   glasses: { flexDirection: 'row', gap: 6 },
-  glass: { flex: 1, maxWidth: 56, height: 44, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  glass: { flex: 1, height: 44, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  // Same border as a glass, so the glasses of the last row measure the same.
+  spacer: { flex: 1, borderWidth: 1.5, borderColor: 'transparent' },
   water: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   creatine: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, borderRadius: radius.lg, borderWidth: 1.5, overflow: 'hidden' },
   circle: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
