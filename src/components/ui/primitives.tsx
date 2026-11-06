@@ -103,7 +103,7 @@ export function Card({ children, style, onPress, padded = true, tone = 'surface'
 // ---------- Buttons ----------
 
 /** danger = soft red (cancel, remove); dangerSolid = filled red for the final destructive confirm. */
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerSolid';
+export type ButtonVariant = 'primary' | 'secondary' | 'add' | 'ghost' | 'danger' | 'dangerSolid';
 
 export function Button({ label, onPress, variant = 'primary', icon, loading, disabled, size = 'md', style, full }: {
   label: string;
@@ -112,16 +112,15 @@ export function Button({ label, onPress, variant = 'primary', icon, loading, dis
   icon?: IconName;
   loading?: boolean;
   disabled?: boolean;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg';
   style?: StyleProp<ViewStyle>;
   full?: boolean;
 }) {
   const c = useColors();
   const off = disabled && variant === 'primary';
-  const xl = size === 'xl';
-  const bg = off ? c.surfaceAlt : variant === 'primary' ? c.accent : variant === 'secondary' ? c.surfaceAlt : variant === 'danger' ? c.dangerSoft : variant === 'dangerSolid' ? c.danger : 'transparent';
-  const fg = off ? c.textDim : variant === 'primary' ? c.accentText : variant === 'danger' ? c.danger : variant === 'dangerSolid' ? '#FFFFFF' : variant === 'ghost' ? c.textMuted : c.text;
-  const height = xl ? 64 : size === 'lg' ? 54 : size === 'sm' ? 36 : 46;
+  const bg = off ? c.surfaceAlt : variant === 'primary' ? c.accent : variant === 'secondary' ? c.surfaceAlt : variant === 'add' ? c.accentSoft : variant === 'danger' ? c.dangerSoft : variant === 'dangerSolid' ? c.danger : 'transparent';
+  const fg = off ? c.textDim : variant === 'primary' ? c.accentText : variant === 'add' ? c.accent : variant === 'danger' ? c.danger : variant === 'dangerSolid' ? '#FFFFFF' : variant === 'ghost' ? c.textMuted : c.text;
+  const height = size === 'lg' ? 54 : size === 'sm' ? 36 : 46;
   const inactive = disabled || loading;
   return (
     <PressableScale
@@ -134,7 +133,7 @@ export function Button({ label, onPress, variant = 'primary', icon, loading, dis
         styles.button,
         { backgroundColor: bg, height, paddingHorizontal: size === 'sm' ? 14 : 20, opacity: disabled && !off ? 0.45 : 1 },
         full && { alignSelf: 'stretch' },
-        xl && { borderRadius: radius.lg, boxShadow: `0 8px 20px ${c.accent}40` },
+        variant === 'add' && { borderRadius: radius.md, borderWidth: 1.5, borderColor: c.accent },
         style,
       ]}
     >
@@ -142,14 +141,14 @@ export function Button({ label, onPress, variant = 'primary', icon, loading, dis
         <ActivityIndicator color={fg} />
       ) : (
         <>
-          {icon && <Feather name={icon} size={xl ? 22 : size === 'sm' ? 15 : 18} color={fg} />}
+          {icon && <Feather name={icon} size={size === 'sm' ? 15 : 18} color={fg} />}
           {/* One line that shrinks to fit: a fixed-height button must never wrap or clip its label (large system fonts included). */}
           <Text
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.75}
             maxFontSizeMultiplier={1.3}
-            style={[styles.buttonText, { color: fg, fontSize: xl ? 19 : size === 'sm' ? 14 : size === 'lg' ? 17 : 15, flexShrink: 1 }, xl && { fontFamily: font.bold }]}
+            style={[styles.buttonText, { color: fg, fontSize: size === 'sm' ? 14 : size === 'lg' ? 17 : 15, flexShrink: 1 }]}
           >
             {label}
           </Text>

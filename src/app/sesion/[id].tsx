@@ -90,7 +90,8 @@ export default function SessionDetailScreen() {
       <Button
         label="Agregar ejercicio"
         icon="plus"
-        variant="secondary"
+        variant="add"
+        size="lg"
         style={{ marginTop: space.lg }}
         onPress={() => router.push({ pathname: '/ejercicios', params: { pick: 'session', target: session.id } })}
       />

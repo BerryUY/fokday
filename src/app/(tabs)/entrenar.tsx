@@ -140,7 +140,7 @@ function Today({ data, today, onStart, onPick }: {
                 <T variant="caption" tone="muted">Empezó hace {formatMinutes((Date.now() - new Date(active.startedAt).getTime()) / 1000)}</T>
               </View>
             </Row>
-            <Button label="Seguir entrenando" icon="play" size="xl" style={{ marginTop: space.lg }} onPress={() => openWorkout()} />
+            <Button label="Seguir entrenando" icon="play" size="lg" style={{ marginTop: space.lg }} onPress={() => openWorkout()} />
             <Button label="Cancelar entrenamiento" variant="ghost" size="sm" style={{ marginTop: space.xs }} onPress={() => void cancelWorkout(active.id)} />
           </Card>
         ) : attendance ? (
@@ -148,14 +148,14 @@ function Today({ data, today, onStart, onPick }: {
             <Foki mood="proud" size={96} />
             <T variant="title" style={{ marginTop: space.md }}>Hoy ya entrenaste</T>
             <T variant="label" tone="muted" style={{ marginTop: 2, textAlign: 'center' }}>Bien ahí. Lo que queda es comer bien y descansar.</T>
-            <Button label="Entrenar de nuevo" icon="play" size="xl" full style={{ marginTop: space.lg }} onPress={onPick} />
+            <Button label="Entrenar de nuevo" icon="play" variant="secondary" full style={{ marginTop: space.lg }} onPress={onPick} />
           </Card>
         ) : !plan ? (
           <Card style={{ padding: space.xl, alignItems: 'center' }}>
             <Foki mood="strong" size={110} />
             <T variant="title" style={{ marginTop: space.md, textAlign: 'center' }}>Armá tu plan en un minuto</T>
             <T variant="label" tone="muted" style={{ marginTop: 2, textAlign: 'center' }}>Elegí uno listo o creá el tuyo. Después solo tocás Empezar.</T>
-            <Button label="Elegir mi plan" icon="arrow-right" size="xl" full style={{ marginTop: space.lg }} onPress={() => router.push('/rutina/nueva')} />
+            <Button label="Elegir mi plan" icon="arrow-right" size="lg" full style={{ marginTop: space.lg }} onPress={() => router.push('/rutina/nueva')} />
           </Card>
         ) : plan.when === 'today' ? (
           <Card style={{ padding: space.xl }}>
@@ -167,7 +167,7 @@ function Today({ data, today, onStart, onPick }: {
             {exercises.length ? (
               <T variant="label" tone="dim" numberOfLines={2} style={{ marginTop: space.md }}>{exercises.map((e) => e.name).join(' · ')}</T>
             ) : null}
-            <Button label="Empezar" icon="play" size="xl" style={{ marginTop: space.lg }} onPress={() => onStart(plan.routine.id, today, plan.weekday)} />
+            <Button label="Empezar" icon="play" size="lg" style={{ marginTop: space.lg }} onPress={() => onStart(plan.routine.id, today, plan.weekday)} />
             <Button label="Hoy hago otra cosa" variant="ghost" size="sm" style={{ marginTop: 4 }} onPress={onPick} />
           </Card>
         ) : (
@@ -177,7 +177,7 @@ function Today({ data, today, onStart, onPick }: {
             <T variant="label" tone="muted" style={{ marginTop: 2, textAlign: 'center' }}>
               {plan.weekday !== null ? `Lo próximo es ${plan.routine.name}, el ${DAY_LONG[plan.weekday]}.` : 'Descansar también es parte del progreso.'}
             </T>
-            <Button label="Entrenar igual" icon="play" size="xl" full style={{ marginTop: space.lg }} onPress={onPick} />
+            <Button label="Entrenar igual" icon="play" variant="secondary" full style={{ marginTop: space.lg }} onPress={onPick} />
           </Card>
         )}
       </Reveal>

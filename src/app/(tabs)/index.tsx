@@ -203,7 +203,8 @@ export default function HomeScreen() {
           <Button
             label={active ? 'Seguir entrenando' : trainedToday ? 'Entrenar de nuevo' : routine ? 'Empezar' : !routines.length ? 'Elegir mi plan' : isTrainingDay ? 'Elegir rutina' : 'Entrenar igual'}
             icon="play"
-            size="xl"
+            size={active || (routine && !trainedToday) ? 'lg' : 'md'}
+            variant={active || (routine && !trainedToday) ? 'primary' : 'secondary'}
             style={{ marginTop: space.lg }}
             onPress={train}
           />

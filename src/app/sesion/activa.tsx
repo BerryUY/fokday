@@ -259,7 +259,7 @@ export default function ActiveSessionScreen() {
           <Foki mood="cheer" size={150} />
           <T variant="title" style={{ marginTop: space.lg, textAlign: 'center' }}>¡Hiciste todo!</T>
           <T variant="label" tone="muted" style={{ marginTop: 4, textAlign: 'center' }}>{doneSets} series en {formatDuration(elapsed)}</T>
-          <Button label="Agregar otro ejercicio" icon="plus" variant="ghost" size="sm" style={{ marginTop: space.lg }} onPress={addExercise} />
+          <Button label="Agregar otro ejercicio" icon="plus" variant="add" size="lg" full style={{ marginTop: space.lg }} onPress={addExercise} />
         </View>
       ) : !current ? (
         <View style={styles.center}>
@@ -332,7 +332,7 @@ export default function ActiveSessionScreen() {
               );
             })}
           </Card>
-          <Button label="Agregar ejercicio" icon="plus" variant="secondary" onPress={addExercise} />
+          <Button label="Agregar ejercicio" icon="plus" variant="add" size="lg" onPress={addExercise} />
           {current && !allDone ? (
             <Button
               label={`Saltear ${current.name}`}
