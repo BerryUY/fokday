@@ -1,11 +1,11 @@
 import { router } from 'expo-router';
 import { goBack } from '@/lib/nav';
 import { useEffect, useState } from 'react';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 import { ExtraFields, extrasToTexts, textsToExtras, type ExtraTexts } from '@/components/ExtraFields';
 import { Field, confirm } from '@/components/ui/form';
 import { Loading, Screen } from '@/components/ui/layout';
-import { Button, Card, Chip, Row, T } from '@/components/ui/primitives';
+import { Button, Card, Chip, Row, T, Toggle } from '@/components/ui/primitives';
 import { archiveMeal, getMeal, saveMeal } from '@/data/meals';
 import { MEAL_CATEGORIES, type MealCategory } from '@/domain/nutrition';
 import { parseNonNegative, toInput } from '@/lib/format';
@@ -15,12 +15,10 @@ import { useFeatures } from '@/state/features';
 import { useCloudConfig } from '@/state/cloud';
 import { useToast } from '@/state/toast';
 import { cloudApi } from '@/backup/api';
-import { useColors } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
 
 /** Create a custom meal or edit any meal in the catalog (predefined ones included). */
 export default function EditMealScreen() {
-  const c = useColors();
   const db = useDb();
   const params = useParams();
   const id = params.string('id');
@@ -154,7 +152,7 @@ export default function EditMealScreen() {
             <T variant="bodyMedium">Valores estimados</T>
             <T variant="caption" tone="dim">Se muestran con “~” para recordar que son aproximados.</T>
           </View>
-          <Switch value={estimate} onValueChange={setEstimate} trackColor={{ true: c.accent, false: c.track }} thumbColor="#FFFFFF" />
+          <Toggle value={estimate} onValueChange={setEstimate} />
         </Row>
         {config ? (
           <Row style={{ justifyContent: 'space-between' }}>
@@ -162,7 +160,7 @@ export default function EditMealScreen() {
               <T variant="bodyMedium">Compartir en Comunidad</T>
               <T variant="caption" tone="dim">Otras personas van a poder usarla. No se muestra tu nombre.</T>
             </View>
-            <Switch value={share} onValueChange={setShare} trackColor={{ true: c.accent, false: c.track }} thumbColor="#FFFFFF" />
+            <Toggle value={share} onValueChange={setShare} />
           </Row>
         ) : null}
         <Field label="Preparación (minutos, opcional)" value={prep} onChangeText={setPrep} keyboardType="numeric" suffix="min" />

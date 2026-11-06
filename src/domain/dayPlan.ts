@@ -36,7 +36,7 @@ export function buildMissions(s: DayState): Mission[] {
   ];
   if (s.trainingDay || s.trained) out.push({ key: 'train', title: s.routineName ? `Entrená ${s.routineName}` : 'Entrená', detail: s.trained ? 'Hecho' : 'Hoy toca', done: s.trained });
   if (s.tracksWater) {
-    const liters = (ml: number) => (ml / 1000).toLocaleString('es-UY', { maximumFractionDigits: 1 });
+    const liters = (ml: number) => (ml / 1000).toLocaleString('es-UY', { maximumFractionDigits: 2 });
     out.push({ key: 'water', title: `Tomá ${liters(s.waterGoalMl)} L de agua`, detail: `${liters(s.waterMl)} L`, done: s.waterMl >= s.waterGoalMl });
   }
   if (s.tracksCreatine) out.push({ key: 'creatine', title: 'Tomá la creatina', detail: s.creatine ? 'Hecho' : 'Pendiente', done: s.creatine });

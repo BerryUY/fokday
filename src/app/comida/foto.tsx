@@ -3,7 +3,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Image, StyleSheet, Switch, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 import Animated, { Easing, FadeIn, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { analyzeFoodPatiently, ApiError, type FoodAnalysis } from '@/backup/api';
 import { refreshPlan, setQuota, usePlan } from '@/billing/pro';
@@ -12,7 +12,7 @@ import { Burst } from '@/components/juice/Burst';
 import { MomentPicker } from '@/components/MomentPicker';
 import { Field } from '@/components/ui/form';
 import { Screen } from '@/components/ui/layout';
-import { Badge, Button, Card, Chip, Row, T } from '@/components/ui/primitives';
+import { Badge, Button, Card, Chip, Row, T, Toggle } from '@/components/ui/primitives';
 import { logMeal, saveMeal } from '@/data/meals';
 import { guessCategory, type Extras, type MealCategory } from '@/domain/nutrition';
 import { formatKcal, parseNonNegative, toInput } from '@/lib/format';
@@ -204,7 +204,7 @@ export default function FoodPhotoScreen() {
               <T variant="bodyMedium">Guardar en mis comidas</T>
               <T variant="caption" tone="dim">Para registrarla con un toque la próxima vez.</T>
             </View>
-            <Switch value={keep} onValueChange={setKeep} trackColor={{ true: c.accent, false: c.track }} thumbColor="#FFFFFF" />
+            <Toggle value={keep} onValueChange={setKeep} />
           </Row>
           <Button label="Sacar otra foto" icon="refresh-cw" variant="ghost" size="sm" onPress={() => setPhase({ kind: 'pick' })} />
         </Animated.View>

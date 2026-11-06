@@ -140,5 +140,5 @@ const styles = StyleSheet.create({
   tabHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: space.xl, gap: space.md },
   footer: { paddingHorizontal: space.lg, paddingTop: space.md, borderTopWidth: StyleSheet.hairlineWidth },
   empty: { alignItems: 'center', paddingVertical: space.xxl, paddingHorizontal: space.lg },
-  row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: 12, paddingHorizontal: space.lg, borderRadius: radius.md },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 50, paddingVertical: 10, paddingHorizontal: space.lg, borderRadius: radius.md },
 });

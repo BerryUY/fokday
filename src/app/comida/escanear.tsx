@@ -2,7 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Platform, StyleSheet, Switch, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { ApiError, cloudApi, type BarcodeProduct } from '@/backup/api';
 import { refreshPlan, setQuota, usePlan } from '@/billing/pro';
@@ -10,7 +10,7 @@ import { MomentPicker } from '@/components/MomentPicker';
 import { left, QuotaCard } from '@/components/QuotaCard';
 import { Field } from '@/components/ui/form';
 import { Screen } from '@/components/ui/layout';
-import { Button, Card, Chip, Row, T } from '@/components/ui/primitives';
+import { Button, Card, Chip, Row, T, Toggle } from '@/components/ui/primitives';
 import { logMeal, saveMeal } from '@/data/meals';
 import { guessCategory, type Extras, type MealCategory } from '@/domain/nutrition';
 import { formatDecimal, formatKcal, formatNumber, parsePositive } from '@/lib/format';
@@ -219,7 +219,7 @@ export default function ScanScreen() {
           <MomentPicker value={moment} onChange={setMoment} />
           <Row style={{ justifyContent: 'space-between' }}>
             <T variant="bodyMedium" style={{ flex: 1 }}>Guardar en mis comidas</T>
-            <Switch value={keep} onValueChange={setKeep} trackColor={{ true: c.accent, false: c.track }} thumbColor="#FFFFFF" />
+            <Toggle value={keep} onValueChange={setKeep} />
           </Row>
           <Button label="Escanear otro" icon="maximize" variant="ghost" size="sm" disabled={out} onPress={() => void scan()} />
         </Animated.View>

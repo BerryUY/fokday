@@ -105,7 +105,7 @@ const copy = {
   ],
   water: (n: string): Copy[] => [
     c('Tengo sed 💧', `¿Y vos${n}? Sumá un vaso.`),
-    c('Un vaso de agua', 'Tocá el botón y lo anoto sin que abras nada.'),
+    c('Un vaso de agua', 'Tocá el botón y lo anoto.'),
     c('Glu, glu, glu 💧', 'Vas por la mitad del día. ¿Cómo viene el agua?'),
   ],
   creatine: (): Copy[] => [

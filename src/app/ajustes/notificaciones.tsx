@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Platform, StyleSheet, Switch, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { Foki } from '@/components/mascot/Foki';
 import { ListRow, Loading, Screen } from '@/components/ui/layout';
-import { Button, Card, Divider, Row, Segmented, T } from '@/components/ui/primitives';
+import { Button, Card, Divider, Row, Segmented, T, Toggle } from '@/components/ui/primitives';
 import type { ChannelKey } from '@/notifications/channels';
 import { INTENSITIES, type Intensity, type PlannedNotification } from '@/notifications/plan';
 import { sendTestNotification } from '@/notifications/schedule';
@@ -27,7 +27,6 @@ const when = (d: Date) => {
 
 /** How much Foki insists, what about, and the messages coming next exactly as they'll look. */
 export default function NotificationsScreen() {
-  const c = useColors();
   const run = useMutation();
   const toast = useToast();
   const [sent, setSent] = useState(false);
@@ -53,7 +52,7 @@ export default function NotificationsScreen() {
             <ListRow
               title={k.label}
               subtitle={k.hint}
-              right={<Switch value={!prefs.off.includes(k.key)} onValueChange={(v) => void toggle(k.key, v)} trackColor={{ true: c.accent, false: c.track }} thumbColor="#FFFFFF" />}
+              right={<Toggle value={!prefs.off.includes(k.key)} onValueChange={(v) => void toggle(k.key, v)} />}
             />
           </View>
         ))}
@@ -104,7 +103,7 @@ function NotificationCard({ n }: { n: PlannedNotification }) {
         ) : null}
       </View>
       <View style={styles.tile}>
-        <Foki mood={n.mood} lit={n.mood !== 'worried' && n.mood !== 'sad'} size={44} still color="#C8F560" />
+        <Foki mood={n.mood} lit={n.mood !== 'worried' && n.mood !== 'sad'} size={50} still color="#C8F560" />
       </View>
     </View>
   );

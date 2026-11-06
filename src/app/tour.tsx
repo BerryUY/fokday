@@ -31,14 +31,14 @@ const STEPS: { icon: IconName; title: string; text: string; tip: string }[] = [
   {
     icon: 'fire',
     title: 'Tu racha',
-    text: 'Cada día que registrás algo (una comida, tu peso o un entreno) suma a tu racha. Arriba a la derecha ves cuántos días llevás.',
-    tip: 'Si se te pasa, te avisamos a la noche antes de que se corte.',
+    text: 'Cada día que registrás una comida o un entreno suma a tu racha. Arriba a la derecha ves cuántos días llevás.',
+    tip: 'Si faltás un día, un protector te cubre. Ganás uno cada 7 días.',
   },
   {
     icon: 'dumbbell',
     title: 'Entrenar',
-    text: 'Tu rutina del día aparece primero, con sus ejercicios. Tocá Empezar, anotá kilos y repeticiones, y deslizá para terminar.',
-    tip: '¿Fuiste y no anotaste nada? Tocá “Ya fui” y cuenta igual.',
+    text: 'Tocá Empezar y Foki te lleva serie por serie, con los pesos de la última vez ya cargados.',
+    tip: '¿Fuiste y no anotaste nada? Tocá “Fui al gym” y cuenta igual.',
   },
   {
     icon: 'chart-line-variant',

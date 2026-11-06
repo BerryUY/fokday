@@ -37,6 +37,10 @@ describe('settleStreak', () => {
     expect(settleStreak(dates, first.vault, '2026-10-29').event).toBeNull();
   });
 
+  it('does not bring up a streak lost long ago', () => {
+    expect(settleStreak(streakDays(5, '2026-06-01'), NEW_VAULT, '2026-10-29').event).toBeNull();
+  });
+
   it('earns a shield every 7 days, up to the maximum', () => {
     const empty: StreakVault = { ...NEW_VAULT, shields: 0 };
     const seven = settleStreak(streakDays(7, '2026-10-29'), empty, '2026-10-29');

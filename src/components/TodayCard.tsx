@@ -1,23 +1,26 @@
 import { Feather } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { FokiSays, gearFor } from '@/components/mascot/Foki';
 import { Card, Divider, PressableScale, Row, T } from '@/components/ui/primitives';
+import { addWater, setCreatine } from '@/data/habits';
 import { markPerfectDay } from '@/data/streak';
 import { buildMissions, fokiLine, type DayState, type Mission } from '@/domain/dayPlan';
 import { goToTab } from '@/lib/tabs';
 import { playReward } from '@/lib/sound';
-import { useDb } from '@/state/db';
+import { useDb, useMutation } from '@/state/db';
 import { haptic, useToast } from '@/state/toast';
 import { useColors } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
+
+const GLASS_ML = 250;
 
 /** The top of Inicio: Foki says how the day is going and the missions show what's left. */
 export function TodayCard({ state, today, longest, onTrain }: { state: DayState; today: string; longest: number; onTrain: () => void }) {
   const c = useColors();
   const db = useDb();
   const toast = useToast();
+  const run = useMutation();
   const missions = buildMissions(state);
   const line = fokiLine(state, missions);
   const done = missions.filter((m) => m.done).length;
@@ -36,12 +39,14 @@ export function TodayCard({ state, today, longest, onTrain }: { state: DayState;
   const open = (m: Mission) => {
     if (m.key === 'train') return onTrain();
     if (m.key === 'meals' || m.key === 'protein') return goToTab('comidas');
-    router.push('/racha');
+    haptic('light');
+    if (m.key === 'water') return void run((d) => addWater(d, today, GLASS_ML), { success: 'Un vaso más' });
+    if (!m.done) void run((d) => setCreatine(d, today, true), { success: 'Creatina anotada' });
   };
 
   return (
     <Card style={{ paddingVertical: space.lg }}>
-      <FokiSays mood={line.mood} lit={state.streakDoneToday} gear={gearFor(longest)} bubble={c.surfaceAlt} size={70}>
+      <FokiSays mood={line.mood} lit={state.streakDoneToday} gear={gearFor(longest)} bubble={c.surfaceAlt} size={88}>
         <T variant="bodyMedium">{line.text}</T>
       </FokiSays>
       <Row style={{ justifyContent: 'space-between', marginTop: space.lg, marginBottom: space.xs }}>

@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Redirect } from 'expo-router';
 import { TopTabs, type MaterialTopTabBarProps } from 'expo-router/js-top-tabs';
 import { useEffect, useState, type ComponentProps } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isOnboarded } from '@/data/settings';
@@ -21,6 +21,9 @@ const TABS: Record<string, TabMeta> = {
   entrenar: { label: 'Entrenar', icon: 'dumbbell', iconActive: 'dumbbell' },
   progreso: { label: 'Progreso', icon: 'chart-line-variant', iconActive: 'chart-line-variant' },
 };
+
+/** The browser can blur what's behind the bar; on Android it stays translucent, which also keeps old phones smooth. */
+const glass = Platform.OS === 'web' ? ({ backdropFilter: 'blur(18px) saturate(1.8)' } as object) : null;
 
 const ITEM_H = 48;
 const PAD = 5;
@@ -55,7 +58,7 @@ function TabBar({ state, navigateToTab }: MaterialTopTabBarProps) {
     <View pointerEvents="box-none" style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 10) }]}>
       <View
         onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
-        style={[styles.bar, { backgroundColor: c.scheme === 'dark' ? 'rgba(24,24,27,0.97)' : 'rgba(255,255,255,0.97)', borderColor: c.border }]}
+        style={[styles.bar, glass, { backgroundColor: c.scheme === 'dark' ? 'rgba(40,40,42,0.78)' : 'rgba(255,255,255,0.78)', borderColor: c.scheme === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.08)' }]}
       >
         {width > 0
           ? routes.map((route) => (
@@ -92,9 +95,9 @@ function TabItem({ meta, focused, closed, open, onPress }: { meta: TabMeta; focu
   return (
     <Animated.View style={[{ height: ITEM_H }, box]}>
       <Pressable accessibilityRole="tab" accessibilityState={{ selected: focused }} accessibilityLabel={meta.label} onPress={onPress} style={styles.item}>
-        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.fill, { backgroundColor: c.accent }, fill]} />
-        <MaterialCommunityIcons name={focused ? meta.iconActive : meta.icon} size={24} color={focused ? c.accentText : c.textDim} />
-        <Animated.Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={[styles.label, { color: c.accentText }, label]}>
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.fill, { backgroundColor: c.scheme === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.06)' }, fill]} />
+        <MaterialCommunityIcons name={focused ? meta.iconActive : meta.icon} size={24} color={focused ? c.accent : c.textMuted} />
+        <Animated.Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={[styles.label, { color: c.accent }, label]}>
           {meta.label}
         </Animated.Text>
       </Pressable>
@@ -141,5 +144,5 @@ const styles = StyleSheet.create({
   },
   item: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, overflow: 'hidden' },
   fill: { borderRadius: ITEM_H / 2 },
-  label: { fontFamily: font.bold, fontSize: 15, letterSpacing: -0.2 },
+  label: { fontFamily: font.semibold, fontSize: 15, letterSpacing: -0.3 },
 });

@@ -1,11 +1,11 @@
 import { goBack } from '@/lib/nav';
 import { useState } from 'react';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 import { DateChip } from '@/components/DatePicker';
 import { ExtraFields, textsToExtras, type ExtraTexts } from '@/components/ExtraFields';
 import { Field } from '@/components/ui/form';
 import { Screen } from '@/components/ui/layout';
-import { Button, Card, Chip, Row, T } from '@/components/ui/primitives';
+import { Button, Card, Chip, Row, T, Toggle } from '@/components/ui/primitives';
 import { LIGHT_DINNER_GUIDE } from '@/data/catalog';
 import { logMeal, saveMeal } from '@/data/meals';
 import { getProfile } from '@/data/settings';
@@ -14,12 +14,10 @@ import { formatKcal, parseNonNegative } from '@/lib/format';
 import { useParams } from '@/lib/params';
 import { useMutation, useQuery } from '@/state/db';
 import { useFeatures } from '@/state/features';
-import { useColors } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
 
 /** Quick entry for anything outside the catalog: a different dinner, a snack, eating out. */
 export default function ManualMealScreen() {
-  const c = useColors();
   const params = useParams();
   const run = useMutation();
   const [date, setDate] = useState(params.date());
@@ -96,7 +94,7 @@ export default function ManualMealScreen() {
             <T variant="bodyMedium">Guardar en el catálogo</T>
             <T variant="caption" tone="dim">Para registrarla con un toque la próxima vez.</T>
           </View>
-          <Switch value={saveToCatalog} onValueChange={setSaveToCatalog} trackColor={{ true: c.accent, false: c.track }} thumbColor="#FFFFFF" />
+          <Toggle value={saveToCatalog} onValueChange={setSaveToCatalog} />
         </Row>
       </View>
     </Screen>

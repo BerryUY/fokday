@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, Switch, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { adsPrivacyRequired, showAdsPrivacyOptions } from '@/ads/rewarded';
 import { useSyncState } from '@/backup/service';
 import { usePro } from '@/billing/pro';
@@ -10,7 +10,7 @@ import { ProfileHeader } from '@/components/ProfileHeader';
 import { ProBadge } from '@/components/ProGate';
 import { Field, Stepper } from '@/components/ui/form';
 import { ListRow, Loading, Screen } from '@/components/ui/layout';
-import { Button, Card, Chip, Divider, Row, SectionHeader, Segmented, T } from '@/components/ui/primitives';
+import { Button, Card, Chip, Divider, Row, SectionHeader, Segmented, T, Toggle } from '@/components/ui/primitives';
 import { getBody, getGoalForDate, getProfile, HABIT_FEATURES, setGoalsFrom, updateProfile, type BodyData, type FeatureKey, type Profile, type ThemePreference } from '@/data/settings';
 import { EXTRA_NUTRIENTS } from '@/domain/nutrition';
 import { useColors } from '@/theme/ThemeProvider';
@@ -174,13 +174,11 @@ function SettingsForm({ profile, calories, protein, latest, body }: {
                 <T variant="bodyMedium">{f.label}</T>
                 <T variant="caption" tone="dim">{f.description}</T>
               </View>
-              <Switch
+              <Toggle
                 value={profile.features.includes(f.key)}
                 onValueChange={(on) =>
                   run((db) => updateProfile(db, { features: on ? [...profile.features, f.key] : profile.features.filter((k) => k !== f.key) }), { silent: true })
                 }
-                trackColor={{ true: c.accent, false: c.track }}
-                thumbColor="#FFFFFF"
                 accessibilityLabel={f.label}
               />
             </Row>
@@ -219,11 +217,9 @@ function SettingsForm({ profile, calories, protein, latest, body }: {
             <T variant="bodyMedium">Sonidos de recompensa</T>
             <T variant="caption" tone="dim">Un clinc al cumplir una tarea, la creatina o el gym</T>
           </View>
-          <Switch
+          <Toggle
             value={profile.sounds}
             onValueChange={(sounds) => run((db) => updateProfile(db, { sounds }), { silent: true })}
-            trackColor={{ true: c.accent, false: c.track }}
-            thumbColor="#FFFFFF"
             accessibilityLabel="Sonidos de recompensa"
           />
         </Row>

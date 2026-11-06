@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons';
-import type { ComponentProps, ReactNode } from 'react';
+import { useEffect, useState, type ComponentProps, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -119,7 +119,7 @@ export function Button({ label, onPress, variant = 'primary', icon, loading, dis
   const c = useColors();
   const bg = variant === 'primary' ? c.accent : variant === 'secondary' ? c.surfaceAlt : variant === 'danger' ? c.dangerSoft : variant === 'dangerSolid' ? c.danger : 'transparent';
   const fg = variant === 'primary' ? c.accentText : variant === 'danger' ? c.danger : variant === 'dangerSolid' ? '#FFFFFF' : variant === 'ghost' ? c.textMuted : c.text;
-  const height = size === 'lg' ? 56 : size === 'sm' ? 38 : 48;
+  const height = size === 'lg' ? 54 : size === 'sm' ? 36 : 46;
   const inactive = disabled || loading;
   return (
     <PressableScale
@@ -215,10 +215,24 @@ export function Chip({ label, selected, onPress, icon, tone = 'accent', compact 
   );
 }
 
+/** The iOS capsule: a thumb slides under the options, eased with no bounce. */
 export function Segmented<K extends string>({ options, value, onChange }: { options: { key: K; label: string }[]; value: K; onChange: (k: K) => void }) {
   const c = useColors();
+  const [width, setWidth] = useState(0);
+  const index = Math.max(0, options.findIndex((o) => o.key === value));
+  const segment = width / options.length;
+  const x = useSharedValue(0);
+  useEffect(() => {
+    x.set(withTiming(index * segment, MOTION.enter));
+  }, [x, index, segment]);
+  const thumb = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() }] }));
+  const dark = c.scheme === 'dark';
   return (
-    <View style={[styles.segmented, { backgroundColor: c.surfaceAlt }]}>
+    <View
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width - 4)}
+      style={[styles.segmented, { backgroundColor: dark ? 'rgba(118, 118, 128, 0.24)' : 'rgba(118, 118, 128, 0.12)' }]}
+    >
+      {width > 0 ? <Animated.View style={[styles.thumb, { width: segment, backgroundColor: dark ? '#636366' : '#FFFFFF' }, thumb]} /> : null}
       {options.map((o) => {
         const active = o.key === value;
         return (
@@ -230,13 +244,41 @@ export function Segmented<K extends string>({ options, value, onChange }: { opti
               if (!active) haptic('light');
               onChange(o.key);
             }}
-            style={[styles.segment, active && { backgroundColor: c.surface }]}
+            style={styles.segment}
           >
-            <Text style={[styles.segmentText, { color: active ? c.text : c.textMuted }]}>{o.label}</Text>
+            <Text style={[styles.segmentText, { color: c.text, fontFamily: active ? font.semibold : font.medium }]}>{o.label}</Text>
           </Pressable>
         );
       })}
     </View>
+  );
+}
+
+/** On/off in the iOS shape, the same on every phone. */
+export function Toggle({ value, onValueChange, accessibilityLabel, disabled }: { value: boolean; onValueChange: (v: boolean) => void; accessibilityLabel?: string; disabled?: boolean }) {
+  const c = useColors();
+  const p = useSharedValue(value ? 1 : 0);
+  useEffect(() => {
+    p.set(withTiming(value ? 1 : 0, MOTION.enter));
+  }, [p, value]);
+  const on = useAnimatedStyle(() => ({ opacity: p.get() }));
+  const knob = useAnimatedStyle(() => ({ transform: [{ translateX: p.get() * 20 }] }));
+  return (
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value, disabled }}
+      accessibilityLabel={accessibilityLabel}
+      disabled={disabled}
+      hitSlop={6}
+      onPress={() => {
+        haptic('light');
+        onValueChange(!value);
+      }}
+      style={[styles.toggle, { backgroundColor: c.scheme === 'dark' ? 'rgba(120, 120, 128, 0.36)' : 'rgba(120, 120, 128, 0.16)', opacity: disabled ? 0.45 : 1 }]}
+    >
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: c.accent, borderRadius: 16 }, on]} />
+      <Animated.View style={[styles.knob, knob]} />
+    </Pressable>
   );
 }
 
@@ -302,9 +344,12 @@ const styles = StyleSheet.create({
   buttonText: { fontFamily: font.semibold, letterSpacing: -0.1 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 36, paddingHorizontal: 14, borderRadius: radius.pill, borderWidth: 1 },
   chipText: { fontFamily: font.semibold, fontSize: 13 },
-  segmented: { flexDirection: 'row', borderRadius: radius.pill, padding: 3 },
-  segment: { flex: 1, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill },
-  segmentText: { fontFamily: font.semibold, fontSize: 13 },
+  segmented: { flexDirection: 'row', borderRadius: radius.pill, padding: 2 },
+  thumb: { position: 'absolute', left: 2, top: 2, bottom: 2, borderRadius: radius.pill, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  segment: { flex: 1, height: 32, alignItems: 'center', justifyContent: 'center' },
+  segmentText: { fontSize: 13, letterSpacing: -0.1 },
+  toggle: { width: 51, height: 31, borderRadius: 16, overflow: 'hidden' },
+  knob: { position: 'absolute', left: 2, top: 2, width: 27, height: 27, borderRadius: 14, backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 3, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, alignSelf: 'flex-start' },
   badgeText: { fontFamily: font.semibold, fontSize: 11, letterSpacing: 0.2 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: space.md },

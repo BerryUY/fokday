@@ -53,6 +53,7 @@ export const milestoneAt = (n: number): number | null => (STREAK_MILESTONES as r
  */
 export const MAX_SHIELDS = 2;
 export const DAYS_PER_SHIELD = 7;
+const LOST_NEWS_DAYS = 14;
 
 export type StreakVault = {
   shields: number;
@@ -87,7 +88,8 @@ export function settleStreak(activeDates: Iterable<DateKey>, vault: StreakVault,
     } else if (streak > 0 && vault.lostAfter !== last) {
       next.lostAfter = last;
       next.rewardedAt = 0;
-      event = { kind: 'lost', streak };
+      // Someone back after months doesn't need to hear about an old streak.
+      if (missed.length <= LOST_NEWS_DAYS) event = { kind: 'lost', streak };
     }
   }
 

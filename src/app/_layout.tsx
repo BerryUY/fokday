@@ -1,10 +1,4 @@
-import {
-  StackSansHeadline_400Regular,
-  StackSansHeadline_500Medium,
-  StackSansHeadline_600SemiBold,
-  StackSansHeadline_700Bold,
-  useFonts,
-} from '@expo-google-fonts/stack-sans-headline';
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, useFonts } from '@expo-google-fonts/inter';
 import { JetBrainsMono_700Bold } from '@expo-google-fonts/jetbrains-mono';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -35,7 +29,7 @@ import { setSoundsEnabled } from '@/lib/sound';
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({ StackSansHeadline_400Regular, StackSansHeadline_500Medium, StackSansHeadline_600SemiBold, StackSansHeadline_700Bold, JetBrainsMono_700Bold });
+  const [fontsLoaded, fontError] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, JetBrainsMono_700Bold });
   const [db, setDb] = useState<Db | null>(null);
   const [dbError, setDbError] = useState<Error | null>(null);
 

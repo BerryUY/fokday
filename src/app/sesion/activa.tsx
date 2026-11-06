@@ -59,7 +59,6 @@ const setLabel = (s: { weight: number | null; reps: number | null }) =>
  */
 export default function ActiveSessionScreen() {
   useKeepAwake();
-  const c = useColors();
   const run = useMutation();
   const [now, setNow] = useState(Date.now());
   const [rest, setRestState] = useState<Rest | null>(liveRest);

@@ -1,3 +1,4 @@
+import { Foki } from '@/components/mascot/Foki';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
@@ -8,7 +9,6 @@ import { finishSignIn, signInWithGoogle, useAccount, type LinkChoice } from '@/a
 import { authConfigured } from '@/auth/supabase';
 import { LinkChoiceSheet } from '@/components/CloudLink';
 import { GoogleButton } from '@/components/GoogleButton';
-import { FokDayMark } from '@/components/brand/FokDayMark';
 import { Button, Chip, IconButton, Row, T } from '@/components/ui/primitives';
 import { completeOnboarding, isOnboarded, saveBody, updateProfile, type FeatureKey } from '@/data/settings';
 import { ACTIVITY_LEVELS, AGE_RANGE, dailyTargets, HEIGHT_RANGE, type ActivityLevel, type Sex } from '@/domain/energy';
@@ -193,10 +193,10 @@ export default function WelcomeScreen() {
         <Animated.View key={key} entering={FadeInRight.duration(260)} style={{ gap: space.xl }}>
           {key === 'hola' ? (
             <View style={{ alignItems: 'center', gap: space.lg, paddingTop: space.xxxl }}>
-              <BrandMark />
+              <Foki mood="cheer" size={150} />
               <T variant="hero" style={{ textAlign: 'center' }}>¡Bienvenido a FokDay!</T>
               <T variant="body" tone="muted" style={{ textAlign: 'center', maxWidth: 320 }}>
-                Te ayudo a seguir tus comidas, tus entrenamientos y tu peso. Son unas preguntas cortitas y arrancamos.
+                Soy Foki. Te ayudo a seguir tus comidas, tus entrenamientos y tu peso. Son unas preguntas cortitas y arrancamos.
               </T>
             </View>
           ) : null}
@@ -639,13 +639,6 @@ function SummaryRow({ icon, label, value }: { icon: IconName; label: string; val
 }
 
 /** The app mark (three rising bars) drawn with views, so it needs no image. */
-function BrandMark() {
-  return (
-    <Animated.View entering={FadeIn.duration(400)}>
-      <FokDayMark size={110} />
-    </Animated.View>
-  );
-}
 
 const styles = StyleSheet.create({
   top: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingBottom: space.sm },
