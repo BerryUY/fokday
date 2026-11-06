@@ -19,7 +19,6 @@ const base: ReminderState = {
   streakDoneToday: true,
   shields: 0,
   usualHours: DEFAULT_HOURS,
-  intensity: 'insistente',
   off: [],
 };
 
@@ -69,25 +68,22 @@ describe('planReminders', () => {
     expect(lunch?.at.getMinutes()).toBe(45);
   });
 
-  it('keeps to the limit of each intensity, the streak first', () => {
-    const busy: Partial<ReminderState> = { streakDoneToday: false, features: ['water', 'creatine'], trainingDays: [2], pendingTodosToday: 2, now: new Date(2026, 9, 27, 7, 0) };
-    for (const intensity of ['suave', 'normal', 'insistente'] as const) {
-      const today = onDay({ ...busy, intensity }, '2026-10-27');
-      expect(today.length).toBeLessThanOrEqual(DAILY_LIMIT[intensity]);
-      expect(today.map((n) => n.id)).toContain('streak-2026-10-27');
-    }
-    expect(onDay({ ...busy, intensity: 'suave' }, '2026-10-27').map((n) => n.id).sort()).toEqual(['streak-2026-10-27', 'streak-last-2026-10-27', 'streak-noon-2026-10-27']);
+  it('sends at most 6 a day, the streak first', () => {
+    const busy: Partial<ReminderState> = { streakDoneToday: false, features: ['water', 'creatine'], trainingDays: [2], pendingTodosToday: 2, proteinLeft: 50, now: new Date(2026, 9, 27, 7, 0) };
+    const today = onDay(busy, '2026-10-27');
+    expect(today).toHaveLength(DAILY_LIMIT);
+    expect(today.map((n) => n.id)).toEqual(expect.arrayContaining(['streak-2026-10-27', 'streak-noon-2026-10-27', 'streak-last-2026-10-27']));
   });
 
   it('covers the whole day, not only the evening', () => {
     const partsOf = (list: { at: Date }[]) => new Set(list.map((n) => { const h = n.at.getHours(); return h < 12 ? 'mañana' : h < 16 ? 'mediodía' : h < 19 ? 'tarde' : 'noche'; }));
     const early = new Date(2026, 9, 27, 7, 0);
     // Someone with no extras, on a day that doesn't count yet and on one that already does.
-    expect(partsOf(onDay({ now: early, intensity: 'normal', streakDoneToday: false }, '2026-10-27')).size).toBe(4);
-    expect(partsOf(onDay({ now: early, intensity: 'normal', streakDoneToday: true }, '2026-10-27')).size).toBe(4);
+    expect(partsOf(onDay({ now: early, streakDoneToday: false }, '2026-10-27')).size).toBe(4);
+    expect(partsOf(onDay({ now: early, streakDoneToday: true }, '2026-10-27')).size).toBe(4);
     // And tomorrow, without having opened the app.
-    expect(partsOf(onDay({ now: early, intensity: 'normal', streakDoneToday: true }, '2026-10-28')).size).toBe(4);
-    expect(onDay({ now: early, intensity: 'normal', streakDoneToday: true }, '2026-10-28').length).toBeGreaterThanOrEqual(5);
+    expect(partsOf(onDay({ now: early, streakDoneToday: true }, '2026-10-28')).size).toBe(4);
+    expect(onDay({ now: early, streakDoneToday: true }, '2026-10-28').length).toBeGreaterThanOrEqual(5);
   });
 
   it('leaves out the kinds turned off in Ajustes', () => {

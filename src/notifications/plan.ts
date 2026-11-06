@@ -12,16 +12,8 @@ import type { ChannelKey } from './channels';
  * picked so that every part of the day keeps some.
  */
 
-export type Intensity = 'suave' | 'normal' | 'insistente';
-
 /** How many messages a day, at most. */
-export const DAILY_LIMIT: Record<Intensity, number> = { suave: 3, normal: 6, insistente: 9 };
-
-export const INTENSITIES: { key: Intensity; label: string; hint: string }[] = [
-  { key: 'suave', label: 'Suave', hint: 'Hasta 3 por día, sobre todo por tu racha' },
-  { key: 'normal', label: 'Normal', hint: 'Hasta 6 por día, repartidas de la mañana a la noche' },
-  { key: 'insistente', label: 'Insistente', hint: 'Hasta 9 por día: no se te pasa nada' },
-];
+export const DAILY_LIMIT = 6;
 
 export type UsualHours = { breakfast: number; lunch: number; dinner: number };
 export const DEFAULT_HOURS: UsualHours = { breakfast: 9, lunch: 13, dinner: 20.5 };
@@ -48,7 +40,6 @@ export type ReminderState = {
   streakDoneToday: boolean;
   shields: number;
   usualHours: UsualHours;
-  intensity: Intensity;
   /** Channels the person turned off in Ajustes. */
   off: ChannelKey[];
 };
@@ -192,7 +183,6 @@ export function planReminders(s: ReminderState): PlannedNotification[] {
   const hi = s.name ? `, ${s.name}` : '';
   const has = (f: FeatureKey) => s.features.includes(f);
   const out: PlannedNotification[] = [];
-  const limit = DAILY_LIMIT[s.intensity];
 
   for (let d = 0; d < PLAN_DAYS; d++) {
     const today = d === 0;
@@ -262,14 +252,14 @@ export function planReminders(s: ReminderState): PlannedNotification[] {
       }
     }
 
-    out.push(...spreadOverDay(list.filter((n) => !s.off.includes(n.channel)), limit));
+    out.push(...spreadOverDay(list.filter((n) => !s.off.includes(n.channel)), DAILY_LIMIT));
   }
 
   // Weigh-in: next Monday morning, only if the last one is a week old or missing.
   const lastWeight = s.lastWeightDate ? new Date(`${s.lastWeightDate}T12:00:00`) : null;
   const daysToMonday = (8 - s.now.getDay()) % 7 || 7;
   const monday = at(s.now, s.now.getDay() === 1 && s.now.getHours() < 8 ? 0 : daysToMonday, 8.5);
-  if ((!lastWeight || monday.getTime() - lastWeight.getTime() >= 6 * 86_400_000) && !s.off.includes('other') && s.intensity !== 'suave') {
+  if ((!lastWeight || monday.getTime() - lastWeight.getTime() >= 6 * 86_400_000) && !s.off.includes('other')) {
     const id = `weight-${key(monday)}`;
     out.push({ id, ...pick(copy.weight(), id), at: monday, channel: 'other', mood: 'happy', url: '/peso/registrar', priority: 8 });
   }

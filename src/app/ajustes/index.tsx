@@ -266,7 +266,7 @@ function SettingsForm({ profile, calories, protein, latest, body }: {
         <Divider style={{ marginHorizontal: space.lg }} />
         <ListRow icon="book" title="Biblioteca de ejercicios" onPress={() => router.push('/ejercicios')} />
         <Divider style={{ marginHorizontal: space.lg }} />
-        <ListRow icon="bell" iconTone="accent" title="Notificaciones" subtitle="Cuánto insiste Foki y sobre qué" onPress={() => router.push('/ajustes/notificaciones')} />
+        <ListRow icon="bell" iconTone="accent" title="Notificaciones" subtitle="Sobre qué te avisa Foki" onPress={() => router.push('/ajustes/notificaciones')} />
         <Divider />
         <ListRow icon="compass" title="Ver el tour de la app" subtitle="Un repaso de 30 segundos" onPress={() => router.push('/tour')} />
         {adsPrivacy ? (

@@ -11,24 +11,19 @@ import { usualHour } from '@/domain/dayPlan';
 import { latestEntry } from '@/domain/weight';
 import { addDays, todayKey } from '@/lib/dates';
 import type { ChannelKey } from './channels';
-import { DEFAULT_HOURS, planReminders, type Intensity, type PlannedNotification, type ReminderState, type UsualHours } from './plan';
+import { DEFAULT_HOURS, planReminders, type PlannedNotification, type ReminderState, type UsualHours } from './plan';
 
-export type NotificationPrefs = { intensity: Intensity; off: ChannelKey[] };
-
-export async function getNotificationPrefs(db: Db): Promise<NotificationPrefs> {
-  const [intensity, off] = await Promise.all([getSetting(db, 'notifications.intensity'), getSetting(db, 'notifications.off')]);
-  let parsed: ChannelKey[] = [];
+/** The kinds of message turned off in Ajustes. */
+export async function getMutedKinds(db: Db): Promise<ChannelKey[]> {
   try {
-    parsed = JSON.parse(off ?? '[]') as ChannelKey[];
+    return JSON.parse((await getSetting(db, 'notifications.off')) ?? '[]') as ChannelKey[];
   } catch {
-    parsed = [];
+    return [];
   }
-  return { intensity: intensity === 'suave' || intensity === 'insistente' ? intensity : 'normal', off: parsed };
 }
 
-export async function saveNotificationPrefs(db: Db, prefs: NotificationPrefs): Promise<void> {
-  await setSetting(db, 'notifications.intensity', prefs.intensity);
-  await setSetting(db, 'notifications.off', JSON.stringify(prefs.off));
+export async function saveMutedKinds(db: Db, off: ChannelKey[]): Promise<void> {
+  await setSetting(db, 'notifications.off', JSON.stringify(off));
 }
 
 /** The hours this person really eats, from the last three weeks. Until there's enough data, the usual ones. */
@@ -51,7 +46,7 @@ async function learnHours(db: Db, today: string): Promise<UsualHours> {
 
 export async function reminderState(db: Db): Promise<ReminderState> {
   const today = todayKey();
-  const [profile, attendance, logs, habits, todos, weights, streak, routines, totals, goal, prefs, usualHours] = await Promise.all([
+  const [profile, attendance, logs, habits, todos, weights, streak, routines, totals, goal, off, usualHours] = await Promise.all([
     getProfile(db),
     getAttendance(db, today),
     getLogsForDate(db, today),
@@ -62,7 +57,7 @@ export async function reminderState(db: Db): Promise<ReminderState> {
     listRoutines(db),
     getDailyTotals(db, today),
     getGoalForDate(db, today),
-    getNotificationPrefs(db),
+    getMutedKinds(db),
     learnHours(db, today),
   ]);
   const byWeekday: Record<number, string> = {};
@@ -85,8 +80,7 @@ export async function reminderState(db: Db): Promise<ReminderState> {
     streakDoneToday: streak.doneToday,
     shields: streak.shields,
     usualHours,
-    intensity: prefs.intensity,
-    off: prefs.off,
+    off,
   };
 }
 
