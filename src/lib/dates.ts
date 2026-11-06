@@ -169,3 +169,9 @@ export function formatMinutes(totalSeconds: number): string {
 export function formatDateTime(iso: string): string {
   return `${formatShort(toDateKey(new Date(iso)))} ${formatTime(iso)}`;
 }
+
+/** "Lun, Mié y Vie": weekdays in order, Monday first. */
+export function daysLabel(days: number[]): string {
+  const names = WEEK_ORDER.filter((d) => days.includes(d)).map((d) => DAY_SHORT[d]);
+  return names.length > 1 ? `${names.slice(0, -1).join(', ')} y ${names[names.length - 1]}` : names.join('');
+}

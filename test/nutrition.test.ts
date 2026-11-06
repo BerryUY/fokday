@@ -10,7 +10,7 @@ import {
   updateMealLog,
 } from '@/data/meals';
 import { getGoalForDate, setGoalsFrom } from '@/data/settings';
-import { goalProgress, scaleNutrition, sumDailyTotals } from '@/domain/nutrition';
+import { extraTargets, goalProgress, scaleNutrition, sumDailyTotals } from '@/domain/nutrition';
 import { toDateKey } from '@/lib/dates';
 import { createTestDb } from './helpers/db';
 
@@ -152,5 +152,14 @@ describe('America/Montevideo day boundaries', () => {
     // 01:30 UTC on the 11th is 22:30 on the 10th in Montevideo (UTC−3).
     expect(toDateKey(new Date('2026-03-11T01:30:00Z'))).toBe('2026-03-10');
     expect(toDateKey(new Date('2026-03-11T03:00:00Z'))).toBe('2026-03-11');
+  });
+});
+
+describe('extraTargets', () => {
+  it('splits the calories left after protein and fat into carbs', () => {
+    expect(extraTargets(2000, 100)).toEqual({ carbs: 249, fat: 67, fiber: 28, dairy: 3 });
+  });
+  it('never asks for negative carbs', () => {
+    expect(extraTargets(600, 200).carbs).toBe(0);
   });
 });

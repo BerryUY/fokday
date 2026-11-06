@@ -5,22 +5,24 @@ import {
   StackSansHeadline_700Bold,
   useFonts,
 } from '@expo-google-fonts/stack-sans-headline';
+import { JetBrainsMono_700Bold } from '@expo-google-fonts/jetbrains-mono';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAccount } from '@/auth/account';
 import { startBackupService } from '@/backup/service';
 import { refreshPlan, syncPurchasesAccount, usePro } from '@/billing/pro';
 import { LaunchAnimation } from '@/components/brand/LaunchAnimation';
-import { StreakCelebration } from '@/components/streak';
+import { StreakCelebration, StreakNotice } from '@/components/streak';
 import { SummaryNotice } from '@/components/SummaryNotice';
 import { DialogHost } from '@/components/ui/dialog';
 import { PortalProvider } from '@/components/ui/portal';
 import { getProfile, type ThemePreference } from '@/data/settings';
+import { NotificationRouter } from '@/notifications/NotificationRouter';
 import { applyReminders } from '@/notifications/schedule';
 import { openAppDatabase } from '@/db/client';
 import type { Db } from '@/db/types';
@@ -33,7 +35,7 @@ import { setSoundsEnabled } from '@/lib/sound';
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({ StackSansHeadline_400Regular, StackSansHeadline_500Medium, StackSansHeadline_600SemiBold, StackSansHeadline_700Bold });
+  const [fontsLoaded, fontError] = useFonts({ StackSansHeadline_400Regular, StackSansHeadline_500Medium, StackSansHeadline_600SemiBold, StackSansHeadline_700Bold, JetBrainsMono_700Bold });
   const [db, setDb] = useState<Db | null>(null);
   const [dbError, setDbError] = useState<Error | null>(null);
 
@@ -112,6 +114,7 @@ function ThemedApp() {
         <PortalProvider>
           <Navigator />
           <StreakCelebration enabled={!launching} />
+          <StreakNotice enabled={!launching} />
           <SummaryNotice />
           <DialogHost />
         </PortalProvider>
@@ -136,6 +139,7 @@ function Navigator() {
         <Stack.Screen name="sesion/activa" options={{ gestureEnabled: false }} />
         <Stack.Screen name="tour" options={{ animation: 'fade_from_bottom' }} />
       </Stack>
+      {Platform.OS !== 'web' ? <NotificationRouter /> : null}
     </View>
   );
 }

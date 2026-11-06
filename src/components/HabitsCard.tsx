@@ -64,14 +64,28 @@ function Water({ date, ml, goal }: { date: string; ml: number; goal: number }) {
           </Animated.View>
         ) : null}
       </Row>
-      <View style={styles.glasses}>
-        {Array.from({ length: glasses }, (_, i) => (
-          <Glass key={i} full={i < filled} onPress={() => tap(i)} />
+      {/* Explicit rows instead of flexWrap: the height never depends on how the row happens to wrap. */}
+      <View style={{ gap: 6 }}>
+        {glassRows(glasses).map((row) => (
+          <View key={row[0]} style={styles.glasses}>
+            {row.map((i) => (
+              <Glass key={i} full={i < filled} onPress={() => tap(i)} />
+            ))}
+          </View>
         ))}
       </View>
       <T variant="caption" tone="dim">Cada vaso son 250 ml. Tocá para sumar o quitar.</T>
     </View>
   );
+}
+
+const MAX_PER_ROW = 6;
+
+/** Splits the glasses into rows of the same length, with at most six in each. */
+function glassRows(total: number): number[][] {
+  const rows = Math.ceil(total / MAX_PER_ROW);
+  const perRow = Math.ceil(total / rows);
+  return Array.from({ length: rows }, (_, r) => Array.from({ length: Math.min(perRow, total - r * perRow) }, (_, i) => r * perRow + i));
 }
 
 function Glass({ full, onPress }: { full: boolean; onPress: () => void }) {
@@ -129,8 +143,8 @@ function Creatine({ date, taken, streak }: { date: string; taken: boolean; strea
 }
 
 const styles = StyleSheet.create({
-  glasses: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  glass: { width: 36, height: 44, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  glasses: { flexDirection: 'row', gap: 6 },
+  glass: { flex: 1, maxWidth: 56, height: 44, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   water: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   creatine: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, borderRadius: radius.lg, borderWidth: 1.5, overflow: 'hidden' },
   circle: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },

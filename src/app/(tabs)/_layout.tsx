@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isOnboarded } from '@/data/settings';
+import { registerTabs } from '@/lib/tabs';
 import { useQuery } from '@/state/db';
 import { haptic } from '@/state/toast';
 import { useColors } from '@/theme/ThemeProvider';
@@ -40,6 +41,15 @@ function TabBar({ state, navigateToTab }: MaterialTopTabBarProps) {
   const routes = state.routes.filter((r) => TABS[r.name]);
   const current = state.routes[state.index]?.key;
   const unit = (width - PAD * 2 - GAP * (routes.length - 1)) / (routes.length - 1 + GROW);
+
+  useEffect(() => {
+    registerTabs((name) => {
+      const route = state.routes.find((r) => r.name === name);
+      if (route) navigateToTab(route.key);
+      return !!route;
+    });
+    return () => registerTabs(null);
+  }, [state.routes, navigateToTab]);
 
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 10) }]}>

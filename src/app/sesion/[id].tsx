@@ -2,24 +2,28 @@ import { router } from 'expo-router';
 import { goBack } from '@/lib/nav';
 import { View } from 'react-native';
 import { DateChip } from '@/components/DatePicker';
+import { Foki } from '@/components/mascot/Foki';
 import { SessionExerciseCard } from '@/components/SessionExercise';
 import { confirm } from '@/components/ui/form';
 import { EmptyState, Loading, Screen } from '@/components/ui/layout';
 import { Badge, Button, Card, Row, T } from '@/components/ui/primitives';
-import { deleteSession, getSession, updateSessionMeta } from '@/data/workouts';
+import { deleteSession, getSession, getSessionRecords, updateSessionMeta } from '@/data/workouts';
 import { capitalize, formatDuration, formatLong, formatTime } from '@/lib/dates';
-import { formatNumber } from '@/lib/format';
+import { formatNumber, toInput } from '@/lib/format';
 import { useParams } from '@/lib/params';
 import { useMutation, useQuery } from '@/state/db';
 import { space } from '@/theme/tokens';
 
 /** A finished session, fully editable: date, sets, weights, reps and exercises (history stays correctable). */
 export default function SessionDetailScreen() {
-  const id = useParams().string('id') ?? '';
+  const params = useParams();
+  const id = params.string('id') ?? '';
+  const justFinished = params.string('done') === '1';
   const run = useMutation();
-  const { data: session, loading } = useQuery((db) => getSession(db, id), [id]);
+  const { data, loading } = useQuery(async (db) => ({ session: await getSession(db, id), records: await getSessionRecords(db, id) }), [id]);
+  const session = data?.session;
 
-  if (loading && !session) return <Screen title="Entrenamiento"><Loading /></Screen>;
+  if (loading && !data) return <Screen title="Entrenamiento"><Loading /></Screen>;
   if (!session) return <Screen title="Entrenamiento"><EmptyState icon="alert-circle" title="Este entrenamiento ya no existe" /></Screen>;
   if (session.status === 'in_progress') {
     return (
@@ -40,7 +44,27 @@ export default function SessionDetailScreen() {
   };
 
   return (
-    <Screen title={session.routineName ?? 'Entrenamiento libre'} subtitle={capitalize(formatLong(session.date))}>
+    <Screen title={session.routineName ?? 'Entrenamiento libre'} subtitle={capitalize(formatLong(session.date))} onBack={justFinished ? () => router.replace('/') : undefined}>
+      {justFinished ? (
+        <View style={{ alignItems: 'center', paddingVertical: space.lg }}>
+          <Foki mood="cheer" size={130} />
+          <T variant="title" style={{ marginTop: space.md, textAlign: 'center' }}>¡Entrenamiento terminado!</T>
+          <T variant="label" tone="muted" style={{ marginTop: 2, textAlign: 'center' }}>Un día más en tu racha.</T>
+        </View>
+      ) : null}
+
+      {data.records.length ? (
+        <Card tone="accent" style={{ marginBottom: space.md, gap: space.sm }}>
+          <T variant="h3">{data.records.length === 1 ? 'Récord nuevo' : `${data.records.length} récords nuevos`}</T>
+          {data.records.map((r) => (
+            <Row key={r.name} style={{ justifyContent: 'space-between' }}>
+              <T variant="label" style={{ flexShrink: 1 }}>{r.name}</T>
+              <T variant="label" tone="accent">{toInput(r.previous, 2)} → {toInput(r.weight, 2)} kg</T>
+            </Row>
+          ))}
+        </Card>
+      ) : null}
+
       <Card style={{ padding: space.xl }}>
         <Row style={{ justifyContent: 'space-between' }}>
           <Badge label="Completado · editable" />

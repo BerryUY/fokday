@@ -53,8 +53,10 @@
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#2CF07A",
-          "defaultChannel": "recordatorios"
+          "largeIcon": "./assets/notifications/foki_happy.png",
+          "color": "#C8F560",
+          "defaultChannel": "foki_avisos",
+          "sounds": ["./assets/sounds/reward.wav"]
         }
       ],
       [
@@ -104,7 +106,8 @@
           }
         }
       ],
-      "./plugins/withWorkManager"
+      "./plugins/withWorkManager",
+      "./plugins/withNotificationArt"
     ],
     "extra": {
       "router": {

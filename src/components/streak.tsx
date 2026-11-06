@@ -4,15 +4,17 @@ import { useEffect, useState } from 'react';
 import { Modal, StyleSheet, View } from 'react-native';
 import Animated, { Easing, FadeIn, ZoomIn } from 'react-native-reanimated';
 import { getMeta, setMeta } from '@/backup/snapshot';
-import { getStreak } from '@/data/streak';
-import { milestoneAt, type Streak } from '@/domain/streak';
+import { getStreak, settleVault } from '@/data/streak';
+import { milestoneAt, type Streak, type StreakEvent } from '@/domain/streak';
 import { DAY_LETTER, todayKey, weekday } from '@/lib/dates';
 import { playReward } from '@/lib/sound';
-import { useDb, useQuery } from '@/state/db';
-import { haptic } from '@/state/toast';
+import { notifyDataChanged } from '@/state/dataBus';
+import { useDataVersion, useDb, useQuery } from '@/state/db';
+import { haptic, useToast } from '@/state/toast';
 import { useColors } from '@/theme/ThemeProvider';
 import { radius, space } from '@/theme/tokens';
 import { Flame } from './Flame';
+import { Foki } from './mascot/Foki';
 import { Button, PressableScale, Row, T } from './ui/primitives';
 
 const days = (n: number) => `${n} ${n === 1 ? 'día' : 'días'}`;
@@ -35,23 +37,6 @@ export function StreakChip({ streak }: { streak: Streak }) {
   );
 }
 
-/** Shown on Inicio only while today doesn't count yet: the nudge that protects the streak. */
-export function StreakBanner({ streak }: { streak: Streak }) {
-  const c = useColors();
-  if (streak.doneToday) return null;
-  const atRisk = streak.current > 0;
-  return (
-    <PressableScale onPress={() => router.push('/racha')} style={[styles.banner, { backgroundColor: c.streakSoft }]} accessibilityRole="button">
-      <Flame size={32} />
-      <View style={{ flex: 1 }}>
-        <T variant="bodyMedium" color={c.streak}>{atRisk ? `No pierdas tu racha de ${days(streak.current)}` : 'Arrancá tu racha hoy'}</T>
-        <T variant="caption" tone="muted">Registrá una comida o un entrenamiento.</T>
-      </View>
-      <MaterialCommunityIcons name="chevron-right" size={20} color={c.streak} />
-    </PressableScale>
-  );
-}
-
 /** Monday-first week with a flame on every day that counted. */
 export function StreakWeek({ streak, size = 38 }: { streak: Streak; size?: number }) {
   const c = useColors();
@@ -67,13 +52,13 @@ export function StreakWeek({ streak, size = 38 }: { streak: Streak; size?: numbe
               borderRadius: size / 2,
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: d.done ? c.streak : c.surfaceAlt,
+              backgroundColor: d.done ? c.streak : d.frozen ? c.proteinSoft : c.surfaceAlt,
               borderWidth: d.isToday && !d.done ? 2 : 0,
               borderColor: c.streak,
               opacity: d.future ? 0.45 : 1,
             }}
           >
-            {d.done ? <MaterialCommunityIcons name="fire" size={size * 0.55} color="#1A0F02" /> : null}
+            {d.done ? <MaterialCommunityIcons name="fire" size={size * 0.55} color="#1A0F02" /> : d.frozen ? <MaterialCommunityIcons name="shield-check" size={size * 0.55} color={c.protein} /> : null}
           </View>
         </View>
       ))}
@@ -130,9 +115,50 @@ export function StreakCelebration({ enabled }: { enabled: boolean }) {
   );
 }
 
+/**
+ * Tells what happened to the streak while the app was closed: a shield covered the missed days, or
+ * the streak went out. A new shield earned is just a toast.
+ */
+export function StreakNotice({ enabled }: { enabled: boolean }) {
+  const c = useColors();
+  const db = useDb();
+  const toast = useToast();
+  const version = useDataVersion();
+  const today = todayKey();
+  const [event, setEvent] = useState<StreakEvent | null>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+    void settleVault(db, today).then((e) => {
+      if (!e) return;
+      notifyDataChanged();
+      if (e.kind === 'earned') toast.show('¡Ganaste un protector de racha!');
+      else setEvent(e);
+    });
+  }, [enabled, db, today, version, toast]);
+
+  if (!event || event.kind === 'earned') return null;
+  const saved = event.kind === 'saved';
+  return (
+    <Modal transparent animationType="fade" visible onRequestClose={() => setEvent(null)} statusBarTranslucent>
+      <View style={[styles.overlay, { backgroundColor: c.overlay }]}>
+        <Animated.View entering={FadeIn.duration(220)} style={[styles.card, { backgroundColor: c.surface }]}>
+          <Foki mood={saved ? 'proud' : 'sad'} lit={saved} size={120} />
+          <T variant="title" style={{ textAlign: 'center', marginTop: space.lg }}>{saved ? 'Te salvé la racha' : `Se apagó tu racha de ${days(event.streak)}`}</T>
+          <T variant="label" tone="muted" style={{ textAlign: 'center', marginTop: space.xs }}>
+            {saved
+              ? `Usé ${event.days === 1 ? 'un protector' : `${event.days} protectores`} para cubrir ${event.days === 1 ? 'el día que faltaste' : 'los días que faltaste'}. Seguís con ${days(event.streak)}.`
+              : 'Pasa. Lo que importa es volver: registrá algo hoy y prendemos una nueva.'}
+          </T>
+          <Button label={saved ? '¡Gracias, Foki!' : 'Empezar de nuevo'} size="lg" full style={{ marginTop: space.xl }} onPress={() => setEvent(null)} />
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
 const styles = StyleSheet.create({
   chip: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 40, paddingHorizontal: 12, borderRadius: radius.pill, borderWidth: 1 },
-  banner: { flexDirection: 'row', alignItems: 'center', gap: space.md, borderRadius: radius.lg, padding: space.lg },
   overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.xl },
   card: { width: '100%', maxWidth: 380, borderRadius: radius.xl, padding: space.xl, alignItems: 'center' },
   flame: { width: 132, height: 132, borderRadius: 66, alignItems: 'center', justifyContent: 'center', marginBottom: space.md },

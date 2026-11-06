@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
+    "@expo-google-fonts/jetbrains-mono": "^0.4.1",
     "@expo-google-fonts/stack-sans-headline": "^0.4.0",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-community/netinfo": "12.0.1",
@@ -21,6 +22,7 @@
     "expo-haptics": "~58.0.7",
     "expo-image-manipulator": "~58.0.16",
     "expo-image-picker": "~58.0.10",
+    "expo-keep-awake": "~58.0.3",
     "expo-linking": "~58.0.15",
     "expo-notifications": "~58.1.7",
     "expo-router": "~58.0.28",
@@ -52,6 +54,7 @@
     "eslint": "^9.0.0",
     "eslint-config-expo": "~58.0.4",
     "jest": "~30.5.2",
+    "patch-package": "^8.0.1",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -62,7 +65,8 @@
     "typecheck": "tsc --noEmit",
     "build:apk": "npx eas-cli@latest build --platform android --profile preview",
     "build:apk:local": "npx eas-cli@latest build --platform android --profile preview --local",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "postinstall": "patch-package"
   },
   "private": true
 }

@@ -203,7 +203,7 @@ function SettingsForm({ profile, calories, protein, latest, body }: {
 
       <Card tone="alt" style={{ marginTop: space.xl }}>
         <T variant="caption" tone="muted">
-          Los recordatorios son automáticos: te avisamos solo lo que falta (gym, comidas, agua, creatina, tareas) y en un buen horario. Podés silenciarlos desde los ajustes de notificaciones del teléfono.
+          Foki te avisa solo lo que falta y a las horas en que solés comer.
         </T>
       </Card>
 
@@ -270,6 +270,8 @@ function SettingsForm({ profile, calories, protein, latest, body }: {
         <Divider style={{ marginHorizontal: space.lg }} />
         <ListRow icon="book" title="Biblioteca de ejercicios" onPress={() => router.push('/ejercicios')} />
         <Divider style={{ marginHorizontal: space.lg }} />
+        <ListRow icon="bell" iconTone="accent" title="Notificaciones" subtitle="Cuánto insiste Foki y sobre qué" onPress={() => router.push('/ajustes/notificaciones')} />
+        <Divider />
         <ListRow icon="compass" title="Ver el tour de la app" subtitle="Un repaso de 30 segundos" onPress={() => router.push('/tour')} />
         {adsPrivacy ? (
           <>

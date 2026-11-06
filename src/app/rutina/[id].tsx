@@ -2,10 +2,9 @@ import { router } from 'expo-router';
 import { goBack } from '@/lib/nav';
 import { useState } from 'react';
 import { View } from 'react-native';
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { Field, Sheet, Stepper, confirm } from '@/components/ui/form';
-import { EmptyState, Loading, Screen } from '@/components/ui/layout';
-import { Button, Card, Chip, IconButton, Row, SectionHeader, T } from '@/components/ui/primitives';
+import { EmptyState, ListRow, Loading, Screen } from '@/components/ui/layout';
+import { Button, Card, Chip, Divider, IconButton, PressableScale, Row, SectionHeader, T } from '@/components/ui/primitives';
 import {
   deleteRoutine,
   exercisesForWeekday,
@@ -19,10 +18,11 @@ import {
   type RoutineExercise,
 } from '@/data/routines';
 import { getActiveSession, startSession } from '@/data/workouts';
-import { DAY_SHORT, todayKey, weekday, WEEK_ORDER } from '@/lib/dates';
+import { DAY_LETTER, DAY_LONG, DAY_SHORT, daysLabel, todayKey, weekday, WEEK_ORDER } from '@/lib/dates';
 import { parsePositive } from '@/lib/format';
 import { useParams } from '@/lib/params';
 import { useMutation, useQuery } from '@/state/db';
+import { useColors } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
 
 export default function RoutineScreen() {
@@ -54,6 +54,8 @@ export default function RoutineScreen() {
     if (sessionId) router.push('/sesion/activa');
   };
 
+  const addExercise = () => router.push({ pathname: '/ejercicios', params: { pick: 'routine', target: routine.id } });
+
   const remove = async () => {
     const ok = await confirm('Eliminar rutina', `Se elimina “${routine.name}”. Los entrenamientos que ya hiciste con ella se conservan en el historial.`, 'Eliminar', true);
     if (!ok) return;
@@ -65,88 +67,56 @@ export default function RoutineScreen() {
     <Screen
       title={routine.name}
       subtitle={`${routine.exerciseCount} ejercicios · ${routine.totalSets} series`}
-      right={<IconButton icon="plus" label="Agregar ejercicio" onPress={() => router.push({ pathname: '/ejercicios', params: { pick: 'routine', target: routine.id } })} />}
+      right={<IconButton icon="edit-2" label="Cambiar el nombre" onPress={() => setRenaming(true)} />}
       footer={
         data?.active ? (
           <Button label="Continuar entrenamiento" icon="play" size="lg" onPress={() => router.push('/sesion/activa')} />
         ) : (
-          <Button label={shownDay === 'all' ? 'Iniciar entrenamiento' : `Iniciar entrenamiento · ${DAY_SHORT[shownDay]}`} icon="play" size="lg" onPress={start} disabled={shown.length === 0} />
+          <Button label="Empezar" icon="play" size="lg" onPress={start} disabled={shown.length === 0} />
         )
       }
     >
-      <Card onPress={() => setRenaming(true)} style={{ marginBottom: space.md }}>
-        <Row gap={space.md}>
-          <View style={{ flex: 1 }}>
-            <T variant="overline" tone="dim">Rutina</T>
-            <T variant="h2" style={{ marginTop: 2 }}>{routine.name}</T>
-          </View>
-          <Button label="Editar" icon="edit-2" size="sm" variant="secondary" onPress={() => setRenaming(true)} />
-        </Row>
-      </Card>
-
       <Card>
-        <SectionHeader title="Días asignados" />
-        <Row style={{ flexWrap: 'wrap' }} gap={6}>
+        <T variant="h3">¿Qué días la hacés?</T>
+        <Row style={{ justifyContent: 'space-between', marginTop: space.md }}>
           {WEEK_ORDER.map((d) => (
-            <Chip key={d} label={DAY_SHORT[d]} compact selected={routine.weekdays.includes(d)} onPress={() => toggleDay(d)} />
+            <DayToggle key={d} day={d} selected={routine.weekdays.includes(d)} onPress={() => toggleDay(d)} />
           ))}
         </Row>
-        <T variant="caption" tone="dim" style={{ marginTop: space.sm }}>Cada día tiene una sola rutina: si elegís un día ocupado, pasa a esta.</T>
       </Card>
 
       <View style={{ marginTop: space.xl }}>
-        <SectionHeader
-          title="Ejercicios"
-          action="Agregar"
-          onAction={() => router.push({ pathname: '/ejercicios', params: { pick: 'routine', target: routine.id } })}
-        />
+        <SectionHeader title="Ejercicios" action="Agregar" onAction={addExercise} />
         {routine.exercises.length === 0 ? (
           <Card>
-            <EmptyState
-              icon="plus-circle"
-              title="Agregá ejercicios"
-              message="Elegilos de tu biblioteca o creá nuevos. Después ajustás series, repeticiones y descanso."
-              action={<Button label="Agregar ejercicio" icon="plus" onPress={() => router.push({ pathname: '/ejercicios', params: { pick: 'routine', target: routine.id } })} />}
-            />
+            <EmptyState icon="plus-circle" title="Sumá tu primer ejercicio" message="Elegilos de la lista y después ajustás series y repeticiones." action={<Button label="Agregar ejercicio" icon="plus" onPress={addExercise} />} />
           </Card>
         ) : (
           <View style={{ gap: space.sm }}>
-            <Row style={{ flexWrap: 'wrap' }} gap={6}>
-              <Chip label="Todos" compact selected={shownDay === 'all'} onPress={() => setView('all')} />
-              {WEEK_ORDER.map((d) => (
-                <Chip key={d} label={DAY_SHORT[d]} compact selected={shownDay === d} onPress={() => setView(d)} />
-              ))}
-            </Row>
-            {shownDay !== 'all' && shown.length === 0 ? <T variant="label" tone="muted">Ese día no tiene ejercicios. Asignalos desde el lápiz de cada ejercicio.</T> : null}
-            <T variant="caption" tone="dim">Tocá un ejercicio para cambiar series, repeticiones, descanso o notas. Usá las flechas para reordenar.{data?.active ? ' Los cambios valen desde el próximo entrenamiento; el que está en curso no cambia.' : ''}</T>
-            {shown.map((ex, i) => (
-              <Animated.View key={ex.id} layout={LinearTransition.duration(220)} entering={FadeInDown.delay(i * 25)}>
-                <Card style={{ paddingVertical: space.md }} onPress={() => setEditing(ex)}>
-                  <Row align="center" gap={space.md}>
-                    <View style={{ flex: 1 }}>
-                      <T variant="h3">{ex.name}</T>
-                      <T variant="caption" tone="dim">{ex.muscleGroup}</T>
-                      <Row gap={space.md} style={{ marginTop: 6 }}>
-                        <T variant="label" tone="accent">{ex.sets} × {formatReps(ex.repsMin, ex.repsMax)}</T>
-                        {ex.restSeconds ? <T variant="label" tone="muted">Descanso {ex.restSeconds} s</T> : null}
-                      </Row>
-                      <T variant="caption" tone="dim" style={{ marginTop: 2 }}>{ex.days.length ? ex.days.map((d) => DAY_SHORT[d]).join(' · ') : 'Todos los días'}</T>
-                    </View>
-                    <IconButton icon="edit-2" label={`Editar ${ex.name}`} size={32} onPress={() => setEditing(ex)} />
-                    <View style={{ gap: 6 }}>
-                      <IconButton icon="chevron-up" label="Subir" size={32} onPress={i > 0 ? () => run((db) => moveRoutineExercise(db, routine.id, ex.id, -1)) : undefined} style={i === 0 && { opacity: 0.3 }} />
-                      <IconButton
-                        icon="chevron-down"
-                        label="Bajar"
-                        size={32}
-                        onPress={i < shown.length - 1 ? () => run((db) => moveRoutineExercise(db, routine.id, ex.id, 1)) : undefined}
-                        style={i === shown.length - 1 && { opacity: 0.3 }}
-                      />
-                    </View>
-                  </Row>
-                </Card>
-              </Animated.View>
-            ))}
+            {splitByDay ? (
+              <Row style={{ flexWrap: 'wrap' }} gap={6}>
+                <Chip label="Todos" compact selected={shownDay === 'all'} onPress={() => setView('all')} />
+                {WEEK_ORDER.map((d) => (
+                  <Chip key={d} label={DAY_SHORT[d]} compact selected={shownDay === d} onPress={() => setView(d)} />
+                ))}
+              </Row>
+            ) : null}
+            {shownDay !== 'all' && shown.length === 0 ? <T variant="label" tone="muted">Ese día no tiene ejercicios.</T> : null}
+            {data?.active ? <T variant="caption" tone="dim">Los cambios valen desde el próximo entrenamiento.</T> : null}
+            {shown.length ? (
+              <Card padded={false} style={{ paddingVertical: space.xs }}>
+                {shown.map((ex, i) => (
+                  <View key={ex.id}>
+                    {i > 0 ? <Divider style={{ marginLeft: space.lg }} /> : null}
+                    <ListRow
+                      title={ex.name}
+                      subtitle={`${ex.sets} × ${formatReps(ex.repsMin, ex.repsMax)}${ex.restSeconds ? ` · descanso ${ex.restSeconds} s` : ''}${ex.days.length ? ` · ${daysLabel(ex.days)}` : ''}`}
+                      onPress={() => setEditing(ex)}
+                    />
+                  </View>
+                ))}
+              </Card>
+            ) : null}
           </View>
         )}
       </View>
@@ -166,6 +136,7 @@ export default function RoutineScreen() {
             const ok = await run((db) => removeRoutineExercise(db, editing.id), { success: 'Quitado de la rutina' });
             if (ok !== undefined) setEditing(null);
           }}
+          onMove={(direction) => run((db) => moveRoutineExercise(db, routine.id, editing.id, direction))}
         />
       ) : null}
 
@@ -183,11 +154,29 @@ export default function RoutineScreen() {
   );
 }
 
-function TargetsSheet({ exercise, onClose, onSave, onRemove }: {
+function DayToggle({ day, selected, onPress }: { day: number; selected: boolean; onPress: () => void }) {
+  const c = useColors();
+  return (
+    <PressableScale
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: selected }}
+      accessibilityLabel={DAY_LONG[day]}
+      onPress={onPress}
+      hapticFeedback
+      scaleTo={0.9}
+      style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: selected ? c.accent : c.surfaceAlt }}
+    >
+      <T variant="label" color={selected ? c.accentText : c.textMuted}>{DAY_LETTER[day]}</T>
+    </PressableScale>
+  );
+}
+
+function TargetsSheet({ exercise, onClose, onSave, onRemove, onMove }: {
   exercise: RoutineExercise;
   onClose: () => void;
   onSave: (input: { sets: number; repsMin: number | null; repsMax: number | null; restSeconds: number | null; notes: string | null; days: number[] }) => void;
   onRemove: () => void;
+  onMove: (direction: -1 | 1) => void;
 }) {
   const [sets, setSets] = useState(exercise.sets);
   const [min, setMin] = useState(exercise.repsMin ? String(exercise.repsMin) : '');
@@ -195,6 +184,7 @@ function TargetsSheet({ exercise, onClose, onSave, onRemove }: {
   const [rest, setRest] = useState(exercise.restSeconds ?? 90);
   const [hasRest, setHasRest] = useState(exercise.restSeconds !== null);
   const [days, setDays] = useState<number[]>(exercise.days);
+  const [someDays, setSomeDays] = useState(exercise.days.length > 0);
   const repsMin = min.trim() ? parsePositive(min) : null;
   const repsMax = max.trim() ? parsePositive(max) : null;
   return (
@@ -213,14 +203,22 @@ function TargetsSheet({ exercise, onClose, onSave, onRemove }: {
           {hasRest ? <Stepper value={rest} onChange={setRest} min={15} max={600} step={15} format={(v) => `${v} s`} /> : null}
         </Row>
         <View style={{ gap: 6 }}>
-          <T variant="bodyMedium">¿Qué días lo hacés?</T>
-          <T variant="caption" tone="dim">Si no marcás ninguno, aparece todos los días de la rutina.</T>
-          <Row style={{ flexWrap: 'wrap', marginTop: 4 }} gap={6}>
-            {WEEK_ORDER.map((d) => (
-              <Chip key={d} label={DAY_SHORT[d]} compact selected={days.includes(d)} onPress={() => setDays(days.includes(d) ? days.filter((x) => x !== d) : [...days, d])} />
-            ))}
+          <Row style={{ justifyContent: 'space-between' }}>
+            <T variant="bodyMedium">Solo algunos días</T>
+            <Chip label={someDays ? 'Sí' : 'No'} compact selected={someDays} onPress={() => { setSomeDays(!someDays); if (someDays) setDays([]); }} />
           </Row>
+          {someDays ? (
+            <Row style={{ flexWrap: 'wrap', marginTop: 4 }} gap={6}>
+              {WEEK_ORDER.map((d) => (
+                <Chip key={d} label={DAY_SHORT[d]} compact selected={days.includes(d)} onPress={() => setDays(days.includes(d) ? days.filter((x) => x !== d) : [...days, d])} />
+              ))}
+            </Row>
+          ) : null}
         </View>
+        <Row gap={space.sm}>
+          <Button label="Subir" icon="chevron-up" variant="secondary" size="sm" style={{ flex: 1 }} onPress={() => onMove(-1)} />
+          <Button label="Bajar" icon="chevron-down" variant="secondary" size="sm" style={{ flex: 1 }} onPress={() => onMove(1)} />
+        </Row>
         <Button
           label="Guardar"
           onPress={() =>

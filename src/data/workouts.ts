@@ -191,6 +191,24 @@ export async function updateSet(db: Db, setId: string, patch: { reps?: number | 
   });
 }
 
+/**
+ * Ticks a set with what was actually lifted. If the weight or reps changed, the sets still to come
+ * in this exercise take the same values, so going up in weight is one change and not three.
+ */
+export async function completeSet(db: Db, setId: string, values: { reps: number | null; weight: number | null }): Promise<void> {
+  const before = await db.getFirstAsync<{ reps: number | null; weight: number | null; weId: string; position: number }>(
+    'SELECT reps, weight_kg AS weight, workout_exercise_id AS weId, position FROM workout_sets WHERE id = ?',
+    [setId],
+  );
+  if (!before) return;
+  await updateSet(db, setId, { ...values, isCompleted: true });
+  if (values.reps === before.reps && values.weight === before.weight) return;
+  await db.runAsync(
+    'UPDATE workout_sets SET reps = ?, weight_kg = ?, updated_at = ? WHERE workout_exercise_id = ? AND position > ? AND is_completed = 0',
+    [values.reps, values.weight, nowIso(), before.weId, before.position],
+  );
+}
+
 async function refreshExerciseStatus(db: Db, workoutExerciseId: string) {
   const row = await db.getFirstAsync<{ total: number; done: number; status: ExerciseStatus }>(
     `SELECT count(s.id) AS total, coalesce(sum(s.is_completed), 0) AS done, we.status
@@ -336,6 +354,31 @@ export async function getPreviousPerformance(db: Db, exerciseId: string, exclude
     [last.weId],
   );
   return { sessionId: last.sessionId, date: last.date, sets };
+}
+
+/** What beat your own best in a session: the heaviest weight ever for that exercise. */
+export type SessionRecord = { name: string; weight: number; previous: number };
+
+export async function getSessionRecords(db: Db, sessionId: string): Promise<SessionRecord[]> {
+  const rows = await db.getAllAsync<{ name: string; weight: number; previous: number | null }>(
+    `SELECT we.exercise_name AS name, max(s.weight_kg) AS weight,
+       (SELECT max(s2.weight_kg) FROM workout_sets s2
+          JOIN workout_exercises we2 ON we2.id = s2.workout_exercise_id
+          JOIN workout_sessions ws2 ON ws2.id = we2.session_id
+        WHERE we2.exercise_id = we.exercise_id AND ws2.id <> ? AND ws2.status = 'completed' AND s2.is_completed = 1
+          AND ws2.started_at < (SELECT started_at FROM workout_sessions WHERE id = ?)) AS previous
+     FROM workout_exercises we JOIN workout_sets s ON s.workout_exercise_id = we.id
+     WHERE we.session_id = ? AND s.is_completed = 1 AND s.weight_kg > 0 AND we.exercise_id IS NOT NULL
+     GROUP BY we.id ORDER BY we.position`,
+    [sessionId, sessionId, sessionId],
+  );
+  // A first time isn't a record: there has to be something to beat.
+  return rows.filter((r): r is SessionRecord => r.previous !== null && r.previous > 0 && r.weight > r.previous);
+}
+
+/** Roughly how long a workout takes: about a minute per set plus the rest between sets. */
+export function estimateMinutes(sets: number, restSeconds = 90): number {
+  return Math.max(5, Math.round((sets * (60 + restSeconds)) / 60 / 5) * 5);
 }
 
 export type ExerciseProgressPoint = {

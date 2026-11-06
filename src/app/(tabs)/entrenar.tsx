@@ -1,63 +1,69 @@
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useState, type ComponentProps } from 'react';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { WeekStrip } from '@/components/calendar';
 import { DateChip } from '@/components/DatePicker';
-import { Field, Sheet } from '@/components/ui/form';
+import { Foki } from '@/components/mascot/Foki';
+import { RoutinePicker } from '@/components/RoutinePicker';
+import { Sheet } from '@/components/ui/form';
 import { ListRow, Loading, Screen, TabHeader } from '@/components/ui/layout';
-import { Badge, Button, Card, Chip, Divider, IconButton, PressableScale, Row, SectionHeader, T } from '@/components/ui/primitives';
+import { Reveal } from '@/components/ui/Reveal';
+import { Badge, Button, Card, Chip, Divider, IconButton, Row, Segmented, T } from '@/components/ui/primitives';
 import { activityLabel, listActivities } from '@/data/activities';
-import { getAttendance, getAttendanceStats, markAttendance, removeAttendance } from '@/data/attendance';
-import { exercisesForWeekday, getRoutine, listRoutines, saveRoutine, type RoutineSummary } from '@/data/routines';
-import { getActiveSession, listSessions, listTrainedExercises, startSession } from '@/data/workouts';
-import { DAY_LONG, DAY_SHORT, formatDuration, formatMinutes, formatShort, todayKey, weekday, WEEK_ORDER } from '@/lib/dates';
+import { getAttendance, getAttendanceStats, listAttendance, markAttendance, removeAttendance } from '@/data/attendance';
+import { exercisesForWeekday, getRoutine, listRoutines, type RoutineSummary } from '@/data/routines';
+import { getProfile } from '@/data/settings';
+import { estimateMinutes, getActiveSession, listSessions, listTrainedExercises, startSession } from '@/data/workouts';
+import { DAY_LONG, daysLabel, formatDuration, formatMinutes, formatShort, startOfWeek, todayKey, weekday } from '@/lib/dates';
 import { formatNumber } from '@/lib/format';
-import { useMutation, useQuery } from '@/state/db';
 import { playReward } from '@/lib/sound';
+import { useMutation, useQuery } from '@/state/db';
 import { haptic } from '@/state/toast';
-import { useColors } from '@/theme/ThemeProvider';
-import { radius, space } from '@/theme/tokens';
+import { space } from '@/theme/tokens';
 
-type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
+type Section = 'hoy' | 'rutinas' | 'historial';
+
+const SECTIONS: { key: Section; label: string }[] = [
+  { key: 'hoy', label: 'Hoy' },
+  { key: 'rutinas', label: 'Rutinas' },
+  { key: 'historial', label: 'Historial' },
+];
 
 /**
- * Built around the routine: the one you're doing (today's, or the next one if today is a rest day)
- * is the big card with its exercises and a start button. Then the quick "it happened" actions,
- * this week and month, your routines, and everything you did.
+ * One question per section. Hoy: what do I do today (one big button). Rutinas: my plans.
+ * Historial: what I already did and how I'm progressing.
  */
 export default function TrainScreen() {
-  const c = useColors();
   const run = useMutation();
   const today = todayKey();
-  const [newOpen, setNewOpen] = useState(false);
-  const [newName, setNewName] = useState('');
+  const [section, setSection] = useState<Section>('hoy');
+  const [picking, setPicking] = useState(false);
   const [pastOpen, setPastOpen] = useState(false);
-  const [pickedId, setPickedId] = useState<string | null>(null);
 
   const { data } = useQuery(async (db) => {
-    const [routines, active, stats, attendance, sessions, trained, activities] = await Promise.all([
+    const [routines, active, stats, attendance, week, sessions, trained, activities, profile] = await Promise.all([
       listRoutines(db),
       getActiveSession(db),
       getAttendanceStats(db, today),
       getAttendance(db, today),
+      listAttendance(db, startOfWeek(today), today),
       listSessions(db, null, today),
       listTrainedExercises(db),
-      listActivities(db, undefined, today, 6),
+      listActivities(db, undefined, today, 20),
+      getProfile(db),
     ]);
-    // The main routine: the one you picked, else today's, else the next scheduled one, else the first.
-    const main = featuredRoutine(routines, today, pickedId);
-    const full = main ? await getRoutine(db, main.routine.id) : null;
-    const exercises = full && main ? exercisesForWeekday(full.exercises, main.weekday) : [];
+    const plan = planFor(routines, today);
+    const full = plan ? await getRoutine(db, plan.routine.id) : null;
+    const exercises = full && plan ? exercisesForWeekday(full.exercises, plan.weekday) : [];
     // Workouts and other activities together, newest first.
     const history = [
-      ...sessions.slice(0, 8).map((s) => ({ kind: 'session' as const, date: s.date, key: s.id, item: s })),
+      ...sessions.slice(0, 20).map((s) => ({ kind: 'session' as const, date: s.date, key: s.id, item: s })),
       ...activities.map((a) => ({ kind: 'activity' as const, date: a.date, key: a.id, item: a })),
     ]
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
-      .slice(0, 6);
-    return { routines, active, stats, attendance, trained: trained.slice(0, 5), main, exercises, history };
-  }, [today, pickedId]);
+      .slice(0, 20);
+    return { routines, active, stats, attendance, week, trained, plan, exercises, history, rest: profile.defaultRestSeconds };
+  }, [today]);
 
   if (!data) return <Screen tab><Loading /></Screen>;
 
@@ -65,247 +71,23 @@ export default function TrainScreen() {
     const id = await run((db) => startSession(db, date, routineId, onWeekday));
     if (id) router.push('/sesion/activa');
   };
-  const createRoutine = async () => {
-    const id = await run((db) => saveRoutine(db, { name: newName }));
-    if (id) {
-      setNewOpen(false);
-      setNewName('');
-      router.push({ pathname: '/rutina/[id]', params: { id } });
-    }
-  };
-  const main = data.main;
-  const others = data.routines.filter((r) => r.id !== main?.routine.id);
-  const weekGoal = data.stats.scheduledDays.length;
+  const startPicked = (r: RoutineSummary | null) => start(r?.id ?? null, today, r ? (r.weekdays.includes(weekday(today)) ? weekday(today) : r.weekdays[0] ?? null) : null);
 
   return (
     <Screen tab>
-      <TabHeader title="Entrenar" subtitle={`Hoy · ${DAY_SHORT[weekday(today)]}`} right={<IconButton icon="book-open" label="Guía de ejercicios" onPress={() => router.push('/ejercicios/explorar')} />} />
+      <TabHeader title="Entrenar" right={<IconButton icon="book-open" label="Guía de ejercicios" onPress={() => router.push('/ejercicios/explorar')} />} />
+      <Segmented options={SECTIONS} value={section} onChange={setSection} />
+      <View style={{ height: space.lg }} />
 
-      {data.active ? (
-        <Animated.View entering={FadeInDown.duration(260)}>
-          <Card tone="accent" onPress={() => router.push('/sesion/activa')} style={{ marginBottom: space.lg }}>
-            <Row style={{ justifyContent: 'space-between' }}>
-              <View style={{ flex: 1 }}>
-                <T variant="overline" tone="accent">En curso</T>
-                <T variant="h2" style={{ marginTop: 4 }}>{data.active.routineName ?? 'Entrenamiento libre'}</T>
-                <T variant="caption" tone="muted">Empezó hace {formatMinutes((Date.now() - new Date(data.active.startedAt).getTime()) / 1000)}</T>
-              </View>
-              <Button label="Seguir" icon="play" onPress={() => router.push('/sesion/activa')} />
-            </Row>
-          </Card>
-        </Animated.View>
-      ) : null}
-
-      {/* 1. The routine */}
-      {main ? (
-        <Card style={{ padding: space.xl }}>
-          <Row style={{ justifyContent: 'space-between' }}>
-            <T variant="overline" tone={main.when === 'today' ? 'accent' : 'dim'}>
-              {main.when === 'today' ? 'Hoy te toca' : main.when === 'next' && main.weekday !== null ? `Próxima · ${DAY_LONG[main.weekday]}` : 'Tu rutina'}
-            </T>
-            {data.attendance ? <Badge label="Hoy fuiste ✓" /> : null}
-          </Row>
-          <T variant="display" style={{ marginTop: space.sm }}>{main.routine.name}</T>
-          <T variant="label" tone="muted" style={{ marginTop: 2 }}>
-            {data.exercises.length} ejercicios · {data.exercises.reduce((n, e) => n + e.sets, 0)} series
-          </T>
-          <View style={[styles.list, { borderColor: c.border }]}>
-            {data.exercises.length === 0 ? (
-              <T variant="label" tone="dim" style={{ paddingVertical: space.sm }}>Todavía no tiene ejercicios. Tocá “Ver o editar” para sumarlos.</T>
-            ) : (
-              data.exercises.map((e, i) => (
-                <Row key={e.id} gap={space.md} style={[styles.exercise, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}>
-                  <View style={[styles.num, { backgroundColor: c.surfaceAlt }]}>
-                    <T variant="caption" tone="muted">{i + 1}</T>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <T variant="bodyMedium" numberOfLines={1}>{e.name}</T>
-                    <T variant="caption" tone="dim">{e.muscleGroup}</T>
-                  </View>
-                  <T variant="label" tone="muted">{e.sets} × {e.repsMin && e.repsMax ? `${e.repsMin}–${e.repsMax}` : e.repsMin ?? e.repsMax ?? '—'}</T>
-                </Row>
-              ))
-            )}
-          </View>
-          {!data.active ? (
-            <Button label="Empezar" icon="play" size="lg" style={{ marginTop: space.lg }} onPress={() => start(main.routine.id, today, main.weekday)} />
-          ) : null}
-          <Button label="Ver o editar la rutina" variant="ghost" size="sm" onPress={() => router.push({ pathname: '/rutina/[id]', params: { id: main.routine.id } })} />
-          {others.length ? (
-            <View style={{ marginTop: space.sm }}>
-              <T variant="caption" tone="dim" style={{ marginBottom: 6 }}>¿Hoy hacés otra?</T>
-              <Row style={{ flexWrap: 'wrap' }} gap={6}>
-                {others.map((r) => (
-                  <Chip key={r.id} label={r.name} compact onPress={() => setPickedId(r.id)} />
-                ))}
-              </Row>
-            </View>
-          ) : null}
-        </Card>
+      {section === 'hoy' ? (
+        <Today data={data} today={today} onStart={start} onPick={() => setPicking(true)} />
+      ) : section === 'rutinas' ? (
+        <Routines routines={data.routines} active={!!data.active} today={today} onStart={startPicked} />
       ) : (
-        <Card style={{ padding: space.xl }}>
-          <T variant="title">Armá tu primera rutina</T>
-          <T variant="label" tone="muted" style={{ marginTop: 2 }}>Elegí ejercicios de la guía con fotos y asignalos a tus días de gym.</T>
-          <Button label="Crear rutina" icon="plus" size="lg" style={{ marginTop: space.lg }} onPress={() => setNewOpen(true)} />
-        </Card>
+        <History history={data.history} trained={data.trained} onPast={() => setPastOpen(true)} />
       )}
 
-      {/* 2. Quick: it happened */}
-      <View style={styles.tiles}>
-        <Tile
-          icon={data.attendance ? 'check-circle' : 'check-circle-outline'}
-          label={data.attendance ? 'Fuiste' : 'Ya fui'}
-          active={!!data.attendance}
-          onPress={() => {
-            if (!data.attendance) {
-              haptic('success');
-              void playReward();
-            }
-            void run((db) => (data.attendance ? removeAttendance(db, today) : markAttendance(db, today)), {
-              success: data.attendance ? 'Listo, lo desmarqué' : '¡Bien ahí! Hoy cuenta como día de gym',
-            });
-          }}
-        />
-        <Tile icon="lightning-bolt-outline" label="Entreno libre" onPress={() => start(null)} disabled={!!data.active} />
-        <Tile icon="walk" label="Aeróbico" onPress={() => router.push('/actividad/nueva')} />
-      </View>
-
-      {/* 3. This week and month */}
-      <Card tone="outline" onPress={() => router.push('/asistencia')} style={{ marginTop: space.md }}>
-        <Row>
-          <View style={{ flex: 1 }}>
-            <T variant="caption" tone="dim">Esta semana</T>
-            <T variant="numberLg">
-              {data.stats.thisWeek}
-              {weekGoal ? <T variant="h2" tone="dim">{` / ${weekGoal}`}</T> : null}
-            </T>
-          </View>
-          <View style={[styles.vr, { backgroundColor: c.border }]} />
-          <View style={{ flex: 1, paddingLeft: space.lg }}>
-            <T variant="caption" tone="dim">Este mes</T>
-            <T variant="numberLg">{data.stats.thisMonth}</T>
-          </View>
-          <MaterialCommunityIcons name="chevron-right" size={20} color={c.textDim} />
-        </Row>
-      </Card>
-
-      {/* 4. Routines */}
-      <View style={{ marginTop: space.xl }}>
-        <SectionHeader title="Mis rutinas" action="Nueva" onAction={() => setNewOpen(true)} />
-        {data.routines.length === 0 ? (
-          <Card>
-            <T variant="label" tone="muted">Todavía no tenés rutinas. Tocá “Nueva” para crear una.</T>
-          </Card>
-        ) : (
-          <View style={{ gap: space.md }}>
-            {data.routines.map((r) => {
-              const isToday = r.weekdays.includes(weekday(today));
-              return (
-                <Card key={r.id} onPress={() => router.push({ pathname: '/rutina/[id]', params: { id: r.id } })} style={[styles.routine, { borderColor: isToday ? c.accent : c.border }]}>
-                  <Row gap={space.md}>
-                    <View style={[styles.routineIcon, { backgroundColor: isToday ? c.accentSoft : c.surfaceAlt }]}>
-                      <MaterialCommunityIcons name="dumbbell" size={20} color={isToday ? c.accent : c.textMuted} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Row gap={6}>
-                        <T variant="h3" numberOfLines={1} style={{ flexShrink: 1 }}>{r.name}</T>
-                        {isToday ? <Badge label="Hoy" /> : null}
-                      </Row>
-                      <T variant="caption" tone="dim">{r.exerciseCount} ejercicios · {r.totalSets} series</T>
-                    </View>
-                    {!data.active ? (
-                      <IconButton icon="play" label={`Empezar ${r.name}`} tone="accent" onPress={() => start(r.id, today, isToday ? weekday(today) : r.weekdays[0] ?? null)} />
-                    ) : null}
-                  </Row>
-                  <Row gap={4} style={[styles.days, { borderTopColor: c.border }]}>
-                    {WEEK_ORDER.map((d) => (
-                      <View key={d} style={[styles.day, { backgroundColor: r.weekdays.includes(d) ? c.accentSoft : 'transparent' }]}>
-                        <T variant="caption" tone={r.weekdays.includes(d) ? 'accent' : 'dim'} style={{ fontSize: 11 }}>{DAY_SHORT[d].slice(0, 2)}</T>
-                      </View>
-                    ))}
-                  </Row>
-                </Card>
-              );
-            })}
-          </View>
-        )}
-      </View>
-
-      {/* 5. History */}
-      <View style={{ marginTop: space.xl }}>
-        <SectionHeader title="Lo que hiciste" action="Cargar uno pasado" onAction={() => setPastOpen(true)} />
-        {data.history.length === 0 ? (
-          <Card>
-            <T variant="label" tone="muted">Tus entrenamientos y actividades aparecen acá. Tocá cualquiera para corregirlo.</T>
-          </Card>
-        ) : (
-          <Card padded={false} style={{ paddingVertical: space.xs }}>
-            {data.history.map((h, i) => (
-              <View key={h.key}>
-                {i > 0 ? <Divider style={{ marginHorizontal: space.lg }} /> : null}
-                {h.kind === 'session' ? (
-                  <ListRow
-                    icon="check-circle"
-                    iconTone="accent"
-                    title={h.item.routineName ?? 'Entrenamiento libre'}
-                    subtitle={`${formatShort(h.date)} · ${h.item.setCount} series · ${formatNumber(h.item.volume)} kg${h.item.durationSeconds ? ' · ' + formatDuration(h.item.durationSeconds) : ''}`}
-                    onPress={() => router.push({ pathname: '/sesion/[id]', params: { id: h.item.id } })}
-                  />
-                ) : (
-                  <ListRow
-                    icon="activity"
-                    iconTone="protein"
-                    title={activityLabel(h.item.type)}
-                    subtitle={`${formatShort(h.date)} · ${h.item.minutes} min${h.item.distanceKm ? ' · ' + formatNumber(h.item.distanceKm) + ' km' : ''}`}
-                    onPress={() => router.push({ pathname: '/actividad/nueva', params: { id: h.item.id } })}
-                  />
-                )}
-              </View>
-            ))}
-          </Card>
-        )}
-      </View>
-
-      {/* 6. Progress + guide */}
-      {data.trained.length > 0 ? (
-        <View style={{ marginTop: space.xl }}>
-          <SectionHeader title="Tu progreso" />
-          <Card padded={false} style={{ paddingVertical: space.xs }}>
-            {data.trained.map((e, i) => (
-              <View key={e.exerciseId}>
-                {i > 0 ? <Divider style={{ marginHorizontal: space.lg }} /> : null}
-                <ListRow
-                  icon="trending-up"
-                  iconTone="protein"
-                  title={e.name}
-                  subtitle={`${e.sessions} ${e.sessions === 1 ? 'sesión' : 'sesiones'}${e.muscleGroup ? ' · ' + e.muscleGroup : ''}`}
-                  onPress={() => router.push({ pathname: '/ejercicio-progreso/[id]', params: { id: e.exerciseId } })}
-                />
-              </View>
-            ))}
-          </Card>
-        </View>
-      ) : null}
-
-      <Card tone="accent" onPress={() => router.push('/ejercicios/explorar')} style={{ marginTop: space.xl }}>
-        <Row gap={space.md}>
-          <Feather name="image" size={22} color={c.accent} />
-          <View style={{ flex: 1 }}>
-            <T variant="bodyMedium">Guía de ejercicios con fotos</T>
-            <T variant="caption" tone="muted">¿No sabés qué hacer o cómo? Más de 800 ejercicios</T>
-          </View>
-          <Feather name="chevron-right" size={18} color={c.textDim} />
-        </Row>
-      </Card>
-      <Button label="Mi biblioteca de ejercicios" icon="book" variant="ghost" size="sm" style={{ marginTop: space.sm }} onPress={() => router.push('/ejercicios')} />
-
-      <Sheet visible={newOpen} onClose={() => setNewOpen(false)} title="Nueva rutina">
-        <View style={{ gap: space.lg }}>
-          <Field label="Nombre" value={newName} onChangeText={setNewName} placeholder="Ej.: Piernas, Pecho y tríceps, Full body" autoFocus onSubmitEditing={createRoutine} />
-          <Button label="Crear y agregar ejercicios" icon="arrow-right" onPress={createRoutine} disabled={!newName.trim()} />
-        </View>
-      </Sheet>
-
+      <RoutinePicker visible={picking} onClose={() => setPicking(false)} routines={data.routines} onStart={startPicked} />
       <PastWorkoutSheet
         visible={pastOpen}
         onClose={() => setPastOpen(false)}
@@ -319,23 +101,241 @@ export default function TrainScreen() {
   );
 }
 
-type Featured = { routine: RoutineSummary; when: 'today' | 'next' | 'any'; weekday: number | null };
+type TrainData = {
+  routines: RoutineSummary[];
+  active: Awaited<ReturnType<typeof getActiveSession>>;
+  stats: Awaited<ReturnType<typeof getAttendanceStats>>;
+  attendance: Awaited<ReturnType<typeof getAttendance>>;
+  week: { date: string }[];
+  plan: Plan | null;
+  exercises: { id: string; name: string; sets: number }[];
+  rest: number;
+};
 
-/** Which routine leads the screen, and for which weekday its exercises are shown. */
-function featuredRoutine(routines: RoutineSummary[], today: string, pickedId: string | null): Featured | null {
+function Today({ data, today, onStart, onPick }: {
+  data: TrainData;
+  today: string;
+  onStart: (routineId: string | null, date?: string, onWeekday?: number | null) => void;
+  onPick: () => void;
+}) {
+  const run = useMutation();
+  const { plan, active, attendance, exercises } = data;
+  const sets = exercises.reduce((n, e) => n + e.sets, 0);
+  const goal = data.stats.scheduledDays.length;
+  const done = data.week.length;
+
+  return (
+    <View style={{ gap: space.md }}>
+      <Reveal>
+        {active ? (
+          <Card tone="accent" onPress={() => router.push('/sesion/activa')} style={{ padding: space.xl }}>
+            <Row gap={space.lg}>
+              <Foki mood="strong" size={64} />
+              <View style={{ flex: 1 }}>
+                <T variant="overline" tone="accent">En curso</T>
+                <T variant="title" style={{ marginTop: 2 }}>{active.routineName ?? 'Entrenamiento libre'}</T>
+                <T variant="caption" tone="muted">Empezó hace {formatMinutes((Date.now() - new Date(active.startedAt).getTime()) / 1000)}</T>
+              </View>
+            </Row>
+            <Button label="Seguir entrenando" icon="play" size="lg" style={{ marginTop: space.lg }} onPress={() => router.push('/sesion/activa')} />
+          </Card>
+        ) : attendance ? (
+          <Card style={{ padding: space.xl, alignItems: 'center' }}>
+            <Foki mood="proud" size={96} />
+            <T variant="title" style={{ marginTop: space.md }}>Hoy ya entrenaste</T>
+            <T variant="label" tone="muted" style={{ marginTop: 2, textAlign: 'center' }}>Bien ahí. Lo que queda es comer bien y descansar.</T>
+            <Button label="Entrenar de nuevo" icon="play" variant="secondary" full style={{ marginTop: space.lg }} onPress={onPick} />
+          </Card>
+        ) : !plan ? (
+          <Card style={{ padding: space.xl, alignItems: 'center' }}>
+            <Foki mood="strong" size={110} />
+            <T variant="title" style={{ marginTop: space.md, textAlign: 'center' }}>Armá tu plan en un minuto</T>
+            <T variant="label" tone="muted" style={{ marginTop: 2, textAlign: 'center' }}>Elegí uno listo o creá el tuyo. Después solo tocás Empezar.</T>
+            <Button label="Elegir mi plan" icon="arrow-right" size="lg" full style={{ marginTop: space.lg }} onPress={() => router.push('/rutina/nueva')} />
+          </Card>
+        ) : plan.when === 'today' ? (
+          <Card style={{ padding: space.xl }}>
+            <T variant="overline" tone="accent">Hoy te toca</T>
+            <T variant="display" style={{ marginTop: 4 }}>{plan.routine.name}</T>
+            <T variant="label" tone="muted" style={{ marginTop: 2 }}>
+              {exercises.length} ejercicios · {sets} series · unos {estimateMinutes(sets, data.rest)} min
+            </T>
+            {exercises.length ? (
+              <T variant="label" tone="dim" numberOfLines={2} style={{ marginTop: space.md }}>{exercises.map((e) => e.name).join(' · ')}</T>
+            ) : null}
+            <Button label="Empezar" icon="play" size="lg" style={{ marginTop: space.lg }} onPress={() => onStart(plan.routine.id, today, plan.weekday)} />
+            <Button label="Hoy hago otra cosa" variant="ghost" size="sm" style={{ marginTop: 4 }} onPress={onPick} />
+          </Card>
+        ) : (
+          <Card style={{ padding: space.xl, alignItems: 'center' }}>
+            <Foki mood="sleepy" size={96} />
+            <T variant="title" style={{ marginTop: space.md }}>Hoy descansás</T>
+            <T variant="label" tone="muted" style={{ marginTop: 2, textAlign: 'center' }}>
+              {plan.weekday !== null ? `Lo próximo es ${plan.routine.name}, el ${DAY_LONG[plan.weekday]}.` : 'Descansar también es parte del progreso.'}
+            </T>
+            <Button label="Entrenar igual" icon="play" variant="secondary" full style={{ marginTop: space.lg }} onPress={onPick} />
+          </Card>
+        )}
+      </Reveal>
+
+      <Reveal index={1}>
+        <Card onPress={() => router.push('/asistencia')}>
+          <Row style={{ justifyContent: 'space-between', marginBottom: space.md }}>
+            <T variant="h3">Esta semana</T>
+            <T variant="label" tone="muted">{goal ? `${done} de ${goal} días` : `${done} ${done === 1 ? 'día' : 'días'}`}</T>
+          </Row>
+          <WeekStrip attended={new Set(data.week.map((a) => a.date))} planned={data.stats.scheduledDays} today={today} />
+        </Card>
+      </Reveal>
+
+      <Reveal index={2}>
+        <T variant="label" tone="dim" style={[styles.groupTitle, { marginTop: space.sm }]}>¿Hiciste otra cosa?</T>
+        <Card padded={false} style={{ paddingVertical: space.xs }}>
+          <ListRow
+            icon={attendance ? 'check-circle' : 'check'}
+            iconTone={attendance ? 'accent' : 'muted'}
+            title={attendance ? 'Fuiste al gym hoy' : 'Fui al gym'}
+            subtitle={attendance ? 'Tocá para desmarcarlo' : 'Suma el día sin cargar series ni pesos'}
+            chevron={false}
+            onPress={() => {
+              if (!attendance) {
+                haptic('success');
+                void playReward();
+              }
+              void run((db) => (attendance ? removeAttendance(db, today) : markAttendance(db, today)), { success: attendance ? 'Listo, lo desmarqué' : '¡Bien ahí! Hoy cuenta como día de gym' });
+            }}
+          />
+          <Divider style={styles.inset} />
+          <ListRow icon="activity" iconTone="protein" title="Aeróbico" subtitle="Caminar, correr, bici, natación" onPress={() => router.push('/actividad/nueva')} />
+          <Divider style={styles.inset} />
+          <ListRow icon="zap" iconTone="weight" title="Entrenamiento libre" subtitle="Sin rutina: sumás ejercicios sobre la marcha" onPress={() => (active ? router.push('/sesion/activa') : onStart(null, today, null))} />
+        </Card>
+      </Reveal>
+    </View>
+  );
+}
+
+function Routines({ routines, active, today, onStart }: { routines: RoutineSummary[]; active: boolean; today: string; onStart: (r: RoutineSummary) => void }) {
+  return (
+    <View style={{ gap: space.md }}>
+      {routines.length ? (
+        <Card padded={false} style={{ paddingVertical: space.xs }}>
+          {routines.map((r, i) => (
+            <View key={r.id}>
+              {i > 0 ? <Divider style={styles.inset} /> : null}
+              <ListRow
+                title={r.name}
+                subtitle={`${r.exerciseCount} ejercicios · ${r.weekdays.length ? daysLabel(r.weekdays) : 'sin día fijo'}`}
+                right={
+                  <Row gap={space.sm}>
+                    {r.weekdays.includes(weekday(today)) ? <Badge label="Hoy" /> : null}
+                    {!active ? <IconButton icon="play" label={`Empezar ${r.name}`} tone="accent" size={36} onPress={() => onStart(r)} /> : null}
+                  </Row>
+                }
+                onPress={() => router.push({ pathname: '/rutina/[id]', params: { id: r.id } })}
+              />
+            </View>
+          ))}
+        </Card>
+      ) : (
+        <Card style={{ alignItems: 'center', padding: space.xl }}>
+          <Foki mood="happy" size={88} />
+          <T variant="h3" style={{ marginTop: space.md }}>Todavía no tenés rutinas</T>
+        </Card>
+      )}
+      <Button label="Nueva rutina" icon="plus" onPress={() => router.push('/rutina/nueva')} />
+
+      <T variant="label" tone="dim" style={[styles.groupTitle, { marginTop: space.md }]}>Ejercicios</T>
+      <Card padded={false} style={{ paddingVertical: space.xs }}>
+        <ListRow icon="image" iconTone="accent" title="Guía con fotos" subtitle="Más de 800 ejercicios y cómo se hacen" onPress={() => router.push('/ejercicios/explorar')} />
+        <Divider style={styles.inset} />
+        <ListRow icon="book" iconTone="muted" title="Mis ejercicios" subtitle="Los que usás en tus rutinas" onPress={() => router.push('/ejercicios')} />
+      </Card>
+    </View>
+  );
+}
+
+type HistoryItem =
+  | { kind: 'session'; date: string; key: string; item: Awaited<ReturnType<typeof listSessions>>[number] }
+  | { kind: 'activity'; date: string; key: string; item: Awaited<ReturnType<typeof listActivities>>[number] };
+
+function History({ history, trained, onPast }: {
+  history: HistoryItem[];
+  trained: Awaited<ReturnType<typeof listTrainedExercises>>;
+  onPast: () => void;
+}) {
+  return (
+    <View style={{ gap: space.md }}>
+      {history.length === 0 ? (
+        <Card style={{ alignItems: 'center', padding: space.xl }}>
+          <Foki mood="sleepy" size={88} />
+          <T variant="h3" style={{ marginTop: space.md }}>Acá va a aparecer lo que hagas</T>
+          <T variant="label" tone="muted" style={{ marginTop: 2, textAlign: 'center' }}>Cada entrenamiento se puede corregir después.</T>
+        </Card>
+      ) : (
+        <Card padded={false} style={{ paddingVertical: space.xs }}>
+          {history.map((h, i) => (
+            <View key={h.key}>
+              {i > 0 ? <Divider style={styles.inset} /> : null}
+              {h.kind === 'session' ? (
+                <ListRow
+                  icon="check-circle"
+                  iconTone="accent"
+                  title={h.item.routineName ?? 'Entrenamiento libre'}
+                  subtitle={`${formatShort(h.date)} · ${h.item.setCount} series · ${formatNumber(h.item.volume)} kg${h.item.durationSeconds ? ' · ' + formatDuration(h.item.durationSeconds) : ''}`}
+                  onPress={() => router.push({ pathname: '/sesion/[id]', params: { id: h.item.id } })}
+                />
+              ) : (
+                <ListRow
+                  icon="activity"
+                  iconTone="protein"
+                  title={activityLabel(h.item.type)}
+                  subtitle={`${formatShort(h.date)} · ${h.item.minutes} min${h.item.distanceKm ? ' · ' + formatNumber(h.item.distanceKm) + ' km' : ''}`}
+                  onPress={() => router.push({ pathname: '/actividad/nueva', params: { id: h.item.id } })}
+                />
+              )}
+            </View>
+          ))}
+        </Card>
+      )}
+      <Button label="Cargar uno que me olvidé" icon="calendar" variant="secondary" onPress={onPast} />
+
+      {trained.length > 0 ? (
+        <>
+          <T variant="label" tone="dim" style={[styles.groupTitle, { marginTop: space.md }]}>Tu progreso por ejercicio</T>
+          <Card padded={false} style={{ paddingVertical: space.xs }}>
+            {trained.slice(0, 8).map((e, i) => (
+              <View key={e.exerciseId}>
+                {i > 0 ? <Divider style={styles.inset} /> : null}
+                <ListRow
+                  icon="trending-up"
+                  iconTone="protein"
+                  title={e.name}
+                  subtitle={`${e.sessions} ${e.sessions === 1 ? 'vez' : 'veces'}${e.muscleGroup ? ' · ' + e.muscleGroup : ''}`}
+                  onPress={() => router.push({ pathname: '/ejercicio-progreso/[id]', params: { id: e.exerciseId } })}
+                />
+              </View>
+            ))}
+          </Card>
+        </>
+      ) : null}
+    </View>
+  );
+}
+
+type Plan = { routine: RoutineSummary; when: 'today' | 'next' | 'any'; weekday: number | null };
+
+/** What's on: today's routine, else the next scheduled one (today is rest), else any routine without a day. */
+function planFor(routines: RoutineSummary[], today: string): Plan | null {
   const wd = weekday(today);
-  const picked = pickedId ? routines.find((r) => r.id === pickedId) : null;
-  if (picked) {
-    const onToday = picked.weekdays.includes(wd);
-    return { routine: picked, when: onToday ? 'today' : 'any', weekday: onToday ? wd : picked.weekdays[0] ?? null };
-  }
   const todays = routines.find((r) => r.weekdays.includes(wd));
   if (todays) return { routine: todays, when: 'today', weekday: wd };
   for (let d = 1; d <= 7; d++) {
     const next = routines.find((r) => r.weekdays.includes((wd + d) % 7));
     if (next) return { routine: next, when: 'next', weekday: (wd + d) % 7 };
   }
-  return routines[0] ? { routine: routines[0], when: 'any', weekday: null } : null;
+  // No routine has a day yet: treat the first one as today's, so there is always something to start.
+  return routines[0] ? { routine: routines[0], when: 'today', weekday: null } : null;
 }
 
 /** Log a workout you forgot: pick the day and the routine, then tick the sets. */
@@ -370,36 +370,7 @@ function PastWorkoutSheet({ visible, onClose, routines, onStart }: {
   );
 }
 
-/** Square, icon-first tiles: same size, label never cut. */
-function Tile({ icon, label, onPress, active, disabled }: { icon: IconName; label: string; onPress: () => void; active?: boolean; disabled?: boolean }) {
-  const c = useColors();
-  return (
-    <PressableScale
-      onPress={onPress}
-      disabled={disabled}
-      hapticFeedback
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      style={[styles.tile, { backgroundColor: active ? c.accent : c.surface, opacity: disabled ? 0.45 : 1 }]}
-    >
-      <MaterialCommunityIcons name={icon} size={26} color={active ? c.accentText : c.accent} />
-      <T variant="label" color={active ? c.accentText : c.text} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.2} style={{ fontWeight: '600' }}>
-        {label}
-      </T>
-    </PressableScale>
-  );
-}
-
-
 const styles = StyleSheet.create({
-  list: { marginTop: space.lg, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: space.xs },
-  exercise: { paddingVertical: 10 },
-  num: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  vr: { width: StyleSheet.hairlineWidth, alignSelf: 'stretch', marginVertical: 2 },
-  routine: { borderWidth: 1, padding: space.lg },
-  routineIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  days: { marginTop: space.md, paddingTop: space.md, borderTopWidth: StyleSheet.hairlineWidth, justifyContent: 'space-between' },
-  tiles: { flexDirection: 'row', gap: space.sm, marginTop: space.md },
-  tile: { flex: 1, minHeight: 86, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 6 },
-  day: { flex: 1, height: 24, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  groupTitle: { marginBottom: space.sm, marginLeft: space.xs },
+  inset: { marginLeft: space.lg },
 });

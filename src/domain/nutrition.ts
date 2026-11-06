@@ -128,6 +128,20 @@ export function goalProgress(consumed: number, target: number): GoalProgress {
   };
 }
 
+/**
+ * Daily targets for the optional nutrients, worked out from the calorie and protein goals: 30 % of the
+ * calories from fat, the rest of them from carbs, 14 g of fiber per 1000 kcal and 3 servings of dairy.
+ */
+export function extraTargets(calories: number, protein: number): Record<ExtraKey, number> {
+  const fat = Math.round((calories * 0.3) / 9);
+  return {
+    carbs: Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4)),
+    fat,
+    fiber: Math.round((calories / 1000) * 14),
+    dairy: 3,
+  };
+}
+
 /** A day "meets" a goal at 95 % or more; targets are guides, so a small margin is fine. */
 export const GOAL_MET_THRESHOLD = 0.95;
 
