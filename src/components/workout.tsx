@@ -10,7 +10,7 @@ import { font, radius, space } from '@/theme/tokens';
 export function SetHeader() {
   return (
     <Row style={{ paddingHorizontal: 4, marginBottom: 6 }}>
-      <T variant="caption" tone="dim" style={{ width: 28 }}>Serie</T>
+      <T variant="caption" tone="dim" numberOfLines={1} style={{ width: 36 }}>Serie</T>
       <T variant="caption" tone="dim" style={{ flex: 1.3, marginLeft: space.sm }}>Anterior</T>
       <T variant="caption" tone="dim" style={{ flex: 1, textAlign: 'center' }}>kg</T>
       <T variant="caption" tone="dim" style={{ flex: 1, textAlign: 'center' }}>Reps</T>
@@ -56,7 +56,7 @@ export function SetRow({ set, index, previous, onCommit, onToggle, onDelete }: {
 
   return (
     <View style={[styles.row, done && { backgroundColor: c.accentSoft }]}>
-      <PressableScale onLongPress={onDelete} disabled={!onDelete} style={{ width: 28, alignItems: 'center' }} accessibilityLabel={`Serie ${index + 1}`}>
+      <PressableScale onLongPress={onDelete} disabled={!onDelete} style={{ width: 36, alignItems: 'center' }} accessibilityLabel={`Serie ${index + 1}`}>
         <T variant="label" tone={done ? 'accent' : 'muted'} style={{ fontFamily: font.bold }}>{index + 1}</T>
       </PressableScale>
       <T variant="caption" tone="dim" style={{ flex: 1.3, marginLeft: space.sm }} numberOfLines={1}>
@@ -101,6 +101,6 @@ export function SetRow({ set, index, previous, onCommit, onToggle, onDelete }: {
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 5, paddingHorizontal: 4, borderRadius: radius.sm },
-  input: { flex: 1, height: 40, borderRadius: 10, textAlign: 'center', fontFamily: font.semibold, fontSize: 16 },
+  input: { flex: 1, minWidth: 0, height: 40, borderRadius: 10, textAlign: 'center', fontFamily: font.semibold, fontSize: 16 },
   check: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginLeft: 4 },
 });
