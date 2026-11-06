@@ -16,6 +16,7 @@ import { getProfile } from '@/data/settings';
 import { estimateMinutes, getActiveSession, listSessions, listTrainedExercises, startSession } from '@/data/workouts';
 import { DAY_LONG, daysLabel, formatDuration, formatMinutes, formatShort, startOfWeek, todayKey, weekday } from '@/lib/dates';
 import { formatNumber } from '@/lib/format';
+import { openWorkout } from '@/lib/nav';
 import { playReward } from '@/lib/sound';
 import { useMutation, useQuery } from '@/state/db';
 import { haptic } from '@/state/toast';
@@ -65,11 +66,11 @@ export default function TrainScreen() {
     return { routines, active, stats, attendance, week, trained, plan, exercises, history, rest: profile.defaultRestSeconds };
   }, [today]);
 
-  if (!data) return <Screen tab><Loading /></Screen>;
+  if (!data) return <Screen tab><Loading variant="train" /></Screen>;
 
   const start = async (routineId: string | null, date = today, onWeekday: number | null = weekday(date)) => {
     const id = await run((db) => startSession(db, date, routineId, onWeekday));
-    if (id) router.push('/sesion/activa');
+    if (id) openWorkout();
   };
   const startPicked = (r: RoutineSummary | null) => start(r?.id ?? null, today, r ? (r.weekdays.includes(weekday(today)) ? weekday(today) : r.weekdays[0] ?? null) : null);
 
@@ -137,7 +138,7 @@ function Today({ data, today, onStart, onPick }: {
                 <T variant="caption" tone="muted">Empezó hace {formatMinutes((Date.now() - new Date(active.startedAt).getTime()) / 1000)}</T>
               </View>
             </Row>
-            <Button label="Seguir entrenando" icon="play" size="lg" style={{ marginTop: space.lg }} onPress={() => router.push('/sesion/activa')} />
+            <Button label="Seguir entrenando" icon="play" size="lg" style={{ marginTop: space.lg }} onPress={() => openWorkout()} />
           </Card>
         ) : attendance ? (
           <Card style={{ padding: space.xl, alignItems: 'center' }}>
@@ -208,7 +209,7 @@ function Today({ data, today, onStart, onPick }: {
           <Divider style={styles.inset} />
           <ListRow icon="activity" iconTone="protein" title="Aeróbico" subtitle="Caminar, correr, bici, natación" onPress={() => router.push('/actividad/nueva')} />
           <Divider style={styles.inset} />
-          <ListRow icon="zap" iconTone="weight" title="Entrenamiento libre" subtitle="Sin rutina: sumás ejercicios sobre la marcha" onPress={() => (active ? router.push('/sesion/activa') : onStart(null, today, null))} />
+          <ListRow icon="zap" iconTone="weight" title="Entrenamiento libre" subtitle="Sin rutina: sumás ejercicios sobre la marcha" onPress={() => (active ? openWorkout() : onStart(null, today, null))} />
         </Card>
       </Reveal>
     </View>

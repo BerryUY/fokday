@@ -67,7 +67,7 @@ export default function PublicLibraryScreen() {
       <Field value={query} onChangeText={setQuery} placeholder="Buscar (ej.: alfajor, guiso, yogur)" returnKeyType="search" />
       <View style={{ marginTop: space.lg, gap: space.sm }}>
         {foods === null ? (
-          <Loading />
+          <Loading variant="list" />
         ) : foods.length === 0 ? (
           <EmptyState
             icon="search"

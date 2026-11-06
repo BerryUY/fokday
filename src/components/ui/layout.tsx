@@ -1,12 +1,13 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import type { ReactNode } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Pressable, RefreshControl, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { KeyboardAvoidingView, Pressable, RefreshControl, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/theme/ThemeProvider';
 import { radius, space } from '@/theme/tokens';
 import { IconBubble, IconButton, T, type IconName } from './primitives';
+import { Skeleton, type SkeletonVariant } from './skeleton';
 
 export const TAB_BAR_SPACE = 90;
 
@@ -102,13 +103,8 @@ export function ListRow({ icon, iconTone = 'muted', title, subtitle, right, acti
   style?: StyleProp<ViewStyle>;
 }) {
   const c = useColors();
-  const row = (
-    <Pressable
-      onPress={onPress}
-      disabled={!onPress}
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.surfacePressed }, style]}
-      accessibilityRole={onPress ? 'button' : undefined}
-    >
+  const content = (
+    <>
       {icon && <IconBubble icon={icon} tone={iconTone} size={34} />}
       <View style={{ flex: 1 }}>
         <T variant="bodyMedium" numberOfLines={1}>{title}</T>
@@ -116,7 +112,15 @@ export function ListRow({ icon, iconTone = 'muted', title, subtitle, right, acti
       </View>
       {right}
       {chevron && <Feather name="chevron-right" size={18} color={c.textDim} />}
+    </>
+  );
+  // A row with nothing to do is a plain view: a disabled pressable would also disable a switch inside it.
+  const row = onPress ? (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.surfacePressed }, style]} accessibilityRole="button">
+      {content}
     </Pressable>
+  ) : (
+    <View style={[styles.row, style]}>{content}</View>
   );
   if (!action) return row;
   return (
@@ -127,13 +131,9 @@ export function ListRow({ icon, iconTone = 'muted', title, subtitle, right, acti
   );
 }
 
-export function Loading() {
-  const c = useColors();
-  return (
-    <View style={{ paddingVertical: 60, alignItems: 'center' }}>
-      <ActivityIndicator color={c.accent} />
-    </View>
-  );
+/** What a screen shows while its data loads. */
+export function Loading({ variant }: { variant?: SkeletonVariant }) {
+  return <Skeleton variant={variant} />;
 }
 
 export function ErrorNote({ error }: { error: Error | null }) {

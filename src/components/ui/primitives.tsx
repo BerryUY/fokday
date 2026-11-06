@@ -92,7 +92,7 @@ export function Card({ children, style, onPress, padded = true, tone = 'surface'
   const base = [styles.card, { backgroundColor: bg }, tone === 'outline' && { borderWidth: 1, borderColor: c.border }, padded && { padding: space.lg }, style];
   if (onPress) {
     return (
-      <PressableScale onPress={onPress} style={base} scaleTo={0.985}>
+      <PressableScale accessibilityRole="button" onPress={onPress} style={base} scaleTo={0.985}>
         {children}
       </PressableScale>
     );
@@ -268,6 +268,7 @@ export function Toggle({ value, onValueChange, accessibilityLabel, disabled }: {
     <Pressable
       accessibilityRole="switch"
       accessibilityState={{ checked: value, disabled }}
+      aria-checked={value}
       accessibilityLabel={accessibilityLabel}
       disabled={disabled}
       hitSlop={6}

@@ -33,7 +33,7 @@ export default function MealDetailScreen() {
   const { data, loading } = useQuery(async (db) => ({ meal: await getMeal(db, id), goal: await getGoalForDate(db, date) }), [id, date]);
   const meal = data?.meal;
 
-  if (loading && !data) return <Screen title=""><Loading /></Screen>;
+  if (loading && !data) return <Screen title=""><Loading variant="cards" /></Screen>;
   if (!meal) return <Screen title="Comida"><EmptyState icon="alert-circle" title="Esta comida ya no existe" /></Screen>;
 
   // Opened without a moment (favorites, search): today it defaults to the current moment of the day.

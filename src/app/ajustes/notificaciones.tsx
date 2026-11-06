@@ -18,7 +18,7 @@ const KINDS: { key: ChannelKey; label: string; hint: string }[] = [
 export default function NotificationsScreen() {
   const run = useMutation();
   const { data: off } = useQuery((db) => getMutedKinds(db), []);
-  if (!off) return <Screen title="Notificaciones"><Loading /></Screen>;
+  if (!off) return <Screen title="Notificaciones"><Loading variant="list" /></Screen>;
 
   const toggle = (k: ChannelKey, on: boolean) => run((db) => saveMutedKinds(db, on ? off.filter((x) => x !== k) : [...off, k]), { silent: true });
 

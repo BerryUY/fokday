@@ -51,7 +51,7 @@ export default function CategoryScreen() {
       }
     >
       {!data ? (
-        <Loading />
+        <Loading variant="list" />
       ) : (
         <>
           {data.bucket.entries > 0 ? (

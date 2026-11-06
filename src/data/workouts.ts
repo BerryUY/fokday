@@ -116,7 +116,17 @@ async function insertWorkoutExercise(
  * Starts a session from a routine (or empty). Only one session can be in progress.
  * Only the exercises that apply on `onWeekday` (default: the weekday of `date`; null = all) are added.
  */
-export async function startSession(db: Db, date: DateKey, routineId: string | null, onWeekday: number | null = weekday(date)): Promise<string> {
+export function startSession(db: Db, date: DateKey, routineId: string | null, onWeekday: number | null = weekday(date)): Promise<string> {
+  // A double tap must not open two workouts: both calls would see that none is running yet.
+  starting ??= createSession(db, date, routineId, onWeekday).finally(() => {
+    starting = null;
+  });
+  return starting;
+}
+
+let starting: Promise<string> | null = null;
+
+async function createSession(db: Db, date: DateKey, routineId: string | null, onWeekday: number | null): Promise<string> {
   const active = await getActiveSession(db);
   if (active) return active.id;
   const routine = routineId ? await getRoutine(db, routineId) : null;

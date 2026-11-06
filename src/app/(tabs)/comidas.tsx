@@ -63,7 +63,7 @@ export default function ComidasScreen() {
       </Row>
 
       {!data ? (
-        <Loading />
+        <Loading variant="cards" />
       ) : (
         <>
           <PhotoHero onPress={() => router.push({ pathname: '/comida/foto', params: { date } })} />

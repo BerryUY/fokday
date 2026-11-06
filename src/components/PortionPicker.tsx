@@ -19,11 +19,11 @@ export function PortionPicker({ value, onChange }: { value: number; onChange: (v
     <Row style={{ justifyContent: 'space-between' }}>
       <T variant="bodyMedium">{value === 1 ? 'Porción' : 'Porciones'}</T>
       <View style={[styles.pill, { backgroundColor: c.surfaceAlt }]}>
-        <PressableScale accessibilityLabel="Una porción menos" disabled={value <= 0.5} onPress={() => onChange(previousPortion(value))} style={[styles.btn, { opacity: value <= 0.5 ? 0.35 : 1 }]} scaleTo={0.85}>
+        <PressableScale accessibilityRole="button" accessibilityLabel="Una porción menos" disabled={value <= 0.5} onPress={() => onChange(previousPortion(value))} style={[styles.btn, { opacity: value <= 0.5 ? 0.35 : 1 }]} scaleTo={0.85}>
           <Feather name="minus" size={16} color={c.text} />
         </PressableScale>
         <T variant="h3" style={styles.value}>{label(value)}</T>
-        <PressableScale accessibilityLabel="Una porción más" disabled={value >= MAX_PORTIONS} onPress={() => onChange(nextPortion(value))} style={[styles.btn, { backgroundColor: c.accent }]} scaleTo={0.85}>
+        <PressableScale accessibilityRole="button" accessibilityLabel="Una porción más" disabled={value >= MAX_PORTIONS} onPress={() => onChange(nextPortion(value))} style={[styles.btn, { backgroundColor: c.accent }]} scaleTo={0.85}>
           <Feather name="plus" size={16} color={c.accentText} />
         </PressableScale>
       </View>

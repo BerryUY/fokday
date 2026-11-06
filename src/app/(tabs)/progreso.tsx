@@ -54,7 +54,7 @@ export default function ProgressScreen() {
           <ProLock title="Estadísticas avanzadas" message="Mirá 90 días o todo tu historial: peso, nutrición y gimnasio, para ver el camino completo." />
         </View>
       ) : !data ? (
-        <Loading />
+        <Loading variant="detail" />
       ) : (
         <Animated.View key={range} entering={FadeIn.duration(250)}>
           {WeightSection({ data, range, today })}

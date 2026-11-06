@@ -110,7 +110,7 @@ export default function ActiveSessionScreen() {
     }
   }, [now, rest]);
 
-  if (!data) return <Screen title="Entrenamiento"><Loading /></Screen>;
+  if (!data) return <Screen title="Entrenamiento"><Loading variant="session" /></Screen>;
   const session = data.session;
   if (!session) {
     return (
@@ -123,7 +123,9 @@ export default function ActiveSessionScreen() {
   const elapsed = (now - new Date(session.startedAt).getTime()) / 1000;
   const live = session.exercises.filter((e) => e.status !== 'skipped');
   const allSets = live.flatMap((e) => e.sets);
-  const doneSets = allSets.filter((s) => s.isCompleted).length;
+  // Sets done on an exercise that was skipped afterwards still count: they get saved when finishing.
+  const doneSets = session.exercises.flatMap((e) => e.sets).filter((s) => s.isCompleted).length;
+  const leftSets = allSets.filter((s) => !s.isCompleted).length;
   const pending = live.filter((e) => e.sets.some((s) => !s.isCompleted));
   const current = session.exercises.find((e) => e.id === focus) ?? pending[0] ?? null;
   const set = current ? current.sets.find((s) => s.id === pickedSet) ?? current.sets.find((s) => !s.isCompleted) ?? current.sets[current.sets.length - 1] ?? null : null;
@@ -182,9 +184,8 @@ export default function ActiveSessionScreen() {
   };
 
   const finish = async () => {
-    const left = allSets.length - doneSets;
-    if (left > 0) {
-      const ok = await confirm('Terminar entrenamiento', `Te ${left === 1 ? 'queda 1 serie' : `quedan ${left} series`} sin hacer: no se guardan.`, 'Terminar');
+    if (leftSets > 0) {
+      const ok = await confirm('Terminar entrenamiento', `Te ${leftSets === 1 ? 'queda 1 serie' : `quedan ${leftSets} series`} sin hacer: no se guardan.`, 'Terminar');
       if (!ok) return;
     }
     setMenu(false);
@@ -299,6 +300,7 @@ export default function ActiveSessionScreen() {
             {session.exercises.map((e, i) => {
               const skipped = e.status === 'skipped';
               const done = e.sets.filter((s) => s.isCompleted).length;
+              const skippedNote = done ? `Salteado con ${done} ${done === 1 ? 'serie hecha' : 'series hechas'} · tocá para retomarlo` : 'Salteado · tocá para retomarlo';
               return (
                 <View key={e.id}>
                   {i > 0 ? <Divider style={{ marginLeft: 62 }} /> : null}
@@ -306,7 +308,7 @@ export default function ActiveSessionScreen() {
                     icon={skipped ? 'skip-forward' : done === e.sets.length && done > 0 ? 'check' : 'circle'}
                     iconTone={skipped ? 'muted' : done === e.sets.length && done > 0 ? 'accent' : 'muted'}
                     title={e.name}
-                    subtitle={skipped ? 'Salteado · tocá para retomarlo' : `${done} de ${e.sets.length} series`}
+                    subtitle={skipped ? skippedNote : `${done} de ${e.sets.length} series`}
                     right={e.id === current?.id && !allDone ? <T variant="caption" tone="accent">Ahora</T> : undefined}
                     chevron={false}
                     onPress={async () => {
@@ -344,6 +346,7 @@ export default function ActiveSessionScreen() {
             />
           ) : null}
           <Button label="Terminar entrenamiento" icon="flag" onPress={finish} loading={finishing} disabled={doneSets === 0} />
+          {doneSets === 0 ? <T variant="caption" tone="dim" style={{ textAlign: 'center' }}>Para terminar tiene que haber al menos una serie hecha.</T> : null}
           <Button label="Descartar entrenamiento" variant="ghost" size="sm" onPress={discard} />
         </View>
       </Sheet>

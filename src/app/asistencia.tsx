@@ -31,7 +31,7 @@ export default function AttendanceScreen() {
     return { stats, all, monthSessions };
   }, [today, month]);
 
-  if (!data) return <Screen title="Asistencia"><Loading /></Screen>;
+  if (!data) return <Screen title="Asistencia"><Loading variant="detail" /></Screen>;
   const attended = new Set(data.all.map((a) => a.date));
   const { stats } = data;
   const sel = selected ? data.all.find((a) => a.date === selected) ?? null : null;

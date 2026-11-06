@@ -32,7 +32,7 @@ export default function ExerciseProgressScreen() {
       </Screen>
     );
   }
-  if (!data) return <Screen title="Progresión"><Loading /></Screen>;
+  if (!data) return <Screen title="Progresión"><Loading variant="detail" /></Screen>;
   const { points } = data;
   const name = data.exercise?.name ?? 'Ejercicio';
   if (points.length === 0) {

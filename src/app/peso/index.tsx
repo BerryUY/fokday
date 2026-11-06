@@ -30,7 +30,7 @@ export default function WeightScreen() {
     return { profile, weights, milestones };
   }, []);
 
-  if (!data) return <Screen title="Peso"><Loading /></Screen>;
+  if (!data) return <Screen title="Peso"><Loading variant="detail" /></Screen>;
   const { profile, weights, milestones } = data;
   const progress = weightProgress(profile.startWeight, profile.targetWeight, weights);
   const last = latestEntry(weights);

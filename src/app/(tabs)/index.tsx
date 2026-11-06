@@ -31,6 +31,7 @@ import { listWeights } from '@/data/weight';
 import { getActiveSession, startSession } from '@/data/workouts';
 import { latestEntry, weightProgress } from '@/domain/weight';
 import { capitalize, formatLong, greeting, startOfWeek, todayKey, weekday } from '@/lib/dates';
+import { openWorkout } from '@/lib/nav';
 import { goToTab } from '@/lib/tabs';
 import { useMutation, useQuery } from '@/state/db';
 import { useColors } from '@/theme/ThemeProvider';
@@ -65,7 +66,7 @@ export default function HomeScreen() {
     return { profile, weights, totals, goal, stats, routine, active, week, streak, routines, habits };
   }, [today]);
 
-  if (!data) return <Screen tab><Loading /></Screen>;
+  if (!data) return <Screen tab><Loading variant="home" /></Screen>;
 
   const { profile, weights, totals, goal, stats, routine, active, week, streak, routines, habits } = data;
   const progress = weightProgress(profile.startWeight, profile.targetWeight, weights);
@@ -76,12 +77,12 @@ export default function HomeScreen() {
 
   const start = async (routineId: string | null, onWeekday: number | null = weekday(today)) => {
     const id = await run((db) => startSession(db, today, routineId, onWeekday));
-    if (id) router.push('/sesion/activa');
+    if (id) openWorkout();
   };
   const startPicked = (r: RoutineSummary | null) => start(r?.id ?? null, r ? (r.weekdays.includes(weekday(today)) ? weekday(today) : r.weekdays[0] ?? null) : null);
   // Always ends somewhere: a running workout, today's routine, the list of routines, or making the first one.
   const train = () => {
-    if (active) return router.push('/sesion/activa');
+    if (active) return openWorkout();
     if (routine && !trainedToday) return void start(routine.id);
     if (routines.length) return setPicking(true);
     router.push('/rutina/nueva');

@@ -24,7 +24,7 @@ export function DayDetail({ date }: { date: DateKey }) {
     setNote(data?.note ?? '');
   }, [data?.note, date]);
 
-  if (!data || data.date !== date) return <Loading />;
+  if (!data || data.date !== date) return <Loading variant="list" />;
   const isFuture = date > todayKey();
 
   return (

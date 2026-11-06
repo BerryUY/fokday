@@ -19,7 +19,7 @@ export default function StreakScreen() {
   const c = useColors();
   const today = todayKey();
   const { data } = useQuery(async (db) => ({ streak: await getStreak(db, today), perfect: await listPerfectDays(db) }), [today]);
-  if (!data) return <Screen title="Tu racha"><Loading /></Screen>;
+  if (!data) return <Screen title="Tu racha"><Loading variant="detail" /></Screen>;
   const s = data.streak;
   const lit = s.doneToday;
   const perfectThisWeek = data.perfect.filter((d) => d >= startOfWeek(today)).length;

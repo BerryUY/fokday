@@ -16,7 +16,7 @@ export default function AccountScreen() {
   const { account, loading } = useAccount();
   const [busy, setBusy] = useState<string | null>(null);
 
-  if (loading) return <Screen title="Tu cuenta"><Loading /></Screen>;
+  if (loading) return <Screen title="Tu cuenta"><Loading variant="list" /></Screen>;
   if (!account) {
     return (
       <Screen title="Tu cuenta">

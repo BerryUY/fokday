@@ -69,11 +69,11 @@ export function Stepper({ value, onChange, min = 0, max = 99, step = 1, format }
   const c = useColors();
   return (
     <View style={[styles.stepper, { backgroundColor: c.surfaceAlt }]}>
-      <PressableScale accessibilityLabel="Restar" onPress={() => onChange(Math.max(min, value - step))} style={styles.stepBtn} scaleTo={0.85}>
+      <PressableScale accessibilityRole="button" accessibilityLabel="Restar" onPress={() => onChange(Math.max(min, value - step))} style={styles.stepBtn} scaleTo={0.85}>
         <Feather name="minus" size={16} color={c.text} />
       </PressableScale>
       <T variant="h3" style={{ minWidth: 44, textAlign: 'center', fontVariant: ['tabular-nums'] }}>{format ? format(value) : value}</T>
-      <PressableScale accessibilityLabel="Sumar" onPress={() => onChange(Math.min(max, value + step))} style={styles.stepBtn} scaleTo={0.85}>
+      <PressableScale accessibilityRole="button" accessibilityLabel="Sumar" onPress={() => onChange(Math.min(max, value + step))} style={styles.stepBtn} scaleTo={0.85}>
         <Feather name="plus" size={16} color={c.text} />
       </PressableScale>
     </View>

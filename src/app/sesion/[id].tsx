@@ -23,7 +23,7 @@ export default function SessionDetailScreen() {
   const { data, loading } = useQuery(async (db) => ({ session: await getSession(db, id), records: await getSessionRecords(db, id) }), [id]);
   const session = data?.session;
 
-  if (loading && !data) return <Screen title="Entrenamiento"><Loading /></Screen>;
+  if (loading && !data) return <Screen title="Entrenamiento"><Loading variant="cards" /></Screen>;
   if (!session) return <Screen title="Entrenamiento"><EmptyState icon="alert-circle" title="Este entrenamiento ya no existe" /></Screen>;
   if (session.status === 'in_progress') {
     return (

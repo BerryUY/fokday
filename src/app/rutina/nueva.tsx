@@ -17,7 +17,7 @@ export default function NewRoutineScreen() {
   const run = useMutation();
   const [name, setName] = useState('');
   const { data: profile } = useQuery((db) => getProfile(db), []);
-  if (!profile) return <Screen title="Nueva rutina"><Loading /></Screen>;
+  if (!profile) return <Screen title="Nueva rutina"><Loading variant="cards" /></Screen>;
 
   const use = async (template: RoutineTemplate) => {
     const id = await run((db) => createFromTemplate(db, template, profile.trainingDays, profile.defaultRestSeconds), { success: '¡Listo! Ya podés ajustarla a tu gusto' });

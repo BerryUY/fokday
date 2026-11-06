@@ -114,7 +114,7 @@ export default function EditMealScreen() {
     if (done !== undefined) router.dismissTo('/comidas');
   };
 
-  if (!loaded) return <Screen title="Editar comida"><Loading /></Screen>;
+  if (!loaded) return <Screen title="Editar comida"><Loading variant="cards" /></Screen>;
 
   return (
     <Screen

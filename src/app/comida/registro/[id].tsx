@@ -35,7 +35,7 @@ export default function EditLogScreen() {
     });
   }, [db, id]);
 
-  if (log === undefined) return <Screen title="Registro"><Loading /></Screen>;
+  if (log === undefined) return <Screen title="Registro"><Loading variant="cards" /></Screen>;
   if (!log || !draft) return <Screen title="Registro"><EmptyState icon="alert-circle" title="Este registro ya no existe" /></Screen>;
 
   const calories = parseNonNegative(kcal);

@@ -33,7 +33,7 @@ export default function SettingsScreen() {
     const [profile, goal, weights, body] = await Promise.all([getProfile(db), getGoalForDate(db, todayKey()), listWeights(db), getBody(db)]);
     return { profile, goal, latest: latestEntry(weights), body };
   }, []);
-  if (!data) return <Screen title="Ajustes"><Loading /></Screen>;
+  if (!data) return <Screen title="Ajustes"><Loading variant="cards" /></Screen>;
   return <SettingsForm profile={data.profile} calories={data.goal.calories} protein={data.goal.protein} latest={data.latest} body={data.body} />;
 }
 

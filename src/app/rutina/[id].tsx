@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { goBack } from '@/lib/nav';
+import { goBack, openWorkout } from '@/lib/nav';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { Field, Sheet, Stepper, confirm } from '@/components/ui/form';
@@ -36,7 +36,7 @@ export default function RoutineScreen() {
   const { data, loading } = useQuery(async (db) => ({ routine: await getRoutine(db, id), active: await getActiveSession(db) }), [id]);
   const routine = data?.routine;
 
-  if (loading && !data) return <Screen title="Rutina"><Loading /></Screen>;
+  if (loading && !data) return <Screen title="Rutina"><Loading variant="list" /></Screen>;
   if (!routine) return <Screen title="Rutina"><EmptyState icon="alert-circle" title="Esta rutina ya no existe" /></Screen>;
 
   const toggleDay = (d: number) => {
@@ -51,7 +51,7 @@ export default function RoutineScreen() {
 
   const start = async () => {
     const sessionId = await run((db) => startSession(db, todayKey(), routine.id, shownDay === 'all' ? null : shownDay));
-    if (sessionId) router.push('/sesion/activa');
+    if (sessionId) openWorkout();
   };
 
   const addExercise = () => router.push({ pathname: '/ejercicios', params: { pick: 'routine', target: routine.id } });
@@ -70,7 +70,7 @@ export default function RoutineScreen() {
       right={<IconButton icon="edit-2" label="Cambiar el nombre" onPress={() => setRenaming(true)} />}
       footer={
         data?.active ? (
-          <Button label="Continuar entrenamiento" icon="play" size="lg" onPress={() => router.push('/sesion/activa')} />
+          <Button label="Continuar entrenamiento" icon="play" size="lg" onPress={() => openWorkout()} />
         ) : (
           <Button label="Empezar" icon="play" size="lg" onPress={start} disabled={shown.length === 0} />
         )

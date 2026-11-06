@@ -112,6 +112,14 @@ describe('workouts', () => {
     expect((await getSession(db, id))!.exercises[0].sets[0]).toMatchObject({ weight: 60, reps: 10 });
   });
 
+  it('a double tap on start opens one workout', async () => {
+    const routine = await setup();
+    const [a, b] = await Promise.all([startSession(db, '2026-10-20', routine, null), startSession(db, '2026-10-20', routine, null)]);
+    expect(a).toBe(b);
+    const running = await db.getAllAsync("SELECT id FROM workout_sessions WHERE status = 'in_progress'", []);
+    expect(running).toHaveLength(1);
+  });
+
   it('finds the records of a session, but not on a first time', async () => {
     const routine = await setup();
     const first = await startSession(db, '2026-10-20', routine, null);

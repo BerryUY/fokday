@@ -70,7 +70,7 @@ export default function ExploreExercisesScreen() {
       {error ? (
         <EmptyState icon="wifi-off" title="Sin conexión" message={error} action={<Button label="Reintentar" icon="refresh-cw" onPress={retry} />} />
       ) : !all ? (
-        <Loading />
+        <Loading variant="list" />
       ) : results.length === 0 ? (
         <EmptyState icon="search" title="Sin resultados" message="Probá con otra palabra, en español o en inglés (por ejemplo: sentadilla, curl, remo)." />
       ) : (
