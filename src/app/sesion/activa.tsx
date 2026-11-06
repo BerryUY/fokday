@@ -1,10 +1,12 @@
 import { Feather } from '@expo/vector-icons';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, TextInput, Vibration, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { BackHandler, Platform, ScrollView, StyleSheet, TextInput, Vibration, View } from 'react-native';
 import { SwipeToComplete } from '@/components/juice/SwipeToComplete';
 import { Foki } from '@/components/mascot/Foki';
+import { useCancelWorkout } from '@/components/useCancelWorkout';
+import { choose, type DialogAction } from '@/components/ui/dialog';
 import { Sheet, confirm } from '@/components/ui/form';
 import { EmptyState, ListRow, Loading, Screen } from '@/components/ui/layout';
 import { ProgressRing } from '@/components/ui/progress';
@@ -13,7 +15,6 @@ import { formatReps } from '@/data/routines';
 import { getProfile } from '@/data/settings';
 import {
   addSet,
-  cancelSession,
   completeSet,
   deleteSet,
   finishSession,
@@ -30,19 +31,15 @@ import { formatDuration } from '@/lib/dates';
 import { parseNonNegative, toInput } from '@/lib/format';
 import { goBack } from '@/lib/nav';
 import { playReward } from '@/lib/sound';
-import { cancelRestEnd, scheduleRestEnd } from '@/notifications/rest';
+import { cancelRestEnd, currentRest, keepRest, scheduleRestEnd, type Rest } from '@/notifications/rest';
 import { useMutation, useQuery } from '@/state/db';
 import { haptic } from '@/state/toast';
 import { useColors } from '@/theme/ThemeProvider';
 import { font, radius, space } from '@/theme/tokens';
 
-type Rest = { endsAt: number; total: number; next: string };
 type Draft = { id: string; weight: string; reps: string };
 
 const WEIGHT_STEP = 2.5;
-
-// The rest keeps running if you leave the screen to check something and come back.
-let liveRest: Rest | null = null;
 
 /**
  * The screen stays on during a workout. Only on the phone: in a browser the lock arrives late and
@@ -72,8 +69,9 @@ const setLabel = (s: { weight: number | null; reps: number | null }) =>
 export default function ActiveSessionScreen() {
   useScreenStaysOn();
   const run = useMutation();
+  const cancelWorkout = useCancelWorkout();
   const [now, setNow] = useState(Date.now());
-  const [rest, setRestState] = useState<Rest | null>(liveRest);
+  const [rest, setRestState] = useState<Rest | null>(currentRest);
   const [focus, setFocus] = useState<string | null>(null);
   const [pickedSet, setPickedSet] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -81,7 +79,7 @@ export default function ActiveSessionScreen() {
   const [finishing, setFinishing] = useState(false);
 
   const setRest = (next: Rest | null) => {
-    liveRest = next;
+    keepRest(next);
     setRestState(next);
   };
 
@@ -103,7 +101,7 @@ export default function ActiveSessionScreen() {
 
   useEffect(() => {
     if (rest && now >= rest.endsAt) {
-      liveRest = null;
+      keepRest(null);
       setRestState(null);
       haptic('success');
       if (Platform.OS === 'android') Vibration.vibrate([0, 180, 120, 180]);
@@ -200,14 +198,24 @@ export default function ActiveSessionScreen() {
   };
 
   const discard = async () => {
-    const ok = await confirm('Descartar entrenamiento', 'Se borra esta sesión y todo lo que cargaste en ella.', 'Descartar', true);
-    if (!ok) return;
-    const done = await run((d) => cancelSession(d, session.id), { success: 'Entrenamiento descartado' });
-    if (done !== undefined) {
-      skipRest();
-      setMenu(false);
-      goBack();
-    }
+    if (!(await cancelWorkout(session.id))) return;
+    setRestState(null);
+    setMenu(false);
+    goBack();
+  };
+
+  // Leaving by accident must not leave a workout running without you knowing.
+  const leave = async () => {
+    const actions: DialogAction<'leave' | 'finish' | 'cancel' | 'stay'>[] = [
+      { key: 'leave', label: 'Salir y dejarlo en curso', variant: 'primary' },
+      ...(doneSets > 0 ? [{ key: 'finish', label: 'Terminar y guardar', variant: 'secondary' } as const] : []),
+      { key: 'cancel', label: 'Cancelar entrenamiento', variant: 'danger' },
+      { key: 'stay', label: 'Quedarme', variant: 'ghost' },
+    ];
+    const answer = await choose('¿Salís del entrenamiento?', 'Queda en curso en segundo plano: el tiempo sigue corriendo y lo retomás desde Entrenar cuando quieras.', actions);
+    if (answer === 'leave') goBack();
+    if (answer === 'finish') void finish();
+    if (answer === 'cancel') void discard();
   };
 
   const addExercise = () => {
@@ -235,11 +243,13 @@ export default function ActiveSessionScreen() {
 
   return (
     <Screen
-      title={session.routineName ?? 'Entrenamiento libre'}
+      title={session.routineName ?? 'Entrenamiento'}
       subtitle={formatDuration(elapsed)}
       right={<IconButton icon="list" label="Ver todos los ejercicios" onPress={() => setMenu(true)} />}
       footer={footer}
+      onBack={() => void leave()}
     >
+      <AskBeforeLeaving onBack={() => void leave()} />
       <Progress exercises={live} currentId={current?.id ?? null} />
 
       {rest ? (
@@ -254,8 +264,9 @@ export default function ActiveSessionScreen() {
       ) : !current ? (
         <View style={styles.center}>
           <Foki mood="strong" size={140} />
-          <T variant="title" style={{ marginTop: space.lg, textAlign: 'center' }}>Entrenamiento libre</T>
-          <T variant="label" tone="muted" style={{ marginTop: 4, textAlign: 'center', maxWidth: 280 }}>Sumá los ejercicios a medida que los vas haciendo.</T>
+          <T variant="title" style={{ marginTop: space.lg, textAlign: 'center' }}>No quedan ejercicios</T>
+          <T variant="label" tone="muted" style={{ marginTop: 4, textAlign: 'center', maxWidth: 280 }}>Sumá uno para seguir, o cancelá si entraste sin querer.</T>
+          {doneSets === 0 ? <Button label="Cancelar entrenamiento" icon="x" variant="danger" style={{ marginTop: space.lg }} onPress={discard} /> : null}
         </View>
       ) : (
         <View>
@@ -347,11 +358,29 @@ export default function ActiveSessionScreen() {
           ) : null}
           <Button label="Terminar entrenamiento" icon="flag" onPress={finish} loading={finishing} disabled={doneSets === 0} />
           {doneSets === 0 ? <T variant="caption" tone="dim" style={{ textAlign: 'center' }}>Para terminar tiene que haber al menos una serie hecha.</T> : null}
-          <Button label="Descartar entrenamiento" variant="ghost" size="sm" onPress={discard} />
+          <Button label="Cancelar entrenamiento" icon="x" variant="danger" onPress={discard} />
         </View>
       </Sheet>
     </Screen>
   );
+}
+
+/** The phone's back button asks too. Only while this screen is on top; sheets and dialogs close first. */
+function AskBeforeLeaving({ onBack }: { onBack: () => void }) {
+  const latest = useRef(onBack);
+  useEffect(() => {
+    latest.current = onBack;
+  });
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        latest.current();
+        return true;
+      });
+      return () => sub.remove();
+    }, []),
+  );
+  return null;
 }
 
 /** One small bar per exercise, filling as its sets get done. */

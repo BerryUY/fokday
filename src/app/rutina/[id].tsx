@@ -70,9 +70,9 @@ export default function RoutineScreen() {
       right={<IconButton icon="edit-2" label="Cambiar el nombre" onPress={() => setRenaming(true)} />}
       footer={
         data?.active ? (
-          <Button label="Continuar entrenamiento" icon="play" size="lg" onPress={() => openWorkout()} />
+          <Button label="Continuar entrenamiento" icon="play" size="xl" onPress={() => openWorkout()} />
         ) : (
-          <Button label="Empezar" icon="play" size="lg" onPress={start} disabled={shown.length === 0} />
+          <Button label="Empezar" icon="play" size="xl" onPress={start} disabled={shown.length === 0} />
         )
       }
     >

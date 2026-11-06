@@ -12,7 +12,7 @@ export function RoutinePicker({ visible, onClose, routines, onStart }: {
   visible: boolean;
   onClose: () => void;
   routines: RoutineSummary[];
-  onStart: (routine: RoutineSummary | null) => void;
+  onStart: (routine: RoutineSummary) => void;
 }) {
   return (
     <Sheet visible={visible} onClose={onClose} title="¿Qué entrenás hoy?">
@@ -36,15 +36,6 @@ export function RoutinePicker({ visible, onClose, routines, onStart }: {
             ))}
           </Card>
         ) : null}
-        <Button
-          label="Sin rutina: voy sumando ejercicios"
-          icon="zap"
-          variant="secondary"
-          onPress={() => {
-            onClose();
-            onStart(null);
-          }}
-        />
         <Button
           label="Crear una rutina nueva"
           icon="plus"

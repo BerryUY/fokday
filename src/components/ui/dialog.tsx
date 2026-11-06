@@ -5,9 +5,10 @@ import { useColors } from '@/theme/ThemeProvider';
 import { radius, space } from '@/theme/tokens';
 import { useBackToClose, usePresence } from './motion';
 import { Portal } from './portal';
-import { Button, T } from './primitives';
+import { Button, T, type ButtonVariant } from './primitives';
 
-type Request = { title: string; message: string; confirmLabel: string; destructive: boolean; resolve: (ok: boolean) => void };
+export type DialogAction<K extends string = string> = { key: K; label: string; variant: ButtonVariant };
+type Request = { title: string; message: string; actions: DialogAction[]; stacked: boolean; resolve: (key: string | null) => void };
 
 let open: ((request: Request) => void) | null = null;
 
@@ -15,7 +16,18 @@ let open: ((request: Request) => void) | null = null;
 export function showConfirm(title: string, message: string, confirmLabel = 'Confirmar', destructive = false): Promise<boolean> | null {
   const present = open;
   if (!present) return null;
-  return new Promise((resolve) => present({ title, message, confirmLabel, destructive, resolve }));
+  const actions: DialogAction[] = [
+    { key: 'no', label: 'Cancelar', variant: 'danger' },
+    { key: 'yes', label: confirmLabel, variant: destructive ? 'dangerSolid' : 'primary' },
+  ];
+  return new Promise((resolve) => present({ title, message, actions, stacked: false, resolve: (key) => resolve(key === 'yes') }));
+}
+
+/** Several ways out, one under the other. Resolves with the key of the one chosen, or null when dismissed. */
+export function choose<K extends string>(title: string, message: string, actions: DialogAction<K>[]): Promise<K | null> {
+  const present = open;
+  if (!present) return Promise.resolve(null);
+  return new Promise((resolve) => present({ title, message, actions, stacked: true, resolve: (key) => resolve(key as K | null) }));
 }
 
 /** Mount once near the root, inside the theme and portal providers. Always drawn above any open sheet. */
@@ -36,13 +48,13 @@ export function DialogHost() {
   }, []);
 
   const close = useCallback(
-    (ok: boolean) => {
-      request?.resolve(ok);
+    (key: string | null) => {
+      request?.resolve(key);
       setRequest(null);
     },
     [request],
   );
-  useBackToClose(!!request, () => close(false));
+  useBackToClose(!!request, () => close(null));
 
   const backdrop = useAnimatedStyle(() => ({ opacity: progress.value }));
   const card = useAnimatedStyle(() => ({ opacity: progress.value, transform: [{ scale: 0.94 + progress.value * 0.06 }] }));
@@ -51,15 +63,16 @@ export function DialogHost() {
   return (
     <Portal>
       <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, { backgroundColor: c.overlay }, backdrop]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={() => close(false)} accessibilityLabel="Cerrar" disabled={!request} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => close(null)} accessibilityLabel="Cerrar" disabled={!request} />
         <Animated.View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }, card]} accessibilityRole="alert">
           <T variant="h2">{shown.title}</T>
           {shown.message ? <T variant="body" tone="muted" style={{ marginTop: space.sm }}>{shown.message}</T> : null}
-          <View style={styles.actions}>
-            <View style={{ flex: 1 }}><Button label="Cancelar" variant="danger" onPress={() => close(false)} /></View>
-            <View style={{ flex: 1 }}>
-              <Button label={shown.confirmLabel} variant={shown.destructive ? 'dangerSolid' : 'primary'} onPress={() => close(true)} />
-            </View>
+          <View style={shown.stacked ? styles.stack : styles.actions}>
+            {shown.actions.map((a) => (
+              <View key={a.key} style={shown.stacked ? undefined : { flex: 1 }}>
+                <Button label={a.label} variant={a.variant} onPress={() => close(a.key)} />
+              </View>
+            ))}
           </View>
         </Animated.View>
       </Animated.View>
@@ -71,4 +84,5 @@ const styles = StyleSheet.create({
   backdrop: { alignItems: 'center', justifyContent: 'center', padding: space.xl },
   card: { width: '100%', maxWidth: 420, borderRadius: radius.xl, borderWidth: StyleSheet.hairlineWidth, padding: space.xl },
   actions: { flexDirection: 'row', gap: space.md, marginTop: space.xl },
+  stack: { gap: space.sm, marginTop: space.xl },
 });

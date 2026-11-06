@@ -86,7 +86,7 @@ export default function AttendanceScreen() {
               {isScheduled(selected, stats.scheduledDays) ? <Badge label="Día de gym" tone="protein" /> : <Badge label="Descanso" tone="muted" />}
             </Row>
             {selSessions.map((s) => (
-              <Chip key={s.id} label={`${s.routineName ?? 'Entrenamiento libre'} · ${s.setCount} series`} icon="activity" onPress={() => {
+              <Chip key={s.id} label={`${s.routineName ?? 'Entrenamiento'} · ${s.setCount} series`} icon="activity" onPress={() => {
                 setSelected(null);
                 router.push({ pathname: '/sesion/[id]', params: { id: s.id } });
               }} />

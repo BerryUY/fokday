@@ -63,7 +63,7 @@ export function DayDetail({ date }: { date: DateKey }) {
         {data.sessions.map((s) => (
           <View key={s.id} style={{ marginBottom: space.md }}>
             <Row style={{ justifyContent: 'space-between' }}>
-              <T variant="h3">{s.routineName ?? 'Entrenamiento libre'}</T>
+              <T variant="h3">{s.routineName ?? 'Entrenamiento'}</T>
               <T variant="caption" tone="dim">{s.durationSeconds ? formatDuration(s.durationSeconds) : ''}</T>
             </Row>
             {s.exercises.filter((e) => e.status === 'done').map((e) => (

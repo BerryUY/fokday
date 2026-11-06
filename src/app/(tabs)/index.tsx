@@ -8,6 +8,7 @@ import { WeekStrip } from '@/components/calendar';
 import { ExtraTotals } from '@/components/ExtraTotals';
 import { HabitsCard } from '@/components/HabitsCard';
 import { RoutinePicker } from '@/components/RoutinePicker';
+import { useCancelWorkout } from '@/components/useCancelWorkout';
 import { StreakChip } from '@/components/streak';
 import { TodayCard } from '@/components/TodayCard';
 import { TodoCard } from '@/components/TodoCard';
@@ -47,6 +48,7 @@ export default function HomeScreen() {
   const outOfPhotos = left(usePlan().ai) === 0;
   const sync = useSyncState();
   const run = useMutation();
+  const cancelWorkout = useCancelWorkout();
   const today = todayKey();
   const [picking, setPicking] = useState(false);
   const { data } = useQuery(async (db) => {
@@ -75,11 +77,11 @@ export default function HomeScreen() {
   const trainedToday = attendedSet.has(today);
   const isTrainingDay = stats.scheduledDays.includes(weekday(today));
 
-  const start = async (routineId: string | null, onWeekday: number | null = weekday(today)) => {
+  const start = async (routineId: string, onWeekday: number | null = weekday(today)) => {
     const id = await run((db) => startSession(db, today, routineId, onWeekday));
     if (id) openWorkout();
   };
-  const startPicked = (r: RoutineSummary | null) => start(r?.id ?? null, r ? (r.weekdays.includes(weekday(today)) ? weekday(today) : r.weekdays[0] ?? null) : null);
+  const startPicked = (r: RoutineSummary) => start(r.id, r.weekdays.includes(weekday(today)) ? weekday(today) : r.weekdays[0] ?? null);
   // Always ends somewhere: a running workout, today's routine, the list of routines, or making the first one.
   const train = () => {
     if (active) return openWorkout();
@@ -187,7 +189,7 @@ export default function HomeScreen() {
             {trainedToday ? <Badge label="Entrenaste hoy" /> : isTrainingDay ? <Badge label="Día de gym" tone="protein" /> : <Badge label="Descanso" tone="muted" />}
           </Row>
           <T variant="title" style={{ marginTop: space.sm }}>
-            {active ? active.routineName ?? 'Entrenamiento libre' : routine ? routine.name : isTrainingDay ? 'Elegí qué entrenar' : 'Día de descanso'}
+            {active ? active.routineName ?? 'Entrenamiento' : routine ? routine.name : isTrainingDay ? 'Elegí qué entrenar' : 'Día de descanso'}
           </T>
           <T variant="label" tone="muted" style={{ marginTop: 2 }}>
             {active
@@ -201,11 +203,11 @@ export default function HomeScreen() {
           <Button
             label={active ? 'Seguir entrenando' : trainedToday ? 'Entrenar de nuevo' : routine ? 'Empezar' : !routines.length ? 'Elegir mi plan' : isTrainingDay ? 'Elegir rutina' : 'Entrenar igual'}
             icon="play"
-            size={active || (routine && !trainedToday) ? 'lg' : 'md'}
-            variant={active || (routine && !trainedToday) ? 'primary' : 'secondary'}
+            size="xl"
             style={{ marginTop: space.lg }}
             onPress={train}
           />
+          {active ? <Button label="Cancelar entrenamiento" variant="ghost" size="sm" style={{ marginTop: space.xs }} onPress={() => void cancelWorkout(active.id)} /> : null}
           <View style={{ marginTop: space.lg }}>
             <WeekStrip attended={attendedSet} planned={stats.scheduledDays} today={today} />
           </View>

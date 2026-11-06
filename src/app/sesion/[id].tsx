@@ -44,7 +44,7 @@ export default function SessionDetailScreen() {
   };
 
   return (
-    <Screen title={session.routineName ?? 'Entrenamiento libre'} subtitle={capitalize(formatLong(session.date))} onBack={justFinished ? () => router.replace('/') : undefined}>
+    <Screen title={session.routineName ?? 'Entrenamiento'} subtitle={capitalize(formatLong(session.date))} onBack={justFinished ? () => router.replace('/') : undefined}>
       {justFinished ? (
         <View style={{ alignItems: 'center', paddingVertical: space.lg }}>
           <Foki mood="cheer" size={130} />

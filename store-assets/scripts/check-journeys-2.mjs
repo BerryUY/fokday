@@ -99,16 +99,11 @@ await step('una actividad se puede borrar', async () => {
   await segment('Historial');
   return !(await visible()).includes('Caminata');
 });
-await step('entrenamiento libre: sumar ejercicio y hacer una serie', async () => {
+await step('empezar una rutina y hacer una serie', async () => {
   await go('/entrenar');
-  await page.getByText('Entrenamiento libre', { exact: true }).first().click();
+  await tap(/^(Empezar|Entrenar igual|Entrenar de nuevo)$/);
+  if ((await visible()).includes('¿Qué entrenás hoy?')) await page.getByRole('button').filter({ hasText: 'ejercicios' }).last().click();
   await wait(1800);
-  await tap('Agregar ejercicio');
-  await wait(1000);
-  await page.getByText('Plancha', { exact: true }).first().click();
-  await wait(1500);
-  const t = await visible();
-  if (!t.includes('Plancha')) return false;
   await page.getByLabel('Repeticiones', { exact: true }).fill('12');
   await tap('Serie hecha');
   return (await visible()).includes('Descanso');
@@ -121,7 +116,7 @@ await step('tocar dos veces Serie hecha no marca dos series de golpe', async () 
   const done = await page.getByRole('button', { name: /^Serie \d, hecha/ }).count();
   return done === 2 ? '2 series, como debe ser' : false;
 });
-await step('terminar el libre', async () => {
+await step('terminar el entrenamiento', async () => {
   await tap('Ver todos los ejercicios');
   await tap('Terminar entrenamiento');
   const confirmBtn = page.getByText('Terminar', { exact: true });
@@ -143,8 +138,8 @@ await step('cargar uno que me olvidé abre la sesión', async () => {
   await wait(1800);
   const ok = page.url().includes('/sesion/activa');
   await tap('Ver todos los ejercicios');
-  await tap('Descartar entrenamiento');
-  await page.getByText('Descartar', { exact: true }).last().click();
+  await tap('Cancelar entrenamiento');
+  await page.getByText('Sí, cancelarlo', { exact: true }).last().click();
   await wait(1200);
   return ok;
 });
@@ -155,8 +150,8 @@ await step('tocar dos veces Empezar no abre dos sesiones', async () => {
   await wait(2000);
   const ok = page.url().includes('/sesion/activa');
   await tap('Ver todos los ejercicios');
-  await tap('Descartar entrenamiento');
-  await page.getByText('Descartar', { exact: true }).last().click();
+  await tap('Cancelar entrenamiento');
+  await page.getByText('Sí, cancelarlo', { exact: true }).last().click();
   await wait(1200);
   await go('/entrenar');
   return ok && !(await visible()).includes('En curso');

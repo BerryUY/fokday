@@ -5,6 +5,7 @@ import { WeekStrip } from '@/components/calendar';
 import { DateChip } from '@/components/DatePicker';
 import { Foki } from '@/components/mascot/Foki';
 import { RoutinePicker } from '@/components/RoutinePicker';
+import { useCancelWorkout } from '@/components/useCancelWorkout';
 import { Sheet } from '@/components/ui/form';
 import { ListRow, Loading, Screen, TabHeader } from '@/components/ui/layout';
 import { Reveal } from '@/components/ui/Reveal';
@@ -68,11 +69,11 @@ export default function TrainScreen() {
 
   if (!data) return <Screen tab><Loading variant="train" /></Screen>;
 
-  const start = async (routineId: string | null, date = today, onWeekday: number | null = weekday(date)) => {
+  const start = async (routineId: string, date = today, onWeekday: number | null = weekday(date)) => {
     const id = await run((db) => startSession(db, date, routineId, onWeekday));
     if (id) openWorkout();
   };
-  const startPicked = (r: RoutineSummary | null) => start(r?.id ?? null, today, r ? (r.weekdays.includes(weekday(today)) ? weekday(today) : r.weekdays[0] ?? null) : null);
+  const startPicked = (r: RoutineSummary) => start(r.id, today, r.weekdays.includes(weekday(today)) ? weekday(today) : r.weekdays[0] ?? null);
 
   return (
     <Screen tab>
@@ -116,10 +117,11 @@ type TrainData = {
 function Today({ data, today, onStart, onPick }: {
   data: TrainData;
   today: string;
-  onStart: (routineId: string | null, date?: string, onWeekday?: number | null) => void;
+  onStart: (routineId: string, date?: string, onWeekday?: number | null) => void;
   onPick: () => void;
 }) {
   const run = useMutation();
+  const cancelWorkout = useCancelWorkout();
   const { plan, active, attendance, exercises } = data;
   const sets = exercises.reduce((n, e) => n + e.sets, 0);
   const goal = data.stats.scheduledDays.length;
@@ -134,25 +136,26 @@ function Today({ data, today, onStart, onPick }: {
               <Foki mood="strong" size={64} />
               <View style={{ flex: 1 }}>
                 <T variant="overline" tone="accent">En curso</T>
-                <T variant="title" style={{ marginTop: 2 }}>{active.routineName ?? 'Entrenamiento libre'}</T>
+                <T variant="title" style={{ marginTop: 2 }}>{active.routineName ?? 'Entrenamiento'}</T>
                 <T variant="caption" tone="muted">Empezó hace {formatMinutes((Date.now() - new Date(active.startedAt).getTime()) / 1000)}</T>
               </View>
             </Row>
-            <Button label="Seguir entrenando" icon="play" size="lg" style={{ marginTop: space.lg }} onPress={() => openWorkout()} />
+            <Button label="Seguir entrenando" icon="play" size="xl" style={{ marginTop: space.lg }} onPress={() => openWorkout()} />
+            <Button label="Cancelar entrenamiento" variant="ghost" size="sm" style={{ marginTop: space.xs }} onPress={() => void cancelWorkout(active.id)} />
           </Card>
         ) : attendance ? (
           <Card style={{ padding: space.xl, alignItems: 'center' }}>
             <Foki mood="proud" size={96} />
             <T variant="title" style={{ marginTop: space.md }}>Hoy ya entrenaste</T>
             <T variant="label" tone="muted" style={{ marginTop: 2, textAlign: 'center' }}>Bien ahí. Lo que queda es comer bien y descansar.</T>
-            <Button label="Entrenar de nuevo" icon="play" variant="secondary" full style={{ marginTop: space.lg }} onPress={onPick} />
+            <Button label="Entrenar de nuevo" icon="play" size="xl" full style={{ marginTop: space.lg }} onPress={onPick} />
           </Card>
         ) : !plan ? (
           <Card style={{ padding: space.xl, alignItems: 'center' }}>
             <Foki mood="strong" size={110} />
             <T variant="title" style={{ marginTop: space.md, textAlign: 'center' }}>Armá tu plan en un minuto</T>
             <T variant="label" tone="muted" style={{ marginTop: 2, textAlign: 'center' }}>Elegí uno listo o creá el tuyo. Después solo tocás Empezar.</T>
-            <Button label="Elegir mi plan" icon="arrow-right" size="lg" full style={{ marginTop: space.lg }} onPress={() => router.push('/rutina/nueva')} />
+            <Button label="Elegir mi plan" icon="arrow-right" size="xl" full style={{ marginTop: space.lg }} onPress={() => router.push('/rutina/nueva')} />
           </Card>
         ) : plan.when === 'today' ? (
           <Card style={{ padding: space.xl }}>
@@ -164,7 +167,7 @@ function Today({ data, today, onStart, onPick }: {
             {exercises.length ? (
               <T variant="label" tone="dim" numberOfLines={2} style={{ marginTop: space.md }}>{exercises.map((e) => e.name).join(' · ')}</T>
             ) : null}
-            <Button label="Empezar" icon="play" size="lg" style={{ marginTop: space.lg }} onPress={() => onStart(plan.routine.id, today, plan.weekday)} />
+            <Button label="Empezar" icon="play" size="xl" style={{ marginTop: space.lg }} onPress={() => onStart(plan.routine.id, today, plan.weekday)} />
             <Button label="Hoy hago otra cosa" variant="ghost" size="sm" style={{ marginTop: 4 }} onPress={onPick} />
           </Card>
         ) : (
@@ -174,7 +177,7 @@ function Today({ data, today, onStart, onPick }: {
             <T variant="label" tone="muted" style={{ marginTop: 2, textAlign: 'center' }}>
               {plan.weekday !== null ? `Lo próximo es ${plan.routine.name}, el ${DAY_LONG[plan.weekday]}.` : 'Descansar también es parte del progreso.'}
             </T>
-            <Button label="Entrenar igual" icon="play" variant="secondary" full style={{ marginTop: space.lg }} onPress={onPick} />
+            <Button label="Entrenar igual" icon="play" size="xl" full style={{ marginTop: space.lg }} onPress={onPick} />
           </Card>
         )}
       </Reveal>
@@ -208,8 +211,6 @@ function Today({ data, today, onStart, onPick }: {
           />
           <Divider style={styles.inset} />
           <ListRow icon="activity" iconTone="protein" title="Aeróbico" subtitle="Caminar, correr, bici, natación" onPress={() => router.push('/actividad/nueva')} />
-          <Divider style={styles.inset} />
-          <ListRow icon="zap" iconTone="weight" title="Entrenamiento libre" subtitle="Sin rutina: sumás ejercicios sobre la marcha" onPress={() => (active ? openWorkout() : onStart(null, today, null))} />
         </Card>
       </Reveal>
     </View>
@@ -279,7 +280,7 @@ function History({ history, trained, onPast }: {
                 <ListRow
                   icon="check-circle"
                   iconTone="accent"
-                  title={h.item.routineName ?? 'Entrenamiento libre'}
+                  title={h.item.routineName ?? 'Entrenamiento'}
                   subtitle={`${formatShort(h.date)} · ${h.item.setCount} series · ${formatNumber(h.item.volume)} kg${h.item.durationSeconds ? ' · ' + formatDuration(h.item.durationSeconds) : ''}`}
                   onPress={() => router.push({ pathname: '/sesion/[id]', params: { id: h.item.id } })}
                 />
@@ -341,10 +342,11 @@ function PastWorkoutSheet({ visible, onClose, routines, onStart }: {
   visible: boolean;
   onClose: () => void;
   routines: { id: string; name: string }[];
-  onStart: (date: string, routineId: string | null) => void;
+  onStart: (date: string, routineId: string) => void;
 }) {
   const [date, setDate] = useState(todayKey());
-  const [routine, setRoutine] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
+  const routine = picked ?? routines[0]?.id ?? null;
   return (
     <Sheet visible={visible} onClose={onClose} title="Cargar un entrenamiento pasado">
       <View style={{ gap: space.lg }}>
@@ -355,14 +357,25 @@ function PastWorkoutSheet({ visible, onClose, routines, onStart }: {
         <View style={{ gap: 6 }}>
           <T variant="label" tone="muted">¿Qué hiciste?</T>
           <Row style={{ flexWrap: 'wrap' }} gap={6}>
-            <Chip label="Libre" selected={routine === null} onPress={() => setRoutine(null)} />
             {routines.map((r) => (
-              <Chip key={r.id} label={r.name} selected={routine === r.id} onPress={() => setRoutine(r.id)} />
+              <Chip key={r.id} label={r.name} selected={routine === r.id} onPress={() => setPicked(r.id)} />
             ))}
           </Row>
+          {routine ? null : <T variant="label" tone="dim">Primero necesitás una rutina.</T>}
         </View>
         <T variant="caption" tone="dim">Se abre el entrenamiento para que marques las series. Al terminar, ese día cuenta para tu racha.</T>
-        <Button label="Cargar" icon="arrow-right" onPress={() => onStart(date, routine)} />
+        {routine ? (
+          <Button label="Cargar" icon="arrow-right" onPress={() => onStart(date, routine)} />
+        ) : (
+          <Button
+            label="Crear una rutina"
+            icon="plus"
+            onPress={() => {
+              onClose();
+              router.push('/rutina/nueva');
+            }}
+          />
+        )}
       </View>
     </Sheet>
   );

@@ -263,11 +263,7 @@ export async function finishSession(db: Db, sessionId: string, now: Date = new D
   const session = await db.getFirstAsync<WorkoutSession>(`SELECT ${SESSION_COLUMNS} FROM workout_sessions WHERE id = ?`, [sessionId]);
   if (!session) throw new Error('La sesión ya no existe.');
   if (session.status === 'completed') return;
-  const completedSets = await db.getFirstAsync<{ n: number }>(
-    `SELECT count(*) AS n FROM workout_sets s JOIN workout_exercises we ON we.id = s.workout_exercise_id WHERE we.session_id = ? AND s.is_completed = 1`,
-    [sessionId],
-  );
-  if (!completedSets?.n) throw new Error('Marcá al menos una serie como hecha para terminar el entrenamiento.');
+  if (!(await countDoneSets(db, sessionId))) throw new Error('Marcá al menos una serie como hecha para terminar el entrenamiento.');
   const finishedAt = now.toISOString();
   const duration = Math.max(0, Math.round((now.getTime() - new Date(session.startedAt).getTime()) / 1000));
   await db.withTransactionAsync(async () => {
@@ -287,6 +283,14 @@ export async function finishSession(db: Db, sessionId: string, now: Date = new D
     );
     await markAttendance(db, session.date, 'workout', sessionId);
   });
+}
+
+export async function countDoneSets(db: Db, sessionId: string): Promise<number> {
+  const row = await db.getFirstAsync<{ n: number }>(
+    `SELECT count(*) AS n FROM workout_sets s JOIN workout_exercises we ON we.id = s.workout_exercise_id WHERE we.session_id = ? AND s.is_completed = 1`,
+    [sessionId],
+  );
+  return row?.n ?? 0;
 }
 
 /** Cancelling discards an unfinished session entirely. */

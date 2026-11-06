@@ -2,7 +2,7 @@ import { buildMissions, fokiLine, usualHour, type DayState } from '@/domain/dayP
 import { computeStreak, MAX_SHIELDS, NEW_VAULT, settleStreak, type StreakVault } from '@/domain/streak';
 import { createFromTemplate, ROUTINE_TEMPLATES, spreadOverDays } from '@/data/routineTemplates';
 import { addRoutineExercise, getRoutine, listRoutines, saveExercise, saveRoutine } from '@/data/routines';
-import { completeSet, finishSession, getSession, getSessionRecords, startSession } from '@/data/workouts';
+import { cancelSession, completeSet, countDoneSets, finishSession, getActiveSession, getSession, getSessionRecords, startSession } from '@/data/workouts';
 import type { Db } from '@/db/types';
 import { createTestDb } from './helpers/db';
 
@@ -118,6 +118,17 @@ describe('workouts', () => {
     expect(a).toBe(b);
     const running = await db.getAllAsync("SELECT id FROM workout_sessions WHERE status = 'in_progress'", []);
     expect(running).toHaveLength(1);
+  });
+
+  it('cancelling a workout leaves no trace and frees the next start', async () => {
+    const routine = await setup();
+    const id = await startSession(db, '2026-10-20', routine, null);
+    await completeSet(db, (await getSession(db, id))!.exercises[0].sets[0].id, { weight: 60, reps: 10 });
+    expect(await countDoneSets(db, id)).toBe(1);
+    await cancelSession(db, id);
+    expect(await getActiveSession(db)).toBeNull();
+    expect(await db.getAllAsync('SELECT date FROM gym_attendance', [])).toHaveLength(0);
+    expect(await startSession(db, '2026-10-20', routine, null)).not.toBe(id);
   });
 
   it('finds the records of a session, but not on a first time', async () => {
