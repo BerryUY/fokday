@@ -67,7 +67,7 @@ const content = (p: PlannedNotification): Notifications.NotificationContentInput
   title: p.title,
   body: p.body,
   color: p.channel === 'streak' ? FLAME : BRAND,
-  data: { url: p.url, largeIcon: artFor(p.mood) },
+  data: { url: p.url, fokiIcon: artFor(p.mood) },
   ...(p.category ? { categoryIdentifier: p.category } : {}),
 });
 

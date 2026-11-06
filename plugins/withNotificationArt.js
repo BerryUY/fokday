@@ -4,7 +4,7 @@ const { withDangerousMod } = require('expo/config-plugins');
 
 /**
  * Copies Foki's faces (assets/notifications/foki_*.png) into the Android drawables, so each
- * notification can show its own image next to the text. See patches/expo-notifications*.patch.
+ * notification can show its own image next to the text. See patches/expo-notifications*.patch, which only takes effect because package.json builds that module from source.
  */
 module.exports = function withNotificationArt(config) {
   return withDangerousMod(config, [

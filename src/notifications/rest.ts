@@ -10,7 +10,7 @@ export async function scheduleRestEnd(seconds: number, next: string): Promise<vo
   try {
     await Notifications.scheduleNotificationAsync({
       identifier: REST_ID,
-      content: { title: '¡Se terminó el descanso!', body: next, data: { url: '/sesion/activa', largeIcon: 'foki_strong' } },
+      content: { title: '¡Se terminó el descanso!', body: next, data: { url: '/sesion/activa', fokiIcon: 'foki_strong' } },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds, channelId: CHANNELS.workout },
     });
   } catch {

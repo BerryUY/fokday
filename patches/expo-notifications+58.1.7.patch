@@ -1,12 +1,12 @@
 diff --git a/node_modules/expo-notifications/android/src/main/java/expo/modules/notifications/notifications/model/NotificationContent.java b/node_modules/expo-notifications/android/src/main/java/expo/modules/notifications/notifications/model/NotificationContent.java
-index ae6d392..7f6efe2 100644
+index ae6d392..03e41ad 100644
 --- a/node_modules/expo-notifications/android/src/main/java/expo/modules/notifications/notifications/model/NotificationContent.java
 +++ b/node_modules/expo-notifications/android/src/main/java/expo/modules/notifications/notifications/model/NotificationContent.java
 @@ -99,6 +99,13 @@ public class NotificationContent implements Parcelable, Serializable, INotificat
    @Nullable
    @Override
    public Object getImage(@NonNull Context context, @NonNull Continuation<? super Bitmap> $completion) {
-+    String name = mBody != null ? mBody.optString("largeIcon", "") : "";
++    String name = mBody != null ? mBody.optString("fokiIcon", "") : "";
 +    if (!name.isEmpty()) {
 +      int id = context.getResources().getIdentifier(name, "drawable", context.getPackageName());
 +      if (id != 0) {
