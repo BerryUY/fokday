@@ -43,7 +43,7 @@ async function learnHours(db: Db, today: string): Promise<UsualHours> {
       return d.getHours() + d.getMinutes() / 60;
     });
   return {
-    breakfast: usualHour(hoursOf('desayuno'), DEFAULT_HOURS.breakfast, 6, 11),
+    breakfast: usualHour(hoursOf('desayuno'), DEFAULT_HOURS.breakfast, 7, 11),
     lunch: usualHour(hoursOf('almuerzo'), DEFAULT_HOURS.lunch, 11, 15.5),
     dinner: usualHour(hoursOf('cena'), DEFAULT_HOURS.dinner, 18.5, 22),
   };

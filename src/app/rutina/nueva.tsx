@@ -34,7 +34,7 @@ export default function NewRoutineScreen() {
   return (
     <Screen title="Nueva rutina">
       <Row gap={space.md} style={{ marginBottom: space.lg }}>
-        <Foki mood="strong" size={72} />
+        <Foki mood="strong" size={84} />
         <View style={{ flex: 1 }}>
           <T variant="title">Elegí un plan</T>
           <T variant="label" tone="muted">Después podés cambiar todo lo que quieras.</T>

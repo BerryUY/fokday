@@ -102,9 +102,7 @@ function NotificationCard({ n }: { n: PlannedNotification }) {
           </Row>
         ) : null}
       </View>
-      <View style={styles.tile}>
-        <Foki mood={n.mood} lit={n.mood !== 'worried' && n.mood !== 'sad'} size={50} still color="#C8F560" />
-      </View>
+      <Foki mood={n.mood} lit={!['worried', 'sad', 'sleepy'].includes(n.mood)} size={58} still />
     </View>
   );
 }
@@ -112,5 +110,4 @@ function NotificationCard({ n }: { n: PlannedNotification }) {
 const styles = StyleSheet.create({
   group: { marginBottom: space.sm, marginLeft: space.xs },
   card: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, paddingLeft: space.lg, borderRadius: radius.lg },
-  tile: { width: 62, height: 62, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0F1210', overflow: 'hidden' },
 });

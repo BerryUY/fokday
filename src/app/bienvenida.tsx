@@ -571,9 +571,17 @@ function NumberPicker({ value, onChange, min, max, step, unit, label, big }: {
   // While typing, the field shows the draft; otherwise it always reflects the current value.
   const [draft, setDraft] = useState<string | null>(null);
   const shown = step < 1 ? formatKg(value) : String(value);
+  const fit = (v: number) => Math.min(max, Math.max(min, Math.round(v / step) * step));
   const set = (v: number) => {
     haptic('light');
-    onChange(Math.min(max, Math.max(min, Math.round(v / step) * step)));
+    onChange(fit(v));
+  };
+  // Saved as it's typed: tapping Continuar with the keyboard open moves on without the field ever
+  // ending its edit, and a value kept for that moment would be lost. Half-typed numbers out of range wait.
+  const type = (text: string) => {
+    setDraft(text);
+    const v = parsePositive(text);
+    if (v !== null && v >= min && v <= max) onChange(fit(v));
   };
   return (
     <Row style={{ justifyContent: 'center', gap: space.lg }}>
@@ -581,13 +589,9 @@ function NumberPicker({ value, onChange, min, max, step, unit, label, big }: {
       <View style={{ alignItems: 'center', minWidth: big ? 140 : 110 }}>
         <TextInput
           value={draft ?? shown}
-          onChangeText={setDraft}
+          onChangeText={type}
           onFocus={() => setDraft(shown)}
-          onEndEditing={() => {
-            const v = parsePositive(draft ?? '');
-            if (v) set(v);
-            setDraft(null);
-          }}
+          onBlur={() => setDraft(null)}
           keyboardType={step < 1 ? 'decimal-pad' : 'number-pad'}
           selectTextOnFocus
           maxFontSizeMultiplier={1.2}
