@@ -14,7 +14,7 @@
     "android": {
       "package": "uy.santiago.momentum",
       "allowBackup": true,
-      "versionCode": 4,
+      "versionCode": 5,
       "adaptiveIcon": {
         "backgroundColor": "#0B0C0E",
         "foregroundImage": "./assets/android-icon-foreground.png",
