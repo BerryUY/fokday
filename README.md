@@ -1,141 +1,173 @@
-# FokDay
+<p align="center">
+  <img src="store-assets/output/play-feature/01.png" alt="FokDay: calories, gym and habits in one app" width="820">
+</p>
 
-Formerly called Momentum. The internal identifiers keep that name on purpose (Android package `uy.santiago.momentum`, EAS slug, database file, backup format, the Supabase function and tables) so updates install over the old app and old backups still restore.
+<p align="center">
+  <b>Calories from a photo, your gym routine and your daily habits, in one Android app.</b><br>
+  Local-first, works offline, with optional cloud backup. The app is in Spanish (Uruguay).
+</p>
 
-Android fitness tracker for a small group of people (the owner and friends): nutrition (with the plan from plancomidas.netlify.app built in), gym attendance, routines with per-day exercises, live workouts, free activities (walks, cycling), body weight toward a goal (up, down or maintain), optional trackers (water, creatine, carbs, fat, fiber, dairy), local reminders, statistics and history. A short step-by-step welcome sets each person up. Works fully offline; each person can back up to Supabase through their own profile. All UI text is in Spanish (Uruguay).
+<p align="center">
+  <img alt="Expo SDK 58" src="https://img.shields.io/badge/Expo-SDK%2058-000020?logo=expo&logoColor=white">
+  <img alt="React Native 0.88" src="https://img.shields.io/badge/React%20Native-0.88-20232a?logo=react&logoColor=61DAFB">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white">
+  <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Edge%20Functions-3FCF8E?logo=supabase&logoColor=white">
+  <img alt="Android" src="https://img.shields.io/badge/Android-7.0%2B-3DDC84?logo=android&logoColor=white">
+</p>
 
-Publishing to Google Play (internal testing): see [docs/play-store.md](docs/play-store.md).
+<table align="center">
+  <tr>
+    <td><img src="store-assets/output/play-screenshots/01.png" width="135" alt="Home: the whole day in one app"></td>
+    <td><img src="store-assets/output/play-screenshots/02.png" width="135" alt="Meals: calories from a photo"></td>
+    <td><img src="store-assets/output/play-screenshots/03.png" width="135" alt="Gym: log every set"></td>
+    <td><img src="store-assets/output/play-screenshots/04.png" width="135" alt="Streak"></td>
+    <td><img src="store-assets/output/play-screenshots/05.png" width="135" alt="Progress and calendar"></td>
+    <td><img src="store-assets/output/play-screenshots/06.png" width="135" alt="Free basics and Pro"></td>
+  </tr>
+</table>
+
+## What it does
+
+- **📸 Calories from a photo.** Snap your plate and the AI estimates calories, protein, carbs and fat. You can fix any value before saving.
+- **🔎 Barcode scanner.** Packaged food comes from [Open Food Facts](https://world.openfoodfacts.org). You can also log by hand or repeat a meal you had before.
+- **🏋️ Gym routines.** Routines by weekday, one set at a time, with what you lifted last time in view, a rest timer and 876 exercises explained in Spanish.
+- **⚖️ Weight and goals.** Lose, gain or maintain, with milestones on the way and daily calorie and protein targets.
+- **✅ Habits and to-dos.** Water, creatine, walks and your list for the day. Reminders only mention what is still missing.
+- **🔥 Streaks.** Every meal, weigh-in or workout counts the day. Streak shields cover a missed day.
+- **📊 Progress.** Weight, calories and protein against your goal, volume per workout, per-exercise progression and a calendar of everything you logged.
+- **🔒 Your data stays yours.** Everything works without an account. Sign in (Google or email) only if you want automatic cloud backups.
+
+## Meet Foki
+
+<p>
+  <img src="assets/notifications/foki_happy.png" width="88" alt="Foki happy">
+  <img src="assets/notifications/foki_strong.png" width="88" alt="Foki lifting">
+  <img src="assets/notifications/foki_hungry.png" width="88" alt="Foki hungry">
+  <img src="assets/notifications/foki_sleepy.png" width="88" alt="Foki sleepy">
+</p>
+
+Foki is the app's mascot. It cheers on the home screen, celebrates streaks and shows up in reminders with a face that matches the message.
+
+## Free and Pro
+
+|  | Free | Pro |
+|---|---|---|
+| Meals, workouts, routines, weight, habits, reminders | ✅ | ✅ |
+| Exercise guide, barcode scanner, cloud backup, JSON/CSV export | ✅ | ✅ |
+| AI food photos | Daily allowance, plus extra ones for an optional rewarded video | 20 per day, no videos |
+| AI weekly summary | | ✅ |
+| 90-day and all-time stats, per-exercise progression, color themes | | ✅ |
+| Ads | Only if you choose to watch a video | None |
+
+Pro is a subscription through Google Play Billing (RevenueCat). The server decides every limit, so they can change without an app update.
 
 ## Architecture
 
 ```
 Android app (Expo SDK 58, React Native, TypeScript, Expo Router)
  ├─ SQLite (expo-sqlite) ← primary database, every action is saved here first
- │   meals · meal_logs · routines · sessions · sets · attendance · weight · goals · notes …
- └─ Backup service (only when online)
-      └─ HTTPS + per-profile token → Supabase Edge Function `momentum` → Postgres (profiles, backup list) + private Storage (gzip snapshots)
+ │   meals · meal_logs · routines · sessions · sets · attendance · weight · goals · todos …
+ └─ Backup and AI services (only when online)
+      └─ HTTPS + Supabase session → Edge Function `momentum` → Postgres + private Storage (gzip snapshots)
+                                                              ├─ Gemini (food photo, weekly summary)
+                                                              ├─ Open Food Facts (barcodes)
+                                                              ├─ RevenueCat (Pro check)
+                                                              └─ AdMob server-side verification (rewarded videos)
 ```
 
 - **Local-first.** Every screen reads and writes SQLite. Nothing waits on the network, and the app never needs the API to work.
-- **Backups are full, versioned snapshots.** SQLite triggers bump a `local_revision` counter on every write. When it is ahead of the last backed-up revision and the phone is online, the app uploads a checksummed JSON snapshot of all tables. The server stores each one as a new version (keeps the last 60 by default).
-- **No duplicates.** A retry reuses the same backup id and the server ignores ids it already has. Restores replace tables inside one transaction, so sync retries can never duplicate meal logs.
-- **No silent overwrites.** Restoring is always a manual, confirmed action. It shows what the backup contains and warns if local changes would be lost. A local safety copy is written first. After a reinstall, automatic backups stay paused until you decide whether to restore the cloud backup or keep the phone's data.
-- **Accounts and security.** Accounts are optional (Google or email and password, Supabase Auth); the app works fully without one. With an account the app sends the Supabase session to the API, which verifies it and finds (or creates) that account's profile. Older installs that used an invite code keep working with their own token until they sign in, when their profile moves into the account. Sessions live in SecureStore. Database credentials never ship in the APK: only public values, in `src/config.ts`. See `docs/seguridad.md`.
-- **Plans.** Free and Pro (RevenueCat over Google Play Billing). The server is the authority for what is limited (AI photo, barcode, weekly summary): daily allowances are reserved atomically in Postgres. Free accounts can earn extras with rewarded videos (AdMob, server-side verified). Limits live in `momentum_config` (`photo_free`, `photo_bonus_max`, `photo_videos_per_extra`, `photo_pro`, `barcode_*`, `summary_pro`).
-
-Decisions you may want to know about:
-- **Backend: Supabase** (Edge Function + Postgres + Storage, one free project). Tables have RLS on with no policies and the bucket is private, so only the function's secret key reaches the data. Snapshots are stored gzip-compressed; each profile keeps its 3 newest backups plus one per day for a week. The app uploads when you leave it (at most hourly) and every 6 hours while open, so the server stays mostly idle.
-- **Styling: no NativeWind.** It adds Babel/Metro configuration risk that I couldn't verify on a device for SDK 58. Instead there is a typed design-token system (`src/theme`) with dark and light palettes.
-- **Charts: custom SVG on `react-native-svg`.** The line chart, bars, rings and heatmap are small components with touch-to-inspect. This gives full control of the look and adds no heavy chart dependency.
+- **Backups are full, versioned snapshots.** SQLite triggers bump a `local_revision` counter on every write. When it is ahead of the last backup and the phone is online, the app uploads a checksummed JSON snapshot. Each profile keeps its 3 newest backups plus one per day for a week.
+- **No duplicates, no silent overwrites.** Retries reuse the same backup id and the server ignores ids it already has. Restoring is always a manual, confirmed action: it shows what the backup contains, warns if local changes would be lost and writes a local safety copy first.
+- **Accounts are optional.** Google or email and password through Supabase Auth. The API verifies the session and finds or creates that account's profile. Sessions live in SecureStore. Only public values ship in the APK, all in `src/config.ts`.
+- **The server is the authority for limits.** Daily allowances (AI photo, barcode, weekly summary) are reserved atomically in Postgres and refunded if the call fails. Limits live in `momentum_config`.
 - **Dates** are stored as `YYYY-MM-DD` keys in America/Montevideo time, so a meal logged at 23:30 counts for that day, not the UTC one.
+
+Some decisions:
+- **Backend: Supabase** (Edge Function + Postgres + Storage on the free tier). Tables have RLS on with no policies and the bucket is private, so only the function's secret key reaches the data.
+- **Styling: a typed design-token system** (`src/theme`) instead of NativeWind, to avoid Babel/Metro configuration risk on SDK 58.
+- **Charts: custom SVG** on `react-native-svg`. Line chart, bars, rings and heatmap are small components with touch-to-inspect and no heavy chart dependency.
+
+> The app was first called Momentum. Internal identifiers keep that name on purpose (Android package `uy.santiago.momentum`, the database file, the backup format and the Supabase function and tables), so updates install over old versions and old backups still restore.
 
 ## Project layout
 
 ```
-src/app/            screens (Expo Router). (tabs)/ = Inicio, Comidas, Entrenar, Progreso, Historial
-src/components/     design system (ui/), charts, calendars, feature components
+src/app/            screens (Expo Router). (tabs)/ = Inicio, Comidas, Entrenar, Progreso
+src/components/     design system (ui/), charts, calendars, Foki, feature components
 src/data/           SQLite repositories (meals, workouts, attendance, weight, stats, history…)
-src/domain/         pure calculations (nutrition totals, streaks, weight progress)
+src/domain/         pure logic (nutrition totals, streaks, weight progress, Open Food Facts, weekly summary)
 src/db/             schema + migrations, seeding, database client
-src/backup/         snapshot export/import, sync logic, background service, JSON/CSV files
-src/data/catalog.ts the meal plan (16 meals + guidance) extracted from plancomidas.netlify.app
-supabase/           backup API (Edge Function `momentum`) and its SQL migration
-test/               Jest tests (run against a real SQLite engine)
+src/backup/         snapshot export/import, sync, background service, JSON/CSV files
+src/auth/ src/billing/ src/ads/   accounts, Pro (RevenueCat), rewarded videos (AdMob)
+src/notifications/  local reminders and the rest timer
+supabase/           API (Edge Function `momentum`) and SQL migrations
+test/               Jest tests, run against a real SQLite engine
+store-assets/       Play Store images, built from real screenshots of the app
+docs/               privacy policy, account deletion page, Play Store checklist, security review
 ```
 
 ## Development
 
-Requirements: Node 20+ (tested with Node 24), npm.
+Requirements: Node 20+ (tested with Node 24) and npm.
 
 ```bash
 npm install
-npm test            # 57 tests: totals, portions, snapshots, streaks, migrations, backup/restore, offline, API
+npm test            # 200+ tests
 npm run typecheck
-npx expo start      # dev server; needs a development build on the phone (see below), not Expo Go
-npm run web         # quick UI preview in a browser (uses SQLite's web build)
+npx expo lint
+npm run web         # quick UI preview in a browser (SQLite's web build)
+npx expo start      # dev server; needs a development build on the phone, not Expo Go
 ```
 
-The local database needs no setup. It is created on first launch, migrated with `PRAGMA user_version`, and seeded once with the meal catalog and your defaults: 57 kg start, 65 kg target, 2750 kcal, 115 g protein. Personal history starts empty.
+The local database needs no setup. It is created on first launch, migrated with `PRAGMA user_version` and seeded once with common starter meals and neutral defaults.
 
-To try native code on a phone during development: `npx eas-cli@latest build -p android --profile development`, install that APK, then run `npx expo start`.
+To run native code on a phone: `npx eas-cli@latest build -p android --profile development`, install that APK, then `npx expo start`.
 
-## 1–2. Backup server (Supabase)
-
-Already set up in the Supabase project `momentum` (`eqvyjnhkhyqzwurdtumh`, São Paulo). To recreate it elsewhere:
+## Backend (Supabase)
 
 1. Create a Supabase project and run `supabase/migrations/*.sql` (SQL Editor or `supabase db push`).
-2. Deploy the function with JWT verification off (the app sends its own token): `supabase functions deploy momentum --no-verify-jwt`.
-3. Set the invite code: generate one (`node -e "console.log(require('crypto').randomBytes(9).toString('base64url'))"`), keep it in `codigo-invitacion.txt` (git-ignored), and store only its hash:
-   `insert into momentum_config values ('invite_code_sha256', '<sha256 hex>') on conflict (key) do update set value = excluded.value;`
-   Changing the code later only affects new profiles.
-4. Put `https://<project>.supabase.co/functions/v1/momentum` in `app.json` → `expo.extra.backupApiUrl` and build again.
+2. Deploy the function: `supabase functions deploy momentum --no-verify-jwt` (it verifies the session itself).
+3. Add the secrets in Supabase → Edge Functions → Secrets: `GEMINI_API_KEY` (food photo and weekly summary), and `REVENUECAT_SECRET_KEY` to check Pro.
+4. Put the project URL and publishable key in `src/config.ts` and build again.
 
-AI (free tier): `GEMINI_API_KEY` in Supabase → Edge Functions → Secrets powers the food photo and the Pro weekly summary (`gemini.ts`, with model fallback). On the free tier Google may use the photos to improve its products; the privacy page says so.
+Endpoints live under `/api/`: `GET status`, `GET|POST backups`, `GET backups/latest|<id>`, `POST food/analyze`, `GET food/barcode/<code>`, `GET|POST food/library`, `DELETE food/library/<id>`, `POST ai/weekly-summary`, `POST profiles/link`, `DELETE profiles/me` and `GET ads/reward` (AdMob callback). Everything except the AdMob callback needs `Authorization: Bearer <Supabase session>`.
 
-Optional: `ANTHROPIC_API_KEY` (Claude, `ai.ts`) is used only when there is no Gemini key. `REVENUECAT_SECRET_KEY` lets the server check Pro. Barcodes go through the server to Open Food Facts. Everything Play Store related (keys to create, forms, checklist) is in `docs/play-store.md`.
+Free-tier notes: Supabase Free gives 500 MB of database, 1 GB of storage and 500,000 function calls a month, and pauses a project after a week without activity. Snapshots are gzip-compressed and the API rejects any over 4.4 MB, which is years of data away.
 
-The public food library (`momentum_public_foods`) never exposes who shared a food; deleting a profile removes what it shared.
-
-Limits live in `momentum_config`: `max_profiles` (default 50) and `min_upload_interval_seconds` (default 60, a guard against a client stuck in a loop).
-
-Endpoints under `/api/`: `GET status` (profile, plan and today's allowances), `GET|POST backups`, `GET backups/latest|<id>`, `POST food/analyze`, `GET food/barcode/<code>`, `GET|POST food/library`, `DELETE food/library/<id>`, `POST ai/weekly-summary` (Pro), `POST profiles/link` (move an older install into the account), `DELETE profiles/me` (delete account, profile and backups), `GET ads/reward` (AdMob server-side verification). Legacy: `POST profiles` (invite code) and `POST profiles/me/token`. Everything except the legacy sign-up and the AdMob callback needs `Authorization: Bearer <Supabase session or legacy token>`.
-
-## 3. Connect the app
-
-Sign in on the welcome step "Guardá tu progreso" or later in **⚙ (Inicio) → Entrar o crear cuenta**. From then on the app backs up by itself:
-- a few seconds after connectivity returns,
-- when the app comes to the foreground,
-- about 20 s after a change,
-- every 15 minutes while it's open,
-- and on demand with **Respaldar ahora**.
-
-Failed uploads retry with backoff (30 s, 2 min, 10 min, 30 min) and never touch local data.
-
-The same screen also has:
-- **Exportar / Importar respaldo (JSON):** a full local backup that doesn't depend on the server. It's validated with a checksum before anything is replaced.
-- **Exportar CSV:** meals, weight, workout sets or attendance, for the last 30 or 90 days or everything.
-- **Copias automáticas:** safety copies taken before any restore or reset (the last 5 are kept).
-- **Borrar todos mis datos:** asks for confirmation twice and saves a safety copy first.
-
-## 4. Build the APK
+## Build and release
 
 ```bash
-npx eas-cli@latest login                 # free Expo account
-npx eas-cli@latest build -p android --profile preview
+npx eas-cli@latest build -p android --profile preview      # APK to install directly
+npx eas-cli@latest build -p android --profile production   # AAB for Google Play (bumps versionCode)
+npx eas-cli@latest submit -p android --profile production  # to the closed testing track
 ```
 
-The `preview` (and `production`) profiles in `eas.json` produce an **APK**, not an AAB. The first build asks to create a project and an Android keystore: let EAS generate and keep it. When the build finishes, open the link on your phone, download the APK and install it. You'll need to allow *Install unknown apps* for your browser or file manager. Expo Go is not needed.
+The Play Store checklist (keys, forms, closed testing, store listing) is in [docs/play-store.md](docs/play-store.md).
 
-If you have a local Android SDK + JDK 17 and want to skip the cloud queue, `npm run build:apk:local` builds on your machine.
+**Updating without losing data**
+- Install new builds over the existing app. Uninstalling deletes the local database.
+- Builds must be signed with the same key. EAS keeps the keystore.
+- Schema changes are new entries in `src/db/schema.ts → MIGRATIONS`. A released migration is never edited. Each one runs once inside a transaction, and the app refuses to open a database written by a newer version.
 
-## Updating without losing data
-
-- Always install new APKs **over** the existing app. Don't uninstall first: uninstalling deletes the app's SQLite database.
-- Updates must be signed with the same key. EAS reuses the stored keystore automatically. Back it up once with `npx eas-cli@latest credentials -p android` → *Download keystore*.
-- Bump `expo.android.versionCode` (and `version`) in `app.json` before each build.
-- Schema changes are new entries in `src/db/schema.ts → MIGRATIONS`. Never edit a released migration. Each one runs once, inside a transaction. A failed migration leaves the previous version intact, and the app refuses to open a database written by a newer version.
-- Catalog changes: add meals to `src/data/catalog.ts` with `since: <new CATALOG_VERSION>` and bump `CATALOG_VERSION`. Meals you edited or deleted are never overwritten or re-added.
-
-## Restoring after reinstall or on a new phone
-
-1. Install the app and open **Ajustes → Datos y respaldo → Crear mi perfil o conectar → Ya tengo un perfil** with your *código de recuperación* (also on the welcome screen: *Ya tengo un respaldo*).
-2. The app finds the backups in the cloud and offers **Restaurar el último respaldo** (or *Mantener los datos de este teléfono*). Older versions are available under **Restaurar desde la nube**.
-3. If the API isn't available, use **Importar respaldo (JSON)** with a file you exported.
-
-## Free-tier notes (check current limits on each provider's pricing page)
-
-- **Size:** each backup is a full snapshot, stored gzip-compressed. A year of heavy use is a few MB of JSON before compression, and each profile keeps about 10 copies.
-- **Supabase Free:** 500 MB database, 1 GB file storage, 5 GB egress and 500,000 Edge Function invocations per month; a project with no activity for a week is paused (unpause it from the dashboard). Check the current numbers on supabase.com/pricing.
-- **Request limit:** the API rejects snapshots over 4.4 MB with a clear message. That's many years of data away.
+**On a new phone:** sign in with the same account and the app offers to restore the latest cloud backup. Without an account, use **Ajustes → Datos y respaldo → Importar respaldo (JSON)** with a file you exported.
 
 ## Tests
 
-`npm test` runs Jest in Node against a real SQLite engine (`node:sqlite`) using the same SQL as the app:
+`npm test` runs Jest in Node against a real SQLite engine (`node:sqlite`) with the same SQL as the app. They cover:
+- nutrition totals, portions and goals;
+- weight progress and streaks;
+- workouts, attendance and cancelling a workout;
+- migrations and rollback;
+- backup and restore, including tampered and newer files;
+- the API: accounts, limits, rewarded-video signatures and account deletion;
+- Open Food Facts parsing, the weekly summary, reminders and onboarding.
 
-- `nutrition.test.ts`: daily totals, multiple meals per category, portions (0.5×–2×), manual corrections, historical snapshots after template edits, duplicating a day, missing days vs. zeros, goal versions, Montevideo day boundaries.
-- `weight.test.ts`: progress without fake data, rolling average, weekly/monthly change, milestones, one entry per day.
-- `attendance.test.ts`: streaks that respect training days, rest days, extra sessions, consistency, duplicate prevention, finishing/cancelling/deleting workouts, history surviving routine edits, progression.
-- `migrations.test.ts`: fresh schema, idempotency, rollback on failure, newer-database guard, foreign keys, seed-once without overwriting edits.
-- `backup.test.ts`: snapshot round-trip, tamper/foreign/newer/incomplete detection, atomic restore, offline behavior, failed uploads, retry without duplicates, reinstall restore, newer-local-data warning.
-- `server.test.ts`: invite-code signup, per-profile tokens (only hashes stored), private backups per profile, checksum validation, version pruning, and an end-to-end phone → API → new phone restore.
-- `optional.test.ts`, `days-activities.test.ts`, `reminders.test.ts`, `onboarding.test.ts`: optional trackers, routine exercises by weekday, free activities, reminder planning and onboarding suggestions.
+## Privacy and security
+
+- [Privacy policy](https://fokday.vercel.app/privacidad.html) · [Delete your account](https://fokday.vercel.app/eliminar-cuenta.html)
+- Security review and remaining risks: [docs/seguridad.md](docs/seguridad.md)
+- Contact: fokday.app@gmail.com
+
+## License
+
+© 2026 FokDay. All rights reserved. The code is public to read and learn from. It is not licensed for reuse or redistribution.
