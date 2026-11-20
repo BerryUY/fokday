@@ -170,4 +170,6 @@ The Play Store checklist (keys, forms, closed testing, store listing) is in [doc
 
 ## License
 
-© 2026 FokDay. All rights reserved. The code is public to read and learn from. It is not licensed for reuse or redistribution.
+The code is released under the [MIT License](LICENSE).
+
+The FokDay name, the logo and the Foki mascot are not covered by that license. Forks need their own name and artwork, and their own Supabase project, since this one only answers to the official app.
