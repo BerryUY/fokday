@@ -21,7 +21,10 @@ npx expo start --web --port 8082                # desde la raíz, en otra termin
 export MSYS_NO_PATHCONV=1                        # solo en Git Bash
 node scripts/app-session.mjs import             # importa el respaldo de ejemplo en un perfil de Chrome aparte (.app-profile)
 node scripts/app-session.mjs shoot home /       # y así cada pantalla: comidas /comidas, entrenar /entrenar, racha /racha, progreso /progreso, "progreso-cal /progreso 2600" (calendario), pro /pro
-node scripts/app-session.mjs session            # arranca la rutina del día y completa dos series (sesion.png)
+export APP_TIME=2026-11-20T16:45:00-03:00       # el mismo día que el respaldo de ejemplo, a las 16:45
+node scripts/shoot-extra.mjs tour               # cierra la tarjeta del tour en Inicio
+node scripts/shoot-extra.mjs open-session       # arranca Piernas desde Entrenar
+node scripts/shoot-extra.mjs workout            # hace dos series y deja el reloj en 21:20 (sesion.png)
 node scripts/build-play.mjs
 W=1080 H=1920 node scripts/render.mjs slides/play output/play-screenshots
 W=1024 H=500 node scripts/render.mjs slides/feature output/play-feature

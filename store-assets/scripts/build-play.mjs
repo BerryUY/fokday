@@ -72,18 +72,17 @@ const brand = (y, ink = false) => `<div class="brandrow" style="left:84px;top:${
   ${chevrons({ x: 540, y: 640, w: 900, rot: 8, opacity: 0.16 })}
   ${copy({ y: 110, lbl: 'Comidas', h: 'Calorías con <span class="lime">una foto.</span>', sub: 'La IA estima calorías y macros. Y si es un paquete, escaneás el código de barras.' })}
   ${p.html}
-  ${zoom(S('comidas'), 40, 640, 14, 140, 384, 114, 700)}
+  ${zoom(S('comidas'), 40, 640, 14, 147, 384, 115, 700)}
 </div>${end}`);
 }
 
 // 03 · Gym: the routine, set by set (light)
 {
-  const p = phone({ src: S('entrenar'), w: 820, x: 130, y: 760 });
+  const p = phone({ src: S('sesion'), w: 820, x: 130, y: 760 });
   slides.push(`${head(1080, 1920)}<div class="slide paper grain">
   ${chevrons({ x: 420, y: 520, w: 900, rot: 6, opacity: 1, glow: false, mono: '#E4E4DF' })}
-  ${copy({ y: 110, lbl: 'Gimnasio', lblColor: 'var(--lime-deep)', h: 'Anotá <span class="deep">cada serie.</span>', sub: 'Tu rutina del día, lo que levantaste la vez anterior y el descanso con timer.' })}
+  ${copy({ y: 110, lbl: 'Gimnasio', lblColor: 'var(--lime-deep)', h: 'Anotá <span class="deep">cada serie.</span>', sub: 'Una serie a la vez, con lo que levantaste la vez pasada a la vista.' })}
   ${p.html}
-  ${zoom(S('sesion'), 70, 1260, 22, 250, 372, 104, 940)}
 </div>${end}`);
 }
 
